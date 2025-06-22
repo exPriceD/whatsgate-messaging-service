@@ -1,0 +1,115 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Сервис для отправки сообщений через WhatsApp с использованием API WhatGate",
+        "title": "WhatsApp Service API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.swagger.io/support",
+            "email": "support@swagger.io"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/api/v1",
+    "paths": {
+        "/health": {
+            "get": {
+                "description": "Проверяет работоспособность сервиса",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/status": {
+            "get": {
+                "description": "Возвращает текущий статус и информацию о сервисе",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "status"
+                ],
+                "summary": "Service status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.StatusResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "http.HealthResponse": {
+            "description": "Ответ для health check endpoint",
+            "type": "object",
+            "properties": {
+                "status": {
+                    "description": "Статус сервиса",
+                    "type": "string",
+                    "example": "ok"
+                },
+                "time": {
+                    "description": "Время ответа",
+                    "type": "string",
+                    "example": "2023-01-01T12:00:00Z"
+                }
+            }
+        },
+        "http.StatusResponse": {
+            "description": "Ответ для status endpoint",
+            "type": "object",
+            "properties": {
+                "status": {
+                    "description": "Статус сервиса",
+                    "type": "string",
+                    "example": "running"
+                },
+                "timestamp": {
+                    "description": "Временная метка",
+                    "type": "string",
+                    "example": "2023-01-01T12:00:00Z"
+                },
+                "version": {
+                    "description": "Версия приложения",
+                    "type": "string",
+                    "example": "1.0.0"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Введите токен в формате: Bearer {token}",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

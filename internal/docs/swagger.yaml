@@ -1,0 +1,81 @@
+basePath: /api/v1
+definitions:
+  http.HealthResponse:
+    description: Ответ для health check endpoint
+    properties:
+      status:
+        description: Статус сервиса
+        example: ok
+        type: string
+      time:
+        description: Время ответа
+        example: "2023-01-01T12:00:00Z"
+        type: string
+    type: object
+  http.StatusResponse:
+    description: Ответ для status endpoint
+    properties:
+      status:
+        description: Статус сервиса
+        example: running
+        type: string
+      timestamp:
+        description: Временная метка
+        example: "2023-01-01T12:00:00Z"
+        type: string
+      version:
+        description: Версия приложения
+        example: 1.0.0
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: Сервис для отправки сообщений через WhatsApp с использованием API WhatGate
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: WhatsApp Service API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Проверяет работоспособность сервиса
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.HealthResponse'
+      summary: Health check
+      tags:
+      - health
+  /status:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает текущий статус и информацию о сервисе
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.StatusResponse'
+      summary: Service status
+      tags:
+      - status
+securityDefinitions:
+  BearerAuth:
+    description: 'Введите токен в формате: Bearer {token}'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
