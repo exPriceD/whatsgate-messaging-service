@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	"whatsapp-service/internal/errors"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // NewPostgresPool создает пул соединений к PostgreSQL через pgxpool.
 func NewPostgresPool(ctx context.Context, dbCfg Config) (*pgxpool.Pool, error) {
 	if err := dbCfg.Validate(); err != nil {
-		return nil, err
+		return nil, appErr.New("DB_CONFIG_INVALID", "invalid database config", err)
 	}
 
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
@@ -19,7 +21,7 @@ func NewPostgresPool(ctx context.Context, dbCfg Config) (*pgxpool.Pool, error) {
 
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, fmt.Errorf("parse pool config: %w", err)
+		return nil, appErr.New("DB_POOL_PARSE_ERROR", "failed to parse pool config", err)
 	}
 
 	poolCfg.MaxConns = int32(dbCfg.MaxOpenConns)
@@ -28,7 +30,7 @@ func NewPostgresPool(ctx context.Context, dbCfg Config) (*pgxpool.Pool, error) {
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
-		return nil, fmt.Errorf("create pool: %w", err)
+		return nil, appErr.New("DB_POOL_CREATE_ERROR", "failed to create pool", err)
 	}
 
 	return pool, nil

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"whatsapp-service/internal/errors"
+
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
 )
@@ -59,7 +61,7 @@ type LoggingConfig struct {
 func LoadConfig(path string) (*Config, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("open config: %w", err)
+		return nil, appErr.New("CONFIG_FILE_OPEN_ERROR", "failed to open config file", err)
 	}
 
 	defer func(f *os.File) {
@@ -69,13 +71,13 @@ func LoadConfig(path string) (*Config, error) {
 	var cfg Config
 	decoder := yaml.NewDecoder(f)
 	if err := decoder.Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("decode yaml: %w", err)
+		return nil, appErr.New("CONFIG_DECODE_ERROR", "failed to decode yaml config", err)
 	}
 
 	cfg.setDefaults()
 
 	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("config validation: %w", err)
+		return nil, appErr.New("CONFIG_VALIDATE_ERROR", "config validation failed", err)
 	}
 
 	return &cfg, nil
