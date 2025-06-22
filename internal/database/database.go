@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"whatsapp-service/internal/errors"
+	appErr "whatsapp-service/internal/errors"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

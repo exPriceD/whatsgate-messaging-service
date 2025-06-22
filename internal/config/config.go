@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"whatsapp-service/internal/errors"
+	appErr "whatsapp-service/internal/errors"
 
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
