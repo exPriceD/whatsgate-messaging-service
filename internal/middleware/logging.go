@@ -3,17 +3,20 @@ package middleware
 import (
 	"time"
 
+	"whatsapp-service/internal/logger"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
-// LoggerMiddleware логирует все HTTP-запросы через zap.
-func LoggerMiddleware(logger *zap.Logger) gin.HandlerFunc {
+// LoggingMiddleware логирует все HTTP-запросы через logger.Logger.
+func Logging(log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
 		latency := time.Since(start)
-		logger.Info("request",
+
+		log.Info("request",
 			zap.String("method", c.Request.Method),
 			zap.String("path", c.Request.URL.Path),
 			zap.Int("status", c.Writer.Status()),
