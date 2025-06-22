@@ -10,8 +10,27 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// NewPostgresPool создает пул соединений к PostgreSQL через pgxpool.
-func NewPostgresPool(ctx context.Context, dbCfg Config) (*pgxpool.Pool, error) {
+// DB — интерфейс для работы с базой данных.
+type DB interface {
+	Close()
+	Ping(ctx context.Context) error
+}
+
+// PoolDB — адаптер для pgxpool.Pool, реализующий интерфейс DB.
+type PoolDB struct {
+	pool *pgxpool.Pool
+}
+
+func (p *PoolDB) Close() {
+	p.pool.Close()
+}
+
+func (p *PoolDB) Ping(ctx context.Context) error {
+	return p.pool.Ping(ctx)
+}
+
+// NewPostgresPool создает PoolDB (адаптер).
+func NewPostgresPool(ctx context.Context, dbCfg Config) (DB, error) {
 	if err := dbCfg.Validate(); err != nil {
 		return nil, appErr.New("DB_CONFIG_INVALID", "invalid database config", err)
 	}
@@ -33,12 +52,12 @@ func NewPostgresPool(ctx context.Context, dbCfg Config) (*pgxpool.Pool, error) {
 		return nil, appErr.New("DB_POOL_CREATE_ERROR", "failed to create pool", err)
 	}
 
-	return pool, nil
+	return &PoolDB{pool: pool}, nil
 }
 
 // HealthCheck проверяет доступность базы данных.
-func HealthCheck(ctx context.Context, pool *pgxpool.Pool) error {
+func HealthCheck(ctx context.Context, db DB) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	return pool.Ping(ctx)
+	return db.Ping(ctx)
 }

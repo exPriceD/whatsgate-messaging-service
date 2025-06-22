@@ -10,6 +10,39 @@ import (
 
 var l *zap.Logger
 
+// Logger — интерфейс для логгирования.
+type Logger interface {
+	Info(msg string, fields ...zap.Field)
+	Error(msg string, fields ...zap.Field)
+	Sync() error
+}
+
+// ZapLogger — адаптер для zap.Logger, реализующий интерфейс Logger.
+type ZapLogger struct {
+	l *zap.Logger
+}
+
+func (z *ZapLogger) Info(msg string, fields ...zap.Field) {
+	z.l.Info(msg, fields...)
+}
+
+func (z *ZapLogger) Error(msg string, fields ...zap.Field) {
+	z.l.Error(msg, fields...)
+}
+
+func (z *ZapLogger) Sync() error {
+	return z.l.Sync()
+}
+
+// NewZapLogger создает ZapLogger по настройкам.
+func NewZapLogger(cfg Config) (Logger, error) {
+	zl, err := Init(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &ZapLogger{l: zl}, nil
+}
+
 // Init инициализирует zap.Logger по настройкам.
 func Init(cfg Config) (*zap.Logger, error) {
 	if err := cfg.Validate(); err != nil {
