@@ -80,7 +80,7 @@ func Init(cfg Config) (*zap.Logger, error) {
 		level,
 	)
 
-	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel), zap.AddCallerSkip(1))
 	l = logger
 	return logger, nil
 }
