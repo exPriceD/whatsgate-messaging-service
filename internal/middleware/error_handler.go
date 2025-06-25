@@ -15,7 +15,6 @@ func ErrorHandler(log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 
-		// Проверяем, есть ли ошибки в контексте
 		if len(c.Errors) > 0 {
 			err := c.Errors.Last().Err
 
@@ -26,7 +25,6 @@ func ErrorHandler(log logger.Logger) gin.HandlerFunc {
 				zap.Error(err),
 			)
 
-			// Определяем тип ошибки и возвращаем соответствующий ответ
 			var statusCode int
 			var errorResponse types.ErrorResponse
 
@@ -63,7 +61,6 @@ func ErrorHandler(log logger.Logger) gin.HandlerFunc {
 					}
 				}
 			default:
-				// Для неизвестных ошибок возвращаем 500
 				statusCode = http.StatusInternalServerError
 				errorResponse = types.ErrorResponse{
 					Error:   "Internal server error",
