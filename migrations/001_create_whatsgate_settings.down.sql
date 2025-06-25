@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS whatsgate_settings; 

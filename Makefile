@@ -1,4 +1,4 @@
-.PHONY: swagger build run test clean deps all init-db build-init-db
+.PHONY: swagger build run test clean deps all init-db build-init-db create-db
 
 # Определение ОС
 ifeq ($(OS),Windows_NT)
@@ -19,6 +19,23 @@ else
     INIT_DB_BINARY := init-db
 endif
 
+# Миграции через golang-migrate
+MIGRATIONS_DIR := ./migrations
+MIGRATE_DB_URL ?= postgres://postgres:postgres@localhost:5433/whatsapp_service?sslmode=disable
+MIGRATE := migrate -path $(MIGRATIONS_DIR) -database $(MIGRATE_DB_URL)
+
+migrate-up:
+	$(MIGRATE) up
+
+migrate-down:
+	$(MIGRATE) down 1
+
+migrate-force:
+	$(MIGRATE) force
+
+migrate-version:
+	$(MIGRATE) version
+
 # Генерация Swagger документации
 swagger:
 	swag init -g cmd/main.go -o internal/docs
@@ -31,12 +48,8 @@ $(BIN_DIR):
 build: $(BIN_DIR)
 	go build -o $(BIN_DIR)/$(BINARY) cmd/main.go
 
-# Сборка утилиты инициализации БД
-build-init-db: $(BIN_DIR)
-	go build -o $(BIN_DIR)/$(INIT_DB_BINARY) cmd/init_db/main.go
-
 # Инициализация базы данных
-init-db: build-init-db
+init-db:
 	$(BIN_DIR)/$(INIT_DB_BINARY)
 
 # Запуск приложения
@@ -89,6 +102,30 @@ swagger-safe: check-swag swagger
 # Полная сборка с проверкой Swagger
 all-safe: check-swag all
 
+# Автоматизация создания миграции: make new-migration name=...
+new-migration:
+ifeq ($(OS),Windows_NT)
+	@if not defined name (echo Укажите имя миграции: make new-migration name=...) else migrate create -ext sql -dir ./migrations -seq $(name)
+else
+	@if [ -z "$(name)" ]; then \
+		echo "Укажите имя миграции: make new-migration name=..."; \
+	else \
+		migrate create -ext sql -dir ./migrations -seq $(name); \
+	fi
+endif
+
+# Создание базы данных: make create-db db=whatsapp_service
+create-db:
+ifeq ($(OS),Windows_NT)
+	@if not defined db (echo Укажите имя базы: make create-db db=whatsapp_service) else psql -U postgres -h localhost -p 5433 -c "CREATE DATABASE $(db);"
+else
+	@if [ -z "$(db)" ]; then \
+		echo "Укажите имя базы: make create-db db=whatsapp_service"; \
+	else \
+		psql -U postgres -h localhost -p 5433 -c "CREATE DATABASE $(db);"; \
+	fi
+endif
+
 # Помощь
 help:
 	@echo "Доступные команды:"
@@ -102,6 +139,10 @@ help:
 	@echo "  make all          - Полная сборка с Swagger"
 	@echo "  make all-safe     - Полная сборка с проверкой Swagger"
 	@echo "  make install-swag - Установка swag"
-	@echo "  make init-db      - Инициализация базы данных"
-	@echo "  make build-init-db - Сборка утилиты инициализации БД"
+	@echo "  make migrate-up   - Применить все миграции к БД (golang-migrate)"
+	@echo "  make migrate-down - Откатить одну миграцию (golang-migrate)"
+	@echo "  make migrate-force - Принудительно установить версию миграции (golang-migrate)"
+	@echo "  make migrate-version - Показать текущую версию миграции (golang-migrate)"
+	@echo "  make new-migration name=... - Создать новую миграцию с заданным именем (golang-migrate)"
+	@echo "  make create-db db=whatsapp_service - Создать новую базу данных (PostgreSQL)"
 	@echo "  make help         - Показать эту справку" 
