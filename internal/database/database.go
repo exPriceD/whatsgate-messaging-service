@@ -29,6 +29,11 @@ func (p *PoolDB) Ping(ctx context.Context) error {
 	return p.pool.Ping(ctx)
 }
 
+// GetPool возвращает прямой доступ к pgxpool.Pool
+func (p *PoolDB) GetPool() *pgxpool.Pool {
+	return p.pool
+}
+
 // NewPostgresPool создает PoolDB (адаптер).
 func NewPostgresPool(ctx context.Context, dbCfg Config) (DB, error) {
 	if err := dbCfg.Validate(); err != nil {
