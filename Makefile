@@ -1,4 +1,4 @@
-.PHONY: swagger build run test clean deps all
+.PHONY: swagger build run test clean deps all init-db build-init-db
 
 # Определение ОС
 ifeq ($(OS),Windows_NT)
@@ -8,6 +8,7 @@ ifeq ($(OS),Windows_NT)
     MKDIR := mkdir
     BIN_DIR := bin
     BINARY := whatsapp-service.exe
+    INIT_DB_BINARY := init-db.exe
 else
     # Unix-like системы (Linux, macOS)
     RM := rm -rf
@@ -15,6 +16,7 @@ else
     MKDIR := mkdir -p
     BIN_DIR := bin
     BINARY := whatsapp-service
+    INIT_DB_BINARY := init-db
 endif
 
 # Генерация Swagger документации
@@ -28,6 +30,14 @@ $(BIN_DIR):
 # Сборка приложения
 build: $(BIN_DIR)
 	go build -o $(BIN_DIR)/$(BINARY) cmd/main.go
+
+# Сборка утилиты инициализации БД
+build-init-db: $(BIN_DIR)
+	go build -o $(BIN_DIR)/$(INIT_DB_BINARY) cmd/init_db/main.go
+
+# Инициализация базы данных
+init-db: build-init-db
+	$(BIN_DIR)/$(INIT_DB_BINARY)
 
 # Запуск приложения
 run:
@@ -92,4 +102,6 @@ help:
 	@echo "  make all          - Полная сборка с Swagger"
 	@echo "  make all-safe     - Полная сборка с проверкой Swagger"
 	@echo "  make install-swag - Установка swag"
+	@echo "  make init-db      - Инициализация базы данных"
+	@echo "  make build-init-db - Сборка утилиты инициализации БД"
 	@echo "  make help         - Показать эту справку" 
