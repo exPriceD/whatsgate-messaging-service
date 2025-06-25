@@ -35,7 +35,235 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.HealthResponse"
+                            "$ref": "#/definitions/types.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/messages/bulk-send": {
+            "post": {
+                "description": "Отправляет сообщения на несколько номеров телефонов. Поддерживает отправку медиа и текста в одном сообщении.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Send bulk messages",
+                "parameters": [
+                    {
+                        "description": "Bulk send request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.BulkSendRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.BulkSendResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/types.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/types.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/messages/send": {
+            "post": {
+                "description": "Отправляет текстовое сообщение через WhatsApp",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Send text message",
+                "parameters": [
+                    {
+                        "description": "Message request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.SendMessageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.SendMessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/types.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/types.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/messages/send-media": {
+            "post": {
+                "description": "Отправляет сообщение с медиа-файлом через WhatsApp",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Send media message",
+                "parameters": [
+                    {
+                        "description": "Media message request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.SendMediaMessageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.SendMessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/types.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/types.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings": {
+            "get": {
+                "description": "Возвращает текущие настройки WhatGate API",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Get WhatGate settings",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.WhatGateSettings"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Обновляет настройки WhatGate API",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Update WhatGate settings",
+                "parameters": [
+                    {
+                        "description": "WhatGate settings",
+                        "name": "settings",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.WhatGateSettings"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.WhatGateSettings"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/types.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/reset": {
+            "delete": {
+                "description": "Сбрасывает настройки WhatGate API (удаляет сохраненные данные)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Reset WhatGate settings",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.SuccessResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/types.ErrorResponse"
                         }
                     }
                 }
@@ -58,7 +286,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http.StatusResponse"
+                            "$ref": "#/definitions/types.StatusResponse"
                         }
                     }
                 }
@@ -66,40 +294,280 @@
         }
     },
     "definitions": {
-        "http.HealthResponse": {
-            "description": "Ответ для health check endpoint",
+        "types.BulkSendMedia": {
+            "type": "object",
+            "required": [
+                "file_data",
+                "filename",
+                "message_type",
+                "mime_type"
+            ],
+            "properties": {
+                "file_data": {
+                    "type": "string",
+                    "example": "base64_encoded_data"
+                },
+                "filename": {
+                    "type": "string",
+                    "example": "image.png"
+                },
+                "message_type": {
+                    "type": "string",
+                    "example": "image"
+                },
+                "mime_type": {
+                    "type": "string",
+                    "example": "image/png"
+                }
+            }
+        },
+        "types.BulkSendRequest": {
+            "type": "object",
+            "required": [
+                "message",
+                "phone_numbers"
+            ],
+            "properties": {
+                "async": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "media": {
+                    "description": "Медиа файл (опционально)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.BulkSendMedia"
+                        }
+                    ]
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Массовое сообщение"
+                },
+                "phone_numbers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "79991234567",
+                        "79998765432"
+                    ]
+                }
+            }
+        },
+        "types.BulkSendResponse": {
+            "type": "object",
+            "properties": {
+                "failed_count": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.BulkSendResult"
+                    }
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "success_count": {
+                    "type": "integer",
+                    "example": 8
+                },
+                "total_count": {
+                    "type": "integer",
+                    "example": 10
+                }
+            }
+        },
+        "types.BulkSendResult": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "Invalid phone number"
+                },
+                "message_id": {
+                    "type": "string",
+                    "example": "message_id_123"
+                },
+                "phone_number": {
+                    "type": "string",
+                    "example": "79991234567"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "sent"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "types.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 400
+                },
+                "error": {
+                    "type": "string",
+                    "example": "Something went wrong"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Detailed error message"
+                }
+            }
+        },
+        "types.HealthResponse": {
             "type": "object",
             "properties": {
                 "status": {
-                    "description": "Статус сервиса",
                     "type": "string",
                     "example": "ok"
                 },
                 "time": {
-                    "description": "Время ответа",
                     "type": "string",
                     "example": "2023-01-01T12:00:00Z"
                 }
             }
         },
-        "http.StatusResponse": {
-            "description": "Ответ для status endpoint",
+        "types.SendMediaMessageRequest": {
+            "type": "object",
+            "required": [
+                "file_data",
+                "filename",
+                "message_type",
+                "mime_type",
+                "phone_number"
+            ],
+            "properties": {
+                "async": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "file_data": {
+                    "type": "string",
+                    "example": "base64_encoded_data"
+                },
+                "filename": {
+                    "type": "string",
+                    "example": "image.png"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Сообщение с медиа"
+                },
+                "message_type": {
+                    "type": "string",
+                    "example": "image"
+                },
+                "mime_type": {
+                    "type": "string",
+                    "example": "image/png"
+                },
+                "phone_number": {
+                    "type": "string",
+                    "example": "79991234567"
+                }
+            }
+        },
+        "types.SendMessageRequest": {
+            "type": "object",
+            "required": [
+                "message",
+                "phone_number"
+            ],
+            "properties": {
+                "async": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Привет! Это тестовое сообщение"
+                },
+                "phone_number": {
+                    "type": "string",
+                    "example": "79991234567"
+                }
+            }
+        },
+        "types.SendMessageResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "message_id_123"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Message sent successfully"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "sent"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "types.StatusResponse": {
             "type": "object",
             "properties": {
                 "status": {
-                    "description": "Статус сервиса",
                     "type": "string",
                     "example": "running"
                 },
                 "timestamp": {
-                    "description": "Временная метка",
                     "type": "string",
                     "example": "2023-01-01T12:00:00Z"
                 },
                 "version": {
-                    "description": "Версия приложения",
                     "type": "string",
                     "example": "1.0.0"
+                }
+            }
+        },
+        "types.SuccessResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Operation completed successfully"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "types.WhatGateSettings": {
+            "type": "object",
+            "required": [
+                "api_key",
+                "whatsapp_id"
+            ],
+            "properties": {
+                "api_key": {
+                    "type": "string",
+                    "example": "your_api_key"
+                },
+                "base_url": {
+                    "type": "string",
+                    "example": "https://whatsgate.ru/api/v1"
+                },
+                "whatsapp_id": {
+                    "type": "string",
+                    "example": "your_whatsapp_id"
                 }
             }
         }

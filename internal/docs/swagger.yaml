@@ -1,32 +1,201 @@
 basePath: /api/v1
 definitions:
-  http.HealthResponse:
-    description: Ответ для health check endpoint
+  types.BulkSendMedia:
+    properties:
+      file_data:
+        example: base64_encoded_data
+        type: string
+      filename:
+        example: image.png
+        type: string
+      message_type:
+        example: image
+        type: string
+      mime_type:
+        example: image/png
+        type: string
+    required:
+    - file_data
+    - filename
+    - message_type
+    - mime_type
+    type: object
+  types.BulkSendRequest:
+    properties:
+      async:
+        example: true
+        type: boolean
+      media:
+        allOf:
+        - $ref: '#/definitions/types.BulkSendMedia'
+        description: Медиа файл (опционально)
+      message:
+        example: Массовое сообщение
+        type: string
+      phone_numbers:
+        example:
+        - "79991234567"
+        - "79998765432"
+        items:
+          type: string
+        type: array
+    required:
+    - message
+    - phone_numbers
+    type: object
+  types.BulkSendResponse:
+    properties:
+      failed_count:
+        example: 2
+        type: integer
+      results:
+        items:
+          $ref: '#/definitions/types.BulkSendResult'
+        type: array
+      success:
+        example: true
+        type: boolean
+      success_count:
+        example: 8
+        type: integer
+      total_count:
+        example: 10
+        type: integer
+    type: object
+  types.BulkSendResult:
+    properties:
+      error:
+        example: Invalid phone number
+        type: string
+      message_id:
+        example: message_id_123
+        type: string
+      phone_number:
+        example: "79991234567"
+        type: string
+      status:
+        example: sent
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
+  types.ErrorResponse:
+    properties:
+      code:
+        example: 400
+        type: integer
+      error:
+        example: Something went wrong
+        type: string
+      message:
+        example: Detailed error message
+        type: string
+    type: object
+  types.HealthResponse:
     properties:
       status:
-        description: Статус сервиса
         example: ok
         type: string
       time:
-        description: Время ответа
         example: "2023-01-01T12:00:00Z"
         type: string
     type: object
-  http.StatusResponse:
-    description: Ответ для status endpoint
+  types.SendMediaMessageRequest:
+    properties:
+      async:
+        example: true
+        type: boolean
+      file_data:
+        example: base64_encoded_data
+        type: string
+      filename:
+        example: image.png
+        type: string
+      message:
+        example: Сообщение с медиа
+        type: string
+      message_type:
+        example: image
+        type: string
+      mime_type:
+        example: image/png
+        type: string
+      phone_number:
+        example: "79991234567"
+        type: string
+    required:
+    - file_data
+    - filename
+    - message_type
+    - mime_type
+    - phone_number
+    type: object
+  types.SendMessageRequest:
+    properties:
+      async:
+        example: true
+        type: boolean
+      message:
+        example: Привет! Это тестовое сообщение
+        type: string
+      phone_number:
+        example: "79991234567"
+        type: string
+    required:
+    - message
+    - phone_number
+    type: object
+  types.SendMessageResponse:
+    properties:
+      id:
+        example: message_id_123
+        type: string
+      message:
+        example: Message sent successfully
+        type: string
+      status:
+        example: sent
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
+  types.StatusResponse:
     properties:
       status:
-        description: Статус сервиса
         example: running
         type: string
       timestamp:
-        description: Временная метка
         example: "2023-01-01T12:00:00Z"
         type: string
       version:
-        description: Версия приложения
         example: 1.0.0
         type: string
+    type: object
+  types.SuccessResponse:
+    properties:
+      message:
+        example: Operation completed successfully
+        type: string
+      success:
+        example: true
+        type: boolean
+    type: object
+  types.WhatGateSettings:
+    properties:
+      api_key:
+        example: your_api_key
+        type: string
+      base_url:
+        example: https://whatsgate.ru/api/v1
+        type: string
+      whatsapp_id:
+        example: your_whatsapp_id
+        type: string
+    required:
+    - api_key
+    - whatsapp_id
     type: object
 host: localhost:8080
 info:
@@ -53,10 +222,160 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.HealthResponse'
+            $ref: '#/definitions/types.HealthResponse'
       summary: Health check
       tags:
       - health
+  /messages/bulk-send:
+    post:
+      consumes:
+      - application/json
+      description: Отправляет сообщения на несколько номеров телефонов. Поддерживает
+        отправку медиа и текста в одном сообщении.
+      parameters:
+      - description: Bulk send request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/types.BulkSendRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.BulkSendResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+      summary: Send bulk messages
+      tags:
+      - messages
+  /messages/send:
+    post:
+      consumes:
+      - application/json
+      description: Отправляет текстовое сообщение через WhatsApp
+      parameters:
+      - description: Message request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/types.SendMessageRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.SendMessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+      summary: Send text message
+      tags:
+      - messages
+  /messages/send-media:
+    post:
+      consumes:
+      - application/json
+      description: Отправляет сообщение с медиа-файлом через WhatsApp
+      parameters:
+      - description: Media message request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/types.SendMediaMessageRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.SendMessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+      summary: Send media message
+      tags:
+      - messages
+  /settings:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает текущие настройки WhatGate API
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.WhatGateSettings'
+      summary: Get WhatGate settings
+      tags:
+      - settings
+    put:
+      consumes:
+      - application/json
+      description: Обновляет настройки WhatGate API
+      parameters:
+      - description: WhatGate settings
+        in: body
+        name: settings
+        required: true
+        schema:
+          $ref: '#/definitions/types.WhatGateSettings'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.WhatGateSettings'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+      summary: Update WhatGate settings
+      tags:
+      - settings
+  /settings/reset:
+    delete:
+      consumes:
+      - application/json
+      description: Сбрасывает настройки WhatGate API (удаляет сохраненные данные)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.SuccessResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/types.ErrorResponse'
+      summary: Reset WhatGate settings
+      tags:
+      - settings
   /status:
     get:
       consumes:
@@ -68,7 +387,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/http.StatusResponse'
+            $ref: '#/definitions/types.StatusResponse'
       summary: Service status
       tags:
       - status
