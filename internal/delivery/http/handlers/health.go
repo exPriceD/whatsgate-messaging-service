@@ -1,41 +1,43 @@
-package http
+package handlers
 
 import (
 	"net/http"
 	"time"
 
+	"whatsapp-service/internal/delivery/http/types"
+
 	"github.com/gin-gonic/gin"
 )
 
-// healthHandler обрабатывает запросы health check.
+// HealthHandler обрабатывает запросы health check.
 // @Summary Health check
 // @Description Проверяет работоспособность сервиса
 // @Tags health
 // @Accept json
 // @Produce json
-// @Success 200 {object} HealthResponse
+// @Success 200 {object} types.HealthResponse
 // @Router /health [get]
-func (s *Server) healthHandler(c *gin.Context) {
-	response := HealthResponse{
-		Status: StatusOK,
+func (s *Server) HealthHandler(c *gin.Context) {
+	response := types.HealthResponse{
+		Status: "ok",
 		Time:   time.Now().UTC(),
 	}
 	c.JSON(http.StatusOK, response)
 }
 
-// statusHandler возвращает статус сервиса.
+// StatusHandler возвращает статус сервиса.
 // @Summary Service status
 // @Description Возвращает текущий статус и информацию о сервисе
 // @Tags status
 // @Accept json
 // @Produce json
-// @Success 200 {object} StatusResponse
+// @Success 200 {object} types.StatusResponse
 // @Router /status [get]
-func (s *Server) statusHandler(c *gin.Context) {
-	response := StatusResponse{
-		Status:    StatusRunning,
+func (s *Server) StatusHandler(c *gin.Context) {
+	response := types.StatusResponse{
+		Status:    "running",
 		Timestamp: time.Now().UTC(),
-		Version:   AppVersion,
+		Version:   "1.0.0",
 	}
 	c.JSON(http.StatusOK, response)
 }
