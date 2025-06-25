@@ -14,6 +14,7 @@ var l *zap.Logger
 type Logger interface {
 	Info(msg string, fields ...zap.Field)
 	Error(msg string, fields ...zap.Field)
+	Debug(msg string, fields ...zap.Field)
 	Sync() error
 }
 
@@ -28,6 +29,10 @@ func (z *ZapLogger) Info(msg string, fields ...zap.Field) {
 
 func (z *ZapLogger) Error(msg string, fields ...zap.Field) {
 	z.l.Error(msg, fields...)
+}
+
+func (z *ZapLogger) Debug(msg string, fields ...zap.Field) {
+	z.l.Debug(msg, fields...)
 }
 
 func (z *ZapLogger) Sync() error {
