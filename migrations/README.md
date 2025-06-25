@@ -120,7 +120,3 @@ migrate -path ./migrations -database "<строка_подключения>" dow
 ## Полезные ссылки
 - [golang-migrate/migrate (GitHub)](https://github.com/golang-migrate/migrate)
 - [Документация по SQL для PostgreSQL](https://www.postgresql.org/docs/current/sql.html)
-
----
-
-Если возникли вопросы — смотри этот файл, Makefile или обращайся к тимлиду/разработчикам backend! 
