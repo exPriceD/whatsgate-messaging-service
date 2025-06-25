@@ -24,3 +24,12 @@ func (e *AppError) Unwrap() error {
 func New(code, message string, err error) *AppError {
 	return &AppError{Code: code, Message: message, Err: err}
 }
+
+// NewValidationError создает ошибку валидации
+func NewValidationError(message string) *AppError {
+	return &AppError{
+		Code:    "VALIDATION_ERROR",
+		Message: message,
+		Err:     nil,
+	}
+}
