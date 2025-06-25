@@ -1,4 +1,4 @@
-.PHONY: swagger build run test clean deps all init-db build-init-db create-db
+.PHONY: swagger build run test clean deps all init-db build-init-db create-db migrate-up migrate-down migrate-force migrate-version new-migration help
 
 # Определение ОС
 ifeq ($(OS),Windows_NT)
@@ -19,9 +19,16 @@ else
     INIT_DB_BINARY := init-db
 endif
 
+# Настройки подключения к БД (можно переопределять через env или make ... VAR=...)
+DB_HOST ?= localhost
+DB_PORT ?= 5433
+DB_USER ?= postgres
+DB_PASSWORD ?= postgres
+DB_NAME ?= whatsapp_service
+
 # Миграции через golang-migrate
 MIGRATIONS_DIR := ./migrations
-MIGRATE_DB_URL ?= postgres://postgres:postgres@localhost:5433/whatsapp_service?sslmode=disable
+MIGRATE_DB_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
 MIGRATE := migrate -path $(MIGRATIONS_DIR) -database $(MIGRATE_DB_URL)
 
 migrate-up:
@@ -114,15 +121,15 @@ else
 	fi
 endif
 
-# Создание базы данных: make create-db db=whatsapp_service
+# Создание базы данных: make create-db DB_NAME=whatsapp_service
 create-db:
 ifeq ($(OS),Windows_NT)
-	@if not defined db (echo Укажите имя базы: make create-db db=whatsapp_service) else psql -U postgres -h localhost -p 5433 -c "CREATE DATABASE $(db);"
+	@if not defined DB_NAME (echo Укажите имя базы: make create-db DB_NAME=whatsapp_service) else psql -U $(DB_USER) -h $(DB_HOST) -p $(DB_PORT) -c "CREATE DATABASE $(DB_NAME);"
 else
-	@if [ -z "$(db)" ]; then \
-		echo "Укажите имя базы: make create-db db=whatsapp_service"; \
+	@if [ -z "$(DB_NAME)" ]; then \
+		echo "Укажите имя базы: make create-db DB_NAME=whatsapp_service"; \
 	else \
-		psql -U postgres -h localhost -p 5433 -c "CREATE DATABASE $(db);"; \
+		psql -U $(DB_USER) -h $(DB_HOST) -p $(DB_PORT) -c "CREATE DATABASE $(DB_NAME);"; \
 	fi
 endif
 
@@ -135,14 +142,13 @@ help:
 	@echo "  make clean        - Очистка файлов"
 	@echo "  make deps         - Установка зависимостей"
 	@echo "  make swagger      - Генерация Swagger документации"
-	@echo "  make swagger-safe - Генерация Swagger с проверкой установки"
-	@echo "  make all          - Полная сборка с Swagger"
-	@echo "  make all-safe     - Полная сборка с проверкой Swagger"
-	@echo "  make install-swag - Установка swag"
 	@echo "  make migrate-up   - Применить все миграции к БД (golang-migrate)"
 	@echo "  make migrate-down - Откатить одну миграцию (golang-migrate)"
 	@echo "  make migrate-force - Принудительно установить версию миграции (golang-migrate)"
 	@echo "  make migrate-version - Показать текущую версию миграции (golang-migrate)"
 	@echo "  make new-migration name=... - Создать новую миграцию с заданным именем (golang-migrate)"
-	@echo "  make create-db db=whatsapp_service - Создать новую базу данных (PostgreSQL)"
-	@echo "  make help         - Показать эту справку" 
+	@echo "  make create-db DB_NAME=whatsapp_service - Создать новую базу данных (PostgreSQL)"
+	@echo "  make help         - Показать эту справку"
+	@echo ""
+	@echo "Параметры подключения к БД можно переопределять через переменные окружения или прямо в команде make:"
+	@echo "  make migrate-up DB_NAME=mydb DB_USER=admin DB_PASSWORD=secret DB_PORT=5432 DB_HOST=localhost" 
