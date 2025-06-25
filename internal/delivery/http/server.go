@@ -6,7 +6,9 @@ import (
 	"net/http"
 
 	"whatsapp-service/internal/config"
+	"whatsapp-service/internal/delivery/http/handlers"
 	"whatsapp-service/internal/logger"
+	whatsgate_domain "whatsapp-service/internal/whatsgate/domain"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -14,21 +16,27 @@ import (
 
 // Server представляет HTTP-сервер приложения.
 type Server struct {
-	engine *gin.Engine
-	server *http.Server
-	logger logger.Logger
-	config config.HTTPConfig
+	engine           *gin.Engine
+	server           *http.Server
+	logger           logger.Logger
+	config           config.HTTPConfig
+	handlers         *handlers.Server
+	whatsgateService *whatsgate_domain.SettingsService
 }
 
 // NewServer создает новый HTTP-сервер.
-func NewServer(cfg config.HTTPConfig, log logger.Logger) *Server {
+func NewServer(cfg config.HTTPConfig, log logger.Logger, whatsgateService *whatsgate_domain.SettingsService) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 
+	handlersServer := handlers.NewServer(log, whatsgateService)
+
 	server := &Server{
-		engine: engine,
-		logger: log,
-		config: cfg,
+		engine:           engine,
+		logger:           log,
+		config:           cfg,
+		handlers:         handlersServer,
+		whatsgateService: whatsgateService,
 		server: &http.Server{
 			Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 			Handler:      engine,
