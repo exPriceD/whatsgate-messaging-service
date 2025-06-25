@@ -12,6 +12,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"
 
+	"whatsapp-service/internal/logger"
 	whatsgateDomain "whatsapp-service/internal/whatsgate/domain"
 	whatsgateInfra "whatsapp-service/internal/whatsgate/infra"
 )
@@ -50,7 +51,8 @@ func loadTestEnv(t *testing.T) testEnv {
 // TestClient_SendTextMessage проверяет отправку текстового сообщения через WhatsGate API.
 func TestClient_SendTextMessage(t *testing.T) {
 	env := loadTestEnv(t)
-	client := NewClient(env.baseURL, env.whatsappID, env.apiKey)
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
+	client := NewClient(env.baseURL, env.whatsappID, env.apiKey, log)
 	resp, err := client.SendTextMessage(context.Background(), env.phone, "Integration test text", false)
 	if err != nil {
 		t.Fatalf("SendTextMessage failed: %v", err)

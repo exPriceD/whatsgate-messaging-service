@@ -5,20 +5,24 @@ import (
 	"time"
 
 	appErr "whatsapp-service/internal/errors"
+	"whatsapp-service/internal/logger"
 	"whatsapp-service/internal/whatsgate/interfaces"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
 )
 
 // SettingsRepository представляет репозиторий для работы с настройками WhatGate
 type SettingsRepository struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	Logger logger.Logger
 }
 
 // NewSettingsRepository создает новый репозиторий настроек
-func NewSettingsRepository(pool *pgxpool.Pool) *SettingsRepository {
+func NewSettingsRepository(pool *pgxpool.Pool, log logger.Logger) *SettingsRepository {
 	return &SettingsRepository{
-		pool: pool,
+		pool:   pool,
+		Logger: log,
 	}
 }
 
@@ -49,40 +53,41 @@ func (r *SettingsRepository) InitTable(ctx context.Context) error {
 
 // Load загружает настройки из базы данных
 func (r *SettingsRepository) Load(ctx context.Context) (*interfaces.Settings, error) {
+	r.Logger.Debug("Loading settings from database")
 	query := `
 		SELECT whatsapp_id, api_key, base_url
 		FROM whatsgate_settings
 		ORDER BY created_at DESC
 		LIMIT 1
 	`
-
 	var settings interfaces.Settings
 	err := r.pool.QueryRow(ctx, query).Scan(
 		&settings.WhatsappID,
 		&settings.APIKey,
 		&settings.BaseURL,
 	)
-
 	if err != nil {
 		if err.Error() == "no rows in result set" {
 			return &interfaces.Settings{
 				BaseURL: "https://whatsgate.ru/api/v1",
 			}, nil
 		}
+		r.Logger.Error("Failed to load settings from database", zap.Error(err))
 		return nil, appErr.New("DB_LOAD_ERROR", "failed to load settings from database", err)
 	}
-
+	r.Logger.Info("Settings loaded from database", zap.String("whatsapp_id", settings.WhatsappID))
 	return &settings, nil
 }
 
 // Save сохраняет настройки в базу данных
 func (r *SettingsRepository) Save(ctx context.Context, settings *interfaces.Settings) error {
+	r.Logger.Debug("Saving settings to database", zap.String("whatsapp_id", settings.WhatsappID))
 	var count int
 	err := r.pool.QueryRow(ctx, "SELECT COUNT(*) FROM whatsgate_settings").Scan(&count)
 	if err != nil {
+		r.Logger.Error("Failed to check existing settings", zap.Error(err))
 		return appErr.New("DB_QUERY_ERROR", "failed to check existing settings", err)
 	}
-
 	if count == 0 {
 		query := `
 			INSERT INTO whatsgate_settings (whatsapp_id, api_key, base_url)
@@ -97,21 +102,24 @@ func (r *SettingsRepository) Save(ctx context.Context, settings *interfaces.Sett
 		`
 		_, err = r.pool.Exec(ctx, query, settings.WhatsappID, settings.APIKey, settings.BaseURL)
 	}
-
 	if err != nil {
+		r.Logger.Error("Failed to save settings", zap.Error(err))
 		return appErr.New("DB_SAVE_ERROR", "failed to save settings", err)
 	}
-
+	r.Logger.Info("Settings saved to database", zap.String("whatsapp_id", settings.WhatsappID))
 	return nil
 }
 
 // Delete удаляет настройки из базы данных
 func (r *SettingsRepository) Delete(ctx context.Context) error {
+	r.Logger.Debug("Deleting settings from database")
 	query := `DELETE FROM whatsgate_settings`
 	_, err := r.pool.Exec(ctx, query)
 	if err != nil {
+		r.Logger.Error("Failed to delete settings from database", zap.Error(err))
 		return appErr.New("DB_DELETE_ERROR", "failed to delete settings from database", err)
 	}
+	r.Logger.Info("Settings deleted from database")
 	return nil
 }
 
@@ -135,18 +143,18 @@ func (r *SettingsRepository) IsConfigured(ctx context.Context) bool {
 
 // GetSettingsHistory возвращает историю изменений настроек
 func (r *SettingsRepository) GetSettingsHistory(ctx context.Context) ([]interfaces.Settings, error) {
+	r.Logger.Debug("Getting settings history from database")
 	query := `
 		SELECT whatsapp_id, api_key, base_url, created_at
 		FROM whatsgate_settings
 		ORDER BY created_at DESC
 	`
-
 	rows, err := r.pool.Query(ctx, query)
 	if err != nil {
+		r.Logger.Error("Failed to get settings history", zap.Error(err))
 		return nil, appErr.New("DB_HISTORY_ERROR", "failed to get settings history", err)
 	}
 	defer rows.Close()
-
 	var history []interfaces.Settings
 	for rows.Next() {
 		var settings interfaces.Settings
@@ -158,14 +166,15 @@ func (r *SettingsRepository) GetSettingsHistory(ctx context.Context) ([]interfac
 			&createdAt,
 		)
 		if err != nil {
+			r.Logger.Error("Failed to scan settings history", zap.Error(err))
 			return nil, appErr.New("DB_SCAN_ERROR", "failed to scan settings history", err)
 		}
 		history = append(history, settings)
 	}
-
 	if err = rows.Err(); err != nil {
+		r.Logger.Error("Error iterating settings history", zap.Error(err))
 		return nil, appErr.New("DB_ROWS_ERROR", "error iterating settings history", err)
 	}
-
+	r.Logger.Info("Settings history loaded from database", zap.Int("count", len(history)))
 	return history, nil
 }

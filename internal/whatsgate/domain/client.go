@@ -10,6 +10,9 @@ import (
 	"time"
 
 	appErr "whatsapp-service/internal/errors"
+	"whatsapp-service/internal/logger"
+
+	"go.uber.org/zap"
 )
 
 // Client представляет клиент для работы с WhatGate API
@@ -18,10 +21,11 @@ type Client struct {
 	whatsappID string
 	apiKey     string
 	httpClient *http.Client
+	Logger     logger.Logger
 }
 
 // NewClient создает новый клиент WhatGate
-func NewClient(baseURL, whatsappID, apiKey string) *Client {
+func NewClient(baseURL, whatsappID, apiKey string, log logger.Logger) *Client {
 	return &Client{
 		baseURL:    baseURL,
 		whatsappID: whatsappID,
@@ -29,6 +33,7 @@ func NewClient(baseURL, whatsappID, apiKey string) *Client {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		Logger: log,
 	}
 }
 
@@ -127,7 +132,9 @@ func (c *Client) sendMessage(ctx context.Context, request SendMessageRequest) (*
 		req.Header.Set("X-Api-Key", c.apiKey)
 	}
 
+	start := time.Now()
 	resp, err := c.httpClient.Do(req)
+	latency := time.Since(start)
 	if err != nil {
 		return nil, appErr.New("NETWORK_ERROR", "failed to send request", err)
 	}
@@ -138,8 +145,20 @@ func (c *Client) sendMessage(ctx context.Context, request SendMessageRequest) (*
 		return nil, appErr.New("READ_ERROR", "failed to read response", err)
 	}
 
+	c.Logger.Info("WhatGate API request",
+		zap.String("url", req.URL.String()),
+		zap.String("whatsapp_id", c.whatsappID),
+		zap.String("recipient", request.Recipient.Number),
+		zap.String("status", resp.Status),
+		zap.Duration("latency", latency),
+	)
+
 	switch resp.StatusCode {
 	case http.StatusOK:
+		c.Logger.Info("Message sent successfully to WhatGate API",
+			zap.String("recipient", request.Recipient.Number),
+			zap.String("status", resp.Status),
+		)
 		return &SendMessageResponse{
 			Status:  "success",
 			Message: "Message sent successfully",

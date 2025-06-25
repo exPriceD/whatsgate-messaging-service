@@ -4,7 +4,10 @@ import (
 	"context"
 	"sync"
 	appErr "whatsapp-service/internal/errors"
+	"whatsapp-service/internal/logger"
 	"whatsapp-service/internal/whatsgate/interfaces"
+
+	"go.uber.org/zap"
 )
 
 // SettingsService представляет сервис для управления настройками WhatGate
@@ -13,10 +16,11 @@ type SettingsService struct {
 	storage interfaces.SettingsStorage
 	cache   *interfaces.Settings
 	repo    interfaces.SettingsRepositoryInterface
+	Logger  logger.Logger
 }
 
 // NewSettingsService создает новый сервис настроек с БД хранилищем
-func NewSettingsService(repo interfaces.SettingsRepositoryInterface) *SettingsService {
+func NewSettingsService(repo interfaces.SettingsRepositoryInterface, log logger.Logger) *SettingsService {
 	storage := &DatabaseSettingsStorage{
 		repo: repo,
 		ctx:  context.Background(),
@@ -25,6 +29,7 @@ func NewSettingsService(repo interfaces.SettingsRepositoryInterface) *SettingsSe
 	return &SettingsService{
 		storage: storage,
 		repo:    repo,
+		Logger:  log,
 	}
 }
 
@@ -86,6 +91,7 @@ func (s *SettingsService) GetSettings() *interfaces.Settings {
 
 	settings, err := s.storage.Load()
 	if err != nil {
+		s.Logger.Error("Failed to load settings from storage", zap.Error(err))
 		return &interfaces.Settings{
 			BaseURL: "https://whatsgate.ru/api/v1",
 		}
@@ -114,6 +120,7 @@ func (s *SettingsService) UpdateSettings(settings *interfaces.Settings) error {
 	}
 
 	if err := s.storage.Save(settings); err != nil {
+		s.Logger.Error("Failed to save settings", zap.Error(err))
 		return appErr.New("STORAGE_ERROR", "failed to save settings", err)
 	}
 
@@ -149,6 +156,7 @@ func (s *SettingsService) ResetSettings() error {
 	defer s.mu.Unlock()
 
 	if err := s.storage.Delete(); err != nil {
+		s.Logger.Error("Failed to reset settings", zap.Error(err))
 		return appErr.New("STORAGE_ERROR", "failed to reset settings", err)
 	}
 
@@ -165,7 +173,7 @@ func (s *SettingsService) GetClient() (*Client, error) {
 		return nil, appErr.New("NOT_CONFIGURED", "WhatGate is not configured", nil)
 	}
 
-	return NewClient(settings.BaseURL, settings.WhatsappID, settings.APIKey), nil
+	return NewClient(settings.BaseURL, settings.WhatsappID, settings.APIKey, s.Logger), nil
 }
 
 // InitDatabase инициализирует таблицу настроек в базе данных

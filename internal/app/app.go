@@ -71,10 +71,10 @@ func InitDB(ctx context.Context, cfg config.DatabaseConfig) (database.DB, *pgxpo
 // InitWhatsGateService инициализирует сервис настроек WhatGate
 func InitWhatsGateService(pool *pgxpool.Pool, log logger.Logger) (*whatsgateDomain.SettingsService, error) {
 	// Создаем репозиторий
-	repo := whatsgateInfra.NewSettingsRepository(pool)
+	repo := whatsgateInfra.NewSettingsRepository(pool, log)
 
 	// Создаем сервис с БД хранилищем
-	service := whatsgateDomain.NewSettingsService(repo)
+	service := whatsgateDomain.NewSettingsService(repo, log)
 
 	// Инициализируем таблицу
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

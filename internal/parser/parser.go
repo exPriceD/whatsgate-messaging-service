@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"whatsapp-service/internal/logger"
 
 	"github.com/xuri/excelize/v2"
+	"go.uber.org/zap"
 )
 
 // ParseResult содержит валидные и невалидные номера телефонов из Excel
@@ -18,9 +20,10 @@ type ParseResult struct {
 }
 
 // ParsePhonesFromExcel парсит Excel-файл, ищет колонку columnName, возвращает валидные и невалидные номера
-func ParsePhonesFromExcel(filePath string, columnName string) (ParseResult, error) {
+func ParsePhonesFromExcel(filePath string, columnName string, log logger.Logger) (ParseResult, error) {
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
+		log.Error("Failed to open excel file", zap.Error(err))
 		return ParseResult{}, fmt.Errorf("failed to open excel file: %w", err)
 	}
 	defer f.Close()
@@ -28,9 +31,11 @@ func ParsePhonesFromExcel(filePath string, columnName string) (ParseResult, erro
 	sheetName := f.GetSheetName(0)
 	rows, err := f.GetRows(sheetName)
 	if err != nil {
+		log.Error("Failed to read rows from excel", zap.Error(err))
 		return ParseResult{}, fmt.Errorf("failed to read rows: %w", err)
 	}
 	if len(rows) == 0 {
+		log.Error("Excel file is empty")
 		return ParseResult{}, fmt.Errorf("excel file is empty")
 	}
 
@@ -42,12 +47,14 @@ func ParsePhonesFromExcel(filePath string, columnName string) (ParseResult, erro
 		}
 	}
 	if phoneCol == -1 {
+		log.Error("Column not found in excel", zap.String("column", columnName))
 		return ParseResult{}, fmt.Errorf("column '%s' not found", columnName)
 	}
 
 	var result ParseResult
 	for rowIdx, row := range rows[1:] {
 		if phoneCol >= len(row) {
+			log.Error("Row does not have enough columns", zap.Int("row", rowIdx+2))
 			continue
 		}
 		raw := row[phoneCol]
@@ -55,10 +62,11 @@ func ParsePhonesFromExcel(filePath string, columnName string) (ParseResult, erro
 		if isValidPhone(normalized) {
 			result.ValidPhones = append(result.ValidPhones, normalized)
 		} else {
+			log.Info("Invalid phone found", zap.String("raw", raw), zap.Int("row", rowIdx+2))
 			result.InvalidPhones = append(result.InvalidPhones, raw)
 		}
-		_ = rowIdx // можно использовать для логирования номера строки
 	}
+	log.Info("Excel parsed", zap.Int("valid", len(result.ValidPhones)), zap.Int("invalid", len(result.InvalidPhones)))
 	return result, nil
 }
 

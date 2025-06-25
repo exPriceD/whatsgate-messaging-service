@@ -11,16 +11,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"whatsapp-service/internal/logger"
 	whatsgateDomain "whatsapp-service/internal/whatsgate/domain"
 )
 
 func TestNewClient(t *testing.T) {
-	client := whatsgateDomain.NewClient("https://api.example.com", "test-id", "test-key")
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
+	client := whatsgateDomain.NewClient("https://api.example.com", "test-id", "test-key", log)
 
 	assert.NotNil(t, client)
 }
 
 func TestSendTextMessage(t *testing.T) {
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
 
@@ -40,7 +43,7 @@ func TestSendTextMessage(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key")
+	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key", log)
 
 	ctx := context.Background()
 	response, err := client.SendTextMessage(ctx, "71234567890", "test message", false)
@@ -49,6 +52,7 @@ func TestSendTextMessage(t *testing.T) {
 }
 
 func TestSendTextMessageAsync(t *testing.T) {
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 
@@ -57,7 +61,7 @@ func TestSendTextMessageAsync(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key")
+	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key", log)
 
 	ctx := context.Background()
 	response, err := client.SendTextMessage(ctx, "71234567890", "test message", true)
@@ -66,6 +70,7 @@ func TestSendTextMessageAsync(t *testing.T) {
 }
 
 func TestSendMediaMessage(t *testing.T) {
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
 
@@ -85,7 +90,7 @@ func TestSendMediaMessage(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key")
+	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key", log)
 
 	imageData := []byte("fake-image-data")
 	ctx := context.Background()
@@ -95,6 +100,7 @@ func TestSendMediaMessage(t *testing.T) {
 }
 
 func TestSendMessageWithoutAPIKey(t *testing.T) {
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "", r.Header.Get("X-Api-Key"))
 
@@ -103,7 +109,7 @@ func TestSendMessageWithoutAPIKey(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "")
+	client := whatsgateDomain.NewClient(server.URL, "test-id", "", log)
 
 	ctx := context.Background()
 	response, err := client.SendTextMessage(ctx, "71234567890", "test message", false)
@@ -112,13 +118,14 @@ func TestSendMessageWithoutAPIKey(t *testing.T) {
 }
 
 func TestSendMessageWithAPIError(t *testing.T) {
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte(`{"error": "Unauthorized", "message": "Invalid API key"}`))
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "invalid-key")
+	client := whatsgateDomain.NewClient(server.URL, "test-id", "invalid-key", log)
 
 	ctx := context.Background()
 	_, err := client.SendTextMessage(ctx, "71234567890", "test message", false)
@@ -127,13 +134,14 @@ func TestSendMessageWithAPIError(t *testing.T) {
 }
 
 func TestSendMessageWithServerError(t *testing.T) {
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(`{"error": "Internal Server Error"}`))
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key")
+	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key", log)
 
 	ctx := context.Background()
 	_, err := client.SendTextMessage(ctx, "71234567890", "test message", false)
@@ -142,13 +150,14 @@ func TestSendMessageWithServerError(t *testing.T) {
 }
 
 func TestSendMessageWithBadRequest(t *testing.T) {
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(`{"error": "Bad Request", "message": "Invalid phone number"}`))
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key")
+	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key", log)
 
 	ctx := context.Background()
 	_, err := client.SendTextMessage(ctx, "invalid-phone", "test message", false)
@@ -157,6 +166,7 @@ func TestSendMessageWithBadRequest(t *testing.T) {
 }
 
 func TestSendMessageWithTimeout(t *testing.T) {
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(2 * time.Second) // Задержка больше таймаута
 		w.WriteHeader(http.StatusOK)
@@ -164,7 +174,7 @@ func TestSendMessageWithTimeout(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key")
+	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key", log)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()

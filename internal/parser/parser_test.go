@@ -3,6 +3,7 @@ package parser
 import (
 	"os"
 	"testing"
+	"whatsapp-service/internal/logger"
 )
 
 // TestParsePhonesFromExcel проверяет корректность парсинга номеров телефонов из Excel-файла,
@@ -13,7 +14,8 @@ func TestParsePhonesFromExcel(t *testing.T) {
 		t.Skip("customer-test.xlsx not found, skipping integration test")
 	}
 
-	result, err := ParsePhonesFromExcel(file, "Телефон")
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
+	result, err := ParsePhonesFromExcel(file, "Телефон", log)
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
