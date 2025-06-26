@@ -3,6 +3,8 @@ package messages
 import (
 	"encoding/base64"
 	"net/http"
+	"strconv"
+	"strings"
 
 	appErr "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
@@ -10,10 +12,25 @@ import (
 
 	"go.uber.org/zap"
 
+	"mime/multipart"
+	"whatsapp-service/internal/bulk/domain"
+	"whatsapp-service/internal/bulk/infra"
+	"whatsapp-service/internal/bulk/usecase"
+
 	"github.com/gin-gonic/gin"
 )
 
-// SendMessageHandler возвращает gin.HandlerFunc с внедрённым сервисом
+// SendMessageHandler godoc
+// @Summary Отправить текстовое сообщение
+// @Description Отправляет текстовое сообщение через WhatsApp
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Param request body SendMessageRequest true "Параметры сообщения"
+// @Success 200 {object} SendMessageResponse "Успешный ответ"
+// @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
+// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /messages/send [post]
 func SendMessageHandler(whatsgateService *whatsgateDomain.SettingsService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := c.MustGet("logger").(logger.Logger)
@@ -57,7 +74,17 @@ func SendMessageHandler(whatsgateService *whatsgateDomain.SettingsService) gin.H
 	}
 }
 
-// SendMediaMessageHandler возвращает gin.HandlerFunc с внедрённым сервисом
+// SendMediaMessageHandler godoc
+// @Summary Отправить медиа-сообщение
+// @Description Отправляет сообщение с медиа-файлом через WhatsApp
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Param request body SendMediaMessageRequest true "Параметры медиа-сообщения"
+// @Success 200 {object} SendMessageResponse "Успешный ответ"
+// @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
+// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /messages/send-media [post]
 func SendMediaMessageHandler(whatsgateService *whatsgateDomain.SettingsService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := c.MustGet("logger").(logger.Logger)
@@ -115,102 +142,82 @@ func SendMediaMessageHandler(whatsgateService *whatsgateDomain.SettingsService) 
 	}
 }
 
-// BulkSendHandler возвращает gin.HandlerFunc с внедрённым сервисом
+// BulkSendHandler godoc
+// @Summary Массовая рассылка сообщений
+// @Description Отправляет сообщения на несколько номеров. Поддерживает отправку медиа и текста. messages_per_hour обязателен и > 0. Все рассылки асинхронные. Тип сообщения для media определяется автоматически по mime_type.
+// @Tags messages
+// @Accept multipart/form-data
+// @Produce json
+// @Param message formData string true "Текст сообщения"
+// @Param async formData boolean false "Асинхронно (true/false)"
+// @Param messages_per_hour formData int true "Сколько сообщений в час (обязателен, > 0)"
+// @Param numbers_file formData file true "Файл с номерами (xlsx)"
+// @Param media_file formData file false "Медиа-файл (опционально, тип определяется по mime_type)"
+// @Success 200 {object} map[string]interface{} "Результат рассылки"
+// @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
+// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /messages/bulk-send [post]
 func BulkSendHandler(whatsgateService *whatsgateDomain.SettingsService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := c.MustGet("logger").(logger.Logger)
-		log.Debug("Incoming BulkSend request")
-		var request BulkSendRequest
-		if err := c.ShouldBindJSON(&request); err != nil {
-			log.Error("Invalid request body", zap.Error(err))
-			c.Error(appErr.NewValidationError("Invalid request body: " + err.Error()))
-			return
+		log.Debug("Incoming BulkSend request (refactored)")
+
+		bulkService := &usecase.BulkService{
+			Logger:          log,
+			WhatsGateClient: &infra.WhatGateClientAdapter{Service: (*whatsgateDomain.SettingsService)(whatsgateService)},
+			FileParser:      &infra.FileParserAdapter{Logger: log},
 		}
-		if request.Media != nil {
-			if err := whatsgateDomain.ValidateMessageType(request.Media.MessageType); err != nil {
-				log.Error("Invalid media message type", zap.String("type", request.Media.MessageType), zap.Error(err))
-				c.Error(err)
+
+		contentType := c.ContentType()
+		if strings.HasPrefix(contentType, "multipart/form-data") {
+			message := c.PostForm("message")
+			async := c.PostForm("async") == "true"
+			messagesPerHourStr := c.PostForm("messages_per_hour")
+			messagesPerHour := 0
+
+			if messagesPerHourStr != "" {
+				if v, err := strconv.Atoi(messagesPerHourStr); err == nil && v > 0 {
+					messagesPerHour = v
+				}
+			}
+			if messagesPerHour <= 0 {
+				log.Error("messages_per_hour is required and must be > 0")
+				c.Error(appErr.NewValidationError("messages_per_hour is required and must be > 0"))
 				return
 			}
-		}
-		client, err := whatsgateService.GetClient()
-		if err != nil {
-			log.Error("Failed to get WhatGate client", zap.Error(err))
-			c.Error(err)
-			return
-		}
-		var fileData []byte
-		if request.Media != nil {
-			var err error
-			fileData, err = base64.StdEncoding.DecodeString(request.Media.FileData)
+
+			numbersFile, err := c.FormFile("numbers_file")
 			if err != nil {
-				log.Error("Media file data must be base64 encoded", zap.Error(err))
-				c.Error(appErr.NewValidationError("Media file data must be base64 encoded"))
+				log.Error("numbers_file is required", zap.Error(err))
+				c.Error(appErr.NewValidationError("numbers_file is required"))
 				return
 			}
-		}
-		results := make([]BulkSendResult, 0, len(request.PhoneNumbers))
-		for _, phone := range request.PhoneNumbers {
-			if err := whatsgateDomain.ValidatePhoneNumber(phone); err != nil {
-				log.Error("Invalid phone in bulk send", zap.String("phone", phone), zap.Error(err))
-				results = append(results, BulkSendResult{
-					PhoneNumber: phone,
-					Success:     false,
-					Error:       err.Error(),
-				})
-				continue
+
+			var mediaFile *multipart.FileHeader
+			if mf, err := c.FormFile("media_file"); err == nil {
+				mediaFile = mf
 			}
-			var response *whatsgateDomain.SendMessageResponse
-			var err error
-			if request.Media != nil {
-				response, err = client.SendMediaMessage(
-					c.Request.Context(),
-					phone,
-					request.Media.MessageType,
-					request.Message,
-					request.Media.Filename,
-					fileData,
-					request.Media.MimeType,
-					request.Async,
-				)
-			} else {
-				response, err = client.SendTextMessage(
-					c.Request.Context(),
-					phone,
-					request.Message,
-					request.Async,
-				)
+			params := domain.BulkSendParams{
+				Message:         message,
+				Async:           async,
+				MessagesPerHour: messagesPerHour,
+				NumbersFile:     numbersFile,
+				MediaFile:       mediaFile,
 			}
+
+			result, err := bulkService.HandleBulkSendMultipart(c.Request.Context(), params)
 			if err != nil {
-				log.Error("Failed to send message in bulk", zap.String("phone", phone), zap.Error(err))
-				results = append(results, BulkSendResult{
-					PhoneNumber: phone,
-					Success:     false,
-					Error:       err.Error(),
-				})
+				c.Error(appErr.NewValidationError("Bulk send error: " + err.Error()))
+				return
+			}
+
+			if result.Started {
+				c.JSON(http.StatusOK, gin.H{"success": true, "message": result.Message, "total": result.Total})
 			} else {
-				log.Info("Bulk message sent", zap.String("phone", phone), zap.String("id", response.ID))
-				results = append(results, BulkSendResult{
-					PhoneNumber: phone,
-					Success:     true,
-					MessageID:   response.ID,
-					Status:      response.Status,
-				})
+				c.JSON(http.StatusOK, gin.H{"success": true, "message": result.Message, "total": result.Total, "results": result.Results})
 			}
+			return
 		}
-		successCount := 0
-		for _, result := range results {
-			if result.Success {
-				successCount++
-			}
-		}
-		log.Info("Bulk send completed", zap.Int("total", len(request.PhoneNumbers)), zap.Int("success", successCount))
-		c.JSON(http.StatusOK, BulkSendResponse{
-			Success:      successCount > 0,
-			TotalCount:   len(request.PhoneNumbers),
-			SuccessCount: successCount,
-			FailedCount:  len(request.PhoneNumbers) - successCount,
-			Results:      results,
-		})
+		c.Error(appErr.NewValidationError("Only multipart supported"))
 	}
 }

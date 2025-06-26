@@ -59,3 +59,10 @@ type BulkSendResponse struct {
 	FailedCount  int              `json:"failed_count" example:"2"`
 	Results      []BulkSendResult `json:"results"`
 }
+
+// ErrorResponse представляет стандартный ответ об ошибке для всех эндпоинтов.
+type ErrorResponse struct {
+	Code    int    `json:"code" example:"400"`
+	Error   string `json:"error" example:"Validation error"`
+	Message string `json:"message" example:"Подробное описание ошибки"`
+}
