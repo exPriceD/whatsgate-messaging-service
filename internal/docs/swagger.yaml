@@ -1,107 +1,30 @@
 basePath: /api/v1
 definitions:
-  types.BulkSendMedia:
+  messages.BulkSendStartResponse:
     properties:
-      file_data:
-        example: base64_encoded_data
-        type: string
-      filename:
-        example: image.png
-        type: string
-      message_type:
-        example: image
-        type: string
-      mime_type:
-        example: image/png
-        type: string
-    required:
-    - file_data
-    - filename
-    - message_type
-    - mime_type
-    type: object
-  types.BulkSendRequest:
-    properties:
-      async:
-        example: true
-        type: boolean
-      media:
-        allOf:
-        - $ref: '#/definitions/types.BulkSendMedia'
-        description: Медиа файл (опционально)
       message:
-        example: Массовое сообщение
-        type: string
-      phone_numbers:
-        example:
-        - "79991234567"
-        - "79998765432"
-        items:
-          type: string
-        type: array
-    required:
-    - message
-    - phone_numbers
-    type: object
-  types.BulkSendResponse:
-    properties:
-      failed_count:
-        example: 2
-        type: integer
-      results:
-        items:
-          $ref: '#/definitions/types.BulkSendResult'
-        type: array
-      success:
-        example: true
-        type: boolean
-      success_count:
-        example: 8
-        type: integer
-      total_count:
-        example: 10
-        type: integer
-    type: object
-  types.BulkSendResult:
-    properties:
-      error:
-        example: Invalid phone number
-        type: string
-      message_id:
-        example: message_id_123
-        type: string
-      phone_number:
-        example: "79991234567"
-        type: string
-      status:
-        example: sent
+        example: Bulk send started in background
         type: string
       success:
         example: true
         type: boolean
+      total:
+        example: 123
+        type: integer
     type: object
-  types.ErrorResponse:
+  messages.ErrorResponse:
     properties:
       code:
         example: 400
         type: integer
       error:
-        example: Something went wrong
+        example: Validation error
         type: string
       message:
-        example: Detailed error message
+        example: Подробное описание ошибки
         type: string
     type: object
-  types.HealthResponse:
-    properties:
-      status:
-        example: ok
-        type: string
-      time:
-        example: "2023-01-01T12:00:00Z"
-        type: string
-    type: object
-  types.SendMediaMessageRequest:
+  messages.SendMediaMessageRequest:
     properties:
       async:
         example: true
@@ -131,7 +54,7 @@ definitions:
     - mime_type
     - phone_number
     type: object
-  types.SendMessageRequest:
+  messages.SendMessageRequest:
     properties:
       async:
         example: true
@@ -146,7 +69,7 @@ definitions:
     - message
     - phone_number
     type: object
-  types.SendMessageResponse:
+  messages.SendMessageResponse:
     properties:
       id:
         example: message_id_123
@@ -160,6 +83,15 @@ definitions:
       success:
         example: true
         type: boolean
+    type: object
+  types.HealthResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+      time:
+        example: "2023-01-01T12:00:00Z"
+        type: string
     type: object
   types.StatusResponse:
     properties:
@@ -223,38 +155,64 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.HealthResponse'
-      summary: Health check
+        "400":
+          description: Ошибка валидации
+          schema:
+            $ref: '#/definitions/messages.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/messages.ErrorResponse'
+      summary: Проверка работоспособности сервиса
       tags:
       - health
   /messages/bulk-send:
     post:
       consumes:
-      - application/json
-      description: Отправляет сообщения на несколько номеров телефонов. Поддерживает
-        отправку медиа и текста в одном сообщении.
+      - multipart/form-data
+      description: Отправляет сообщения на несколько номеров. Поддерживает отправку
+        медиа и текста. messages_per_hour обязателен и > 0. Все рассылки асинхронные.
+        Тип сообщения для media определяется автоматически по mime_type.
       parameters:
-      - description: Bulk send request
-        in: body
-        name: request
+      - description: Текст сообщения
+        in: formData
+        name: message
         required: true
-        schema:
-          $ref: '#/definitions/types.BulkSendRequest'
+        type: string
+      - description: Асинхронно (true/false)
+        in: formData
+        name: async
+        type: boolean
+      - description: Сколько сообщений в час (обязателен, > 0)
+        in: formData
+        name: messages_per_hour
+        required: true
+        type: integer
+      - description: Файл с номерами (xlsx)
+        in: formData
+        name: numbers_file
+        required: true
+        type: file
+      - description: Медиа-файл (опционально, тип определяется по mime_type)
+        in: formData
+        name: media_file
+        type: file
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Запуск рассылки
           schema:
-            $ref: '#/definitions/types.BulkSendResponse'
+            $ref: '#/definitions/messages.BulkSendStartResponse'
         "400":
-          description: Bad Request
+          description: Ошибка валидации
           schema:
-            $ref: '#/definitions/types.ErrorResponse'
+            $ref: '#/definitions/messages.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Внутренняя ошибка сервера
           schema:
-            $ref: '#/definitions/types.ErrorResponse'
-      summary: Send bulk messages
+            $ref: '#/definitions/messages.ErrorResponse'
+      summary: Массовая рассылка сообщений
       tags:
       - messages
   /messages/send:
@@ -263,28 +221,28 @@ paths:
       - application/json
       description: Отправляет текстовое сообщение через WhatsApp
       parameters:
-      - description: Message request
+      - description: Параметры сообщения
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/types.SendMessageRequest'
+          $ref: '#/definitions/messages.SendMessageRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Успешный ответ
           schema:
-            $ref: '#/definitions/types.SendMessageResponse'
+            $ref: '#/definitions/messages.SendMessageResponse'
         "400":
-          description: Bad Request
+          description: Ошибка валидации
           schema:
-            $ref: '#/definitions/types.ErrorResponse'
+            $ref: '#/definitions/messages.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Внутренняя ошибка сервера
           schema:
-            $ref: '#/definitions/types.ErrorResponse'
-      summary: Send text message
+            $ref: '#/definitions/messages.ErrorResponse'
+      summary: Отправить текстовое сообщение
       tags:
       - messages
   /messages/send-media:
@@ -293,28 +251,28 @@ paths:
       - application/json
       description: Отправляет сообщение с медиа-файлом через WhatsApp
       parameters:
-      - description: Media message request
+      - description: Параметры медиа-сообщения
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/types.SendMediaMessageRequest'
+          $ref: '#/definitions/messages.SendMediaMessageRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Успешный ответ
           schema:
-            $ref: '#/definitions/types.SendMessageResponse'
+            $ref: '#/definitions/messages.SendMessageResponse'
         "400":
-          description: Bad Request
+          description: Ошибка валидации
           schema:
-            $ref: '#/definitions/types.ErrorResponse'
+            $ref: '#/definitions/messages.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: Внутренняя ошибка сервера
           schema:
-            $ref: '#/definitions/types.ErrorResponse'
-      summary: Send media message
+            $ref: '#/definitions/messages.ErrorResponse'
+      summary: Отправить медиа-сообщение
       tags:
       - messages
   /settings:
@@ -329,7 +287,7 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.WhatGateSettings'
-      summary: Get WhatGate settings
+      summary: Получить настройки WhatGate
       tags:
       - settings
     put:
@@ -337,7 +295,7 @@ paths:
       - application/json
       description: Обновляет настройки WhatGate API
       parameters:
-      - description: WhatGate settings
+      - description: Настройки WhatGate
         in: body
         name: settings
         required: true
@@ -351,10 +309,10 @@ paths:
           schema:
             $ref: '#/definitions/types.WhatGateSettings'
         "400":
-          description: Bad Request
+          description: Ошибка валидации
           schema:
-            $ref: '#/definitions/types.ErrorResponse'
-      summary: Update WhatGate settings
+            $ref: '#/definitions/messages.ErrorResponse'
+      summary: Обновить настройки WhatGate
       tags:
       - settings
   /settings/reset:
@@ -370,10 +328,10 @@ paths:
           schema:
             $ref: '#/definitions/types.SuccessResponse'
         "500":
-          description: Internal Server Error
+          description: Внутренняя ошибка сервера
           schema:
-            $ref: '#/definitions/types.ErrorResponse'
-      summary: Reset WhatGate settings
+            $ref: '#/definitions/messages.ErrorResponse'
+      summary: Сбросить настройки WhatGate
       tags:
       - settings
   /status:
@@ -388,7 +346,7 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.StatusResponse'
-      summary: Service status
+      summary: Статус сервиса
       tags:
       - status
 securityDefinitions:

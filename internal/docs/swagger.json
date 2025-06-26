@@ -30,12 +30,24 @@
                 "tags": [
                     "health"
                 ],
-                "summary": "Health check",
+                "summary": "Проверка работоспособности сервиса",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/types.HealthResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Ошибка валидации",
+                        "schema": {
+                            "$ref": "#/definitions/messages.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/messages.ErrorResponse"
                         }
                     }
                 }
@@ -43,9 +55,9 @@
         },
         "/messages/bulk-send": {
             "post": {
-                "description": "Отправляет сообщения на несколько номеров телефонов. Поддерживает отправку медиа и текста в одном сообщении.",
+                "description": "Отправляет сообщения на несколько номеров. Поддерживает отправку медиа и текста. messages_per_hour обязателен и \u003e 0. Все рассылки асинхронные. Тип сообщения для media определяется автоматически по mime_type.",
                 "consumes": [
-                    "application/json"
+                    "multipart/form-data"
                 ],
                 "produces": [
                     "application/json"
@@ -53,35 +65,59 @@
                 "tags": [
                     "messages"
                 ],
-                "summary": "Send bulk messages",
+                "summary": "Массовая рассылка сообщений",
                 "parameters": [
                     {
-                        "description": "Bulk send request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.BulkSendRequest"
-                        }
+                        "type": "string",
+                        "description": "Текст сообщения",
+                        "name": "message",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Асинхронно (true/false)",
+                        "name": "async",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Сколько сообщений в час (обязателен, \u003e 0)",
+                        "name": "messages_per_hour",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Файл с номерами (xlsx)",
+                        "name": "numbers_file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Медиа-файл (опционально, тип определяется по mime_type)",
+                        "name": "media_file",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Запуск рассылки",
                         "schema": {
-                            "$ref": "#/definitions/types.BulkSendResponse"
+                            "$ref": "#/definitions/messages.BulkSendStartResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Ошибка валидации",
                         "schema": {
-                            "$ref": "#/definitions/types.ErrorResponse"
+                            "$ref": "#/definitions/messages.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Внутренняя ошибка сервера",
                         "schema": {
-                            "$ref": "#/definitions/types.ErrorResponse"
+                            "$ref": "#/definitions/messages.ErrorResponse"
                         }
                     }
                 }
@@ -99,35 +135,35 @@
                 "tags": [
                     "messages"
                 ],
-                "summary": "Send text message",
+                "summary": "Отправить текстовое сообщение",
                 "parameters": [
                     {
-                        "description": "Message request",
+                        "description": "Параметры сообщения",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.SendMessageRequest"
+                            "$ref": "#/definitions/messages.SendMessageRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Успешный ответ",
                         "schema": {
-                            "$ref": "#/definitions/types.SendMessageResponse"
+                            "$ref": "#/definitions/messages.SendMessageResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Ошибка валидации",
                         "schema": {
-                            "$ref": "#/definitions/types.ErrorResponse"
+                            "$ref": "#/definitions/messages.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Внутренняя ошибка сервера",
                         "schema": {
-                            "$ref": "#/definitions/types.ErrorResponse"
+                            "$ref": "#/definitions/messages.ErrorResponse"
                         }
                     }
                 }
@@ -145,35 +181,35 @@
                 "tags": [
                     "messages"
                 ],
-                "summary": "Send media message",
+                "summary": "Отправить медиа-сообщение",
                 "parameters": [
                     {
-                        "description": "Media message request",
+                        "description": "Параметры медиа-сообщения",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.SendMediaMessageRequest"
+                            "$ref": "#/definitions/messages.SendMediaMessageRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Успешный ответ",
                         "schema": {
-                            "$ref": "#/definitions/types.SendMessageResponse"
+                            "$ref": "#/definitions/messages.SendMessageResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Ошибка валидации",
                         "schema": {
-                            "$ref": "#/definitions/types.ErrorResponse"
+                            "$ref": "#/definitions/messages.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Внутренняя ошибка сервера",
                         "schema": {
-                            "$ref": "#/definitions/types.ErrorResponse"
+                            "$ref": "#/definitions/messages.ErrorResponse"
                         }
                     }
                 }
@@ -191,7 +227,7 @@
                 "tags": [
                     "settings"
                 ],
-                "summary": "Get WhatGate settings",
+                "summary": "Получить настройки WhatGate",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -212,10 +248,10 @@
                 "tags": [
                     "settings"
                 ],
-                "summary": "Update WhatGate settings",
+                "summary": "Обновить настройки WhatGate",
                 "parameters": [
                     {
-                        "description": "WhatGate settings",
+                        "description": "Настройки WhatGate",
                         "name": "settings",
                         "in": "body",
                         "required": true,
@@ -232,9 +268,9 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Ошибка валидации",
                         "schema": {
-                            "$ref": "#/definitions/types.ErrorResponse"
+                            "$ref": "#/definitions/messages.ErrorResponse"
                         }
                     }
                 }
@@ -252,7 +288,7 @@
                 "tags": [
                     "settings"
                 ],
-                "summary": "Reset WhatGate settings",
+                "summary": "Сбросить настройки WhatGate",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -261,9 +297,9 @@
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Внутренняя ошибка сервера",
                         "schema": {
-                            "$ref": "#/definitions/types.ErrorResponse"
+                            "$ref": "#/definitions/messages.ErrorResponse"
                         }
                     }
                 }
@@ -281,7 +317,7 @@
                 "tags": [
                     "status"
                 ],
-                "summary": "Service status",
+                "summary": "Статус сервиса",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -294,121 +330,24 @@
         }
     },
     "definitions": {
-        "types.BulkSendMedia": {
+        "messages.BulkSendStartResponse": {
             "type": "object",
-            "required": [
-                "file_data",
-                "filename",
-                "message_type",
-                "mime_type"
-            ],
             "properties": {
-                "file_data": {
-                    "type": "string",
-                    "example": "base64_encoded_data"
-                },
-                "filename": {
-                    "type": "string",
-                    "example": "image.png"
-                },
-                "message_type": {
-                    "type": "string",
-                    "example": "image"
-                },
-                "mime_type": {
-                    "type": "string",
-                    "example": "image/png"
-                }
-            }
-        },
-        "types.BulkSendRequest": {
-            "type": "object",
-            "required": [
-                "message",
-                "phone_numbers"
-            ],
-            "properties": {
-                "async": {
-                    "type": "boolean",
-                    "example": true
-                },
-                "media": {
-                    "description": "Медиа файл (опционально)",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/types.BulkSendMedia"
-                        }
-                    ]
-                },
                 "message": {
                     "type": "string",
-                    "example": "Массовое сообщение"
-                },
-                "phone_numbers": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "79991234567",
-                        "79998765432"
-                    ]
-                }
-            }
-        },
-        "types.BulkSendResponse": {
-            "type": "object",
-            "properties": {
-                "failed_count": {
-                    "type": "integer",
-                    "example": 2
-                },
-                "results": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/types.BulkSendResult"
-                    }
+                    "example": "Bulk send started in background"
                 },
                 "success": {
                     "type": "boolean",
                     "example": true
                 },
-                "success_count": {
+                "total": {
                     "type": "integer",
-                    "example": 8
-                },
-                "total_count": {
-                    "type": "integer",
-                    "example": 10
+                    "example": 123
                 }
             }
         },
-        "types.BulkSendResult": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string",
-                    "example": "Invalid phone number"
-                },
-                "message_id": {
-                    "type": "string",
-                    "example": "message_id_123"
-                },
-                "phone_number": {
-                    "type": "string",
-                    "example": "79991234567"
-                },
-                "status": {
-                    "type": "string",
-                    "example": "sent"
-                },
-                "success": {
-                    "type": "boolean",
-                    "example": true
-                }
-            }
-        },
-        "types.ErrorResponse": {
+        "messages.ErrorResponse": {
             "type": "object",
             "properties": {
                 "code": {
@@ -417,28 +356,15 @@
                 },
                 "error": {
                     "type": "string",
-                    "example": "Something went wrong"
+                    "example": "Validation error"
                 },
                 "message": {
                     "type": "string",
-                    "example": "Detailed error message"
+                    "example": "Подробное описание ошибки"
                 }
             }
         },
-        "types.HealthResponse": {
-            "type": "object",
-            "properties": {
-                "status": {
-                    "type": "string",
-                    "example": "ok"
-                },
-                "time": {
-                    "type": "string",
-                    "example": "2023-01-01T12:00:00Z"
-                }
-            }
-        },
-        "types.SendMediaMessageRequest": {
+        "messages.SendMediaMessageRequest": {
             "type": "object",
             "required": [
                 "file_data",
@@ -478,7 +404,7 @@
                 }
             }
         },
-        "types.SendMessageRequest": {
+        "messages.SendMessageRequest": {
             "type": "object",
             "required": [
                 "message",
@@ -499,7 +425,7 @@
                 }
             }
         },
-        "types.SendMessageResponse": {
+        "messages.SendMessageResponse": {
             "type": "object",
             "properties": {
                 "id": {
@@ -517,6 +443,19 @@
                 "success": {
                     "type": "boolean",
                     "example": true
+                }
+            }
+        },
+        "types.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                },
+                "time": {
+                    "type": "string",
+                    "example": "2023-01-01T12:00:00Z"
                 }
             }
         },
