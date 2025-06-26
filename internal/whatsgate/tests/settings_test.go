@@ -5,116 +5,121 @@ package whatsgate_test
 import (
 	"context"
 	"testing"
+	"whatsapp-service/internal/logger"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 
-	whatsgateDomain "whatsapp-service/internal/whatsgate/domain"
+	"whatsapp-service/internal/whatsgate/domain"
 	whatsgateInfra "whatsapp-service/internal/whatsgate/infra"
-	"whatsapp-service/internal/whatsgate/interfaces"
 	"whatsapp-service/internal/whatsgate/mocks"
+	usecase "whatsapp-service/internal/whatsgate/usecase"
 )
 
 func TestSettingsService_UpdateSettings_GetSettings(t *testing.T) {
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 	repo := &mocks.MockSettingsRepository{}
-	service := whatsgateDomain.NewSettingsService(repo)
+	usecase := usecase.NewSettingsUsecase(repo, log)
 
 	// Тест 1: Получение настроек по умолчанию
-	settings := service.GetSettings()
+	settings := usecase.GetSettings()
 	require.Equal(t, "", settings.WhatsappID)
 	require.Equal(t, "https://whatsgate.ru/api/v1", settings.BaseURL)
 
 	// Тест 2: Обновление настроек
-	testSettings := &interfaces.Settings{
+	testSettings := &domain.Settings{
 		WhatsappID: "test-whatsapp-id",
 		APIKey:     "test-api-key",
 		BaseURL:    "https://test-api.example.com",
 	}
 
-	err := service.UpdateSettings(testSettings)
+	err := usecase.UpdateSettings(testSettings)
 	require.NoError(t, err)
 
-	updatedSettings := service.GetSettings()
+	updatedSettings := usecase.GetSettings()
 	require.Equal(t, testSettings.WhatsappID, updatedSettings.WhatsappID)
 	require.Equal(t, testSettings.APIKey, updatedSettings.APIKey)
 	require.Equal(t, testSettings.BaseURL, updatedSettings.BaseURL)
 
 	// Тест 3: Проверка IsConfigured
-	require.True(t, service.IsConfigured())
+	require.True(t, usecase.IsConfigured())
 }
 
 func TestSettingsService_UpdateSettings_Validation(t *testing.T) {
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 	repo := &mocks.MockSettingsRepository{}
-	service := whatsgateDomain.NewSettingsService(repo)
+	usecase := usecase.NewSettingsUsecase(repo, log)
 
 	// Тест 1: Пустой WhatsappID
-	settings := &interfaces.Settings{
+	settings := &domain.Settings{
 		WhatsappID: "",
 		APIKey:     "test-api-key",
 		BaseURL:    "https://test-api.example.com",
 	}
 
-	err := service.UpdateSettings(settings)
+	err := usecase.UpdateSettings(settings)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "whatsapp_id is required")
 
 	// Тест 2: Пустой APIKey
-	settings = &interfaces.Settings{
+	settings = &domain.Settings{
 		WhatsappID: "test-whatsapp-id",
 		APIKey:     "",
 		BaseURL:    "https://test-api.example.com",
 	}
 
-	err = service.UpdateSettings(settings)
+	err = usecase.UpdateSettings(settings)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "api_key is required")
 }
 
 func TestSettingsService_GetClient(t *testing.T) {
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 	repo := &mocks.MockSettingsRepository{}
-	service := whatsgateDomain.NewSettingsService(repo)
+	usecase := usecase.NewSettingsUsecase(repo, log)
 
 	// Тест 1: Попытка получить клиент без настроек
-	_, err := service.GetClient()
+	_, err := usecase.GetClient()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not configured")
 
 	// Тест 2: Получение клиента с настройками
-	testSettings := &interfaces.Settings{
+	testSettings := &domain.Settings{
 		WhatsappID: "test-whatsapp-id",
 		APIKey:     "test-api-key",
 		BaseURL:    "https://test-api.example.com",
 	}
 
-	err = service.UpdateSettings(testSettings)
+	err = usecase.UpdateSettings(testSettings)
 	require.NoError(t, err)
 
-	client, err := service.GetClient()
+	client, err := usecase.GetClient()
 	require.NoError(t, err)
 	require.NotNil(t, client)
 }
 
 func TestSettingsService_ResetSettings(t *testing.T) {
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 	repo := &mocks.MockSettingsRepository{}
-	service := whatsgateDomain.NewSettingsService(repo)
+	usecase := usecase.NewSettingsUsecase(repo, log)
 
-	testSettings := &interfaces.Settings{
+	testSettings := &domain.Settings{
 		WhatsappID: "test-whatsapp-id",
 		APIKey:     "test-api-key",
 		BaseURL:    "https://test-api.example.com",
 	}
 
-	err := service.UpdateSettings(testSettings)
+	err := usecase.UpdateSettings(testSettings)
 	require.NoError(t, err)
 
-	require.True(t, service.IsConfigured())
+	require.True(t, usecase.IsConfigured())
 
-	err = service.ResetSettings()
+	err = usecase.ResetSettings()
 	require.NoError(t, err)
 
-	require.False(t, service.IsConfigured())
+	require.False(t, usecase.IsConfigured())
 
-	settings := service.GetSettings()
+	settings := usecase.GetSettings()
 	require.Equal(t, "", settings.WhatsappID)
 	require.Equal(t, "https://whatsgate.ru/api/v1", settings.BaseURL)
 }
@@ -128,7 +133,8 @@ func TestSettingsService_Integration(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	// Подключение к тестовой БД
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
+
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5433/whatsapp_service?sslmode=disable")
 	if err != nil {
@@ -136,8 +142,8 @@ func TestSettingsService_Integration(t *testing.T) {
 	}
 	defer pool.Close()
 
-	repo := whatsgateInfra.NewSettingsRepository(pool)
-	service := whatsgateDomain.NewSettingsService(repo)
+	repo := whatsgateInfra.NewSettingsRepository(pool, log)
+	usecase := usecase.NewSettingsUsecase(repo, log)
 
 	err = repo.InitTable(ctx)
 	require.NoError(t, err)
@@ -146,35 +152,35 @@ func TestSettingsService_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Тест 1: Получение настроек по умолчанию
-	settings := service.GetSettings()
+	settings := usecase.GetSettings()
 	require.Equal(t, "", settings.WhatsappID)
 	require.Equal(t, "https://whatsgate.ru/api/v1", settings.BaseURL)
 
 	// Тест 2: Обновление настроек
-	testSettings := &interfaces.Settings{
+	testSettings := &domain.Settings{
 		WhatsappID: "test-whatsapp-id",
 		APIKey:     "test-api-key",
 		BaseURL:    "https://test-api.example.com",
 	}
 
-	err = service.UpdateSettings(testSettings)
+	err = usecase.UpdateSettings(testSettings)
 	require.NoError(t, err)
 
-	updatedSettings := service.GetSettings()
+	updatedSettings := usecase.GetSettings()
 	require.Equal(t, testSettings.WhatsappID, updatedSettings.WhatsappID)
 	require.Equal(t, testSettings.APIKey, updatedSettings.APIKey)
 	require.Equal(t, testSettings.BaseURL, updatedSettings.BaseURL)
 
 	// Тест 3: Проверка IsConfigured
-	require.True(t, service.IsConfigured())
+	require.True(t, usecase.IsConfigured())
 
 	// Тест 4: Сброс настроек
-	err = service.ResetSettings()
+	err = usecase.ResetSettings()
 	require.NoError(t, err)
 
-	require.False(t, service.IsConfigured())
+	require.False(t, usecase.IsConfigured())
 
-	settings = service.GetSettings()
+	settings = usecase.GetSettings()
 	require.Equal(t, "", settings.WhatsappID)
 	require.Equal(t, "https://whatsgate.ru/api/v1", settings.BaseURL)
 }

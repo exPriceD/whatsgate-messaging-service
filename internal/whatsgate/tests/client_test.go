@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"whatsapp-service/internal/logger"
-	whatsgateDomain "whatsapp-service/internal/whatsgate/domain"
+	infra "whatsapp-service/internal/whatsgate/infra"
 )
 
 func TestNewClient(t *testing.T) {
 	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
-	client := whatsgateDomain.NewClient("https://api.example.com", "test-id", "test-key", log)
+	client := infra.NewClient("https://api.example.com", "test-id", "test-key", log)
 
 	assert.NotNil(t, client)
 }
@@ -43,7 +43,7 @@ func TestSendTextMessage(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key", log)
+	client := infra.NewClient(server.URL, "test-id", "test-key", log)
 
 	ctx := context.Background()
 	response, err := client.SendTextMessage(ctx, "71234567890", "test message", false)
@@ -61,7 +61,7 @@ func TestSendTextMessageAsync(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key", log)
+	client := infra.NewClient(server.URL, "test-id", "test-key", log)
 
 	ctx := context.Background()
 	response, err := client.SendTextMessage(ctx, "71234567890", "test message", true)
@@ -90,7 +90,7 @@ func TestSendMediaMessage(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key", log)
+	client := infra.NewClient(server.URL, "test-id", "test-key", log)
 
 	imageData := []byte("fake-image-data")
 	ctx := context.Background()
@@ -109,7 +109,7 @@ func TestSendMessageWithoutAPIKey(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "", log)
+	client := infra.NewClient(server.URL, "test-id", "", log)
 
 	ctx := context.Background()
 	response, err := client.SendTextMessage(ctx, "71234567890", "test message", false)
@@ -125,7 +125,7 @@ func TestSendMessageWithAPIError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "invalid-key", log)
+	client := infra.NewClient(server.URL, "test-id", "invalid-key", log)
 
 	ctx := context.Background()
 	_, err := client.SendTextMessage(ctx, "71234567890", "test message", false)
@@ -141,7 +141,7 @@ func TestSendMessageWithServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key", log)
+	client := infra.NewClient(server.URL, "test-id", "test-key", log)
 
 	ctx := context.Background()
 	_, err := client.SendTextMessage(ctx, "71234567890", "test message", false)
@@ -157,7 +157,7 @@ func TestSendMessageWithBadRequest(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key", log)
+	client := infra.NewClient(server.URL, "test-id", "test-key", log)
 
 	ctx := context.Background()
 	_, err := client.SendTextMessage(ctx, "invalid-phone", "test message", false)
@@ -174,7 +174,7 @@ func TestSendMessageWithTimeout(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := whatsgateDomain.NewClient(server.URL, "test-id", "test-key", log)
+	client := infra.NewClient(server.URL, "test-id", "test-key", log)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -206,7 +206,7 @@ func TestValidatePhoneNumber(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := whatsgateDomain.ValidatePhoneNumber(tt.phone)
+			err := infra.ValidatePhoneNumber(tt.phone)
 			if tt.isValid {
 				assert.NoError(t, err)
 			} else {
@@ -234,7 +234,7 @@ func TestValidateMessageType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := whatsgateDomain.ValidateMessageType(tt.msgType)
+			err := infra.ValidateMessageType(tt.msgType)
 			if tt.isValid {
 				assert.NoError(t, err)
 			} else {

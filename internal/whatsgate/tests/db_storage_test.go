@@ -5,12 +5,13 @@ package whatsgate_test
 import (
 	"context"
 	"testing"
+	"whatsapp-service/internal/logger"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 
+	"whatsapp-service/internal/whatsgate/domain"
 	whatsgateInfra "whatsapp-service/internal/whatsgate/infra"
-	"whatsapp-service/internal/whatsgate/interfaces"
 )
 
 // MockPoolDB создает мок для тестирования
@@ -25,10 +26,11 @@ func (m *MockPoolDB) GetPool() *pgxpool.Pool {
 func TestDatabaseSettingsStorage_Integration(t *testing.T) {
 	// Этот тест требует реальной БД PostgreSQL
 	// Для запуска: go test -v -tags=integration ./internal/whatsgate/
-
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
+
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
 
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5433/whatsapp_service?sslmode=disable")
@@ -37,7 +39,7 @@ func TestDatabaseSettingsStorage_Integration(t *testing.T) {
 	}
 	defer pool.Close()
 
-	repo := whatsgateInfra.NewSettingsRepository(pool)
+	repo := whatsgateInfra.NewSettingsRepository(pool, log)
 
 	err = repo.InitTable(ctx)
 	require.NoError(t, err)
@@ -54,7 +56,7 @@ func TestDatabaseSettingsStorage_Integration(t *testing.T) {
 	require.Equal(t, "https://whatsgate.ru/api/v1", settings.BaseURL)
 
 	// Тест 2: Сохранение настроек
-	testSettings := &interfaces.Settings{
+	testSettings := &domain.Settings{
 		WhatsappID: "test-whatsapp-id",
 		APIKey:     "test-api-key",
 		BaseURL:    "https://test-api.example.com",
@@ -72,7 +74,7 @@ func TestDatabaseSettingsStorage_Integration(t *testing.T) {
 	require.Equal(t, testSettings.BaseURL, loadedSettings.BaseURL)
 
 	// Тест 3: Обновление настроек
-	updatedSettings := &interfaces.Settings{
+	updatedSettings := &domain.Settings{
 		WhatsappID: "updated-whatsapp-id",
 		APIKey:     "updated-api-key",
 		BaseURL:    "https://updated-api.example.com",
@@ -105,6 +107,8 @@ func TestDatabaseSettingsStorage_EmptyDatabase(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
+
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5433/whatsapp_service?sslmode=disable")
 	if err != nil {
@@ -112,7 +116,7 @@ func TestDatabaseSettingsStorage_EmptyDatabase(t *testing.T) {
 	}
 	defer pool.Close()
 
-	repo := whatsgateInfra.NewSettingsRepository(pool)
+	repo := whatsgateInfra.NewSettingsRepository(pool, log)
 
 	err = repo.InitTable(ctx)
 	require.NoError(t, err)
@@ -136,6 +140,8 @@ func TestDatabaseSettingsStorage_ConcurrentAccess(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
+
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5433/whatsapp_service?sslmode=disable")
 	if err != nil {
@@ -143,7 +149,7 @@ func TestDatabaseSettingsStorage_ConcurrentAccess(t *testing.T) {
 	}
 	defer pool.Close()
 
-	repo := whatsgateInfra.NewSettingsRepository(pool)
+	repo := whatsgateInfra.NewSettingsRepository(pool, log)
 
 	err = repo.InitTable(ctx)
 	require.NoError(t, err)
@@ -153,7 +159,7 @@ func TestDatabaseSettingsStorage_ConcurrentAccess(t *testing.T) {
 
 	storage := whatsgateInfra.NewDatabaseSettingsStorage(repo)
 
-	testSettings := &interfaces.Settings{
+	testSettings := &domain.Settings{
 		WhatsappID: "concurrent-test-id",
 		APIKey:     "concurrent-test-key",
 		BaseURL:    "https://concurrent-test.example.com",
@@ -185,6 +191,8 @@ func TestSettingsRepository_Load_EmptyDB(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
+
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5433/whatsapp_service?sslmode=disable")
 	if err != nil {
@@ -192,7 +200,7 @@ func TestSettingsRepository_Load_EmptyDB(t *testing.T) {
 	}
 	defer pool.Close()
 
-	repo := whatsgateInfra.NewSettingsRepository(pool)
+	repo := whatsgateInfra.NewSettingsRepository(pool, log)
 
 	err = repo.InitTable(ctx)
 	require.NoError(t, err)
@@ -214,6 +222,8 @@ func TestSettingsRepository_Save_Update(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
+	log, _ := logger.NewZapLogger(logger.Config{Level: "debug", Format: "console", OutputPath: "stdout"})
+
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5433/whatsapp_service?sslmode=disable")
 	if err != nil {
@@ -221,7 +231,7 @@ func TestSettingsRepository_Save_Update(t *testing.T) {
 	}
 	defer pool.Close()
 
-	repo := whatsgateInfra.NewSettingsRepository(pool)
+	repo := whatsgateInfra.NewSettingsRepository(pool, log)
 
 	err = repo.InitTable(ctx)
 	require.NoError(t, err)
@@ -229,7 +239,7 @@ func TestSettingsRepository_Save_Update(t *testing.T) {
 	_, err = pool.Exec(ctx, "DELETE FROM whatsgate_settings")
 	require.NoError(t, err)
 
-	testSettings := &interfaces.Settings{
+	testSettings := &domain.Settings{
 		WhatsappID: "test-whatsapp-id",
 		APIKey:     "test-api-key",
 		BaseURL:    "https://test-api.example.com",
@@ -246,7 +256,7 @@ func TestSettingsRepository_Save_Update(t *testing.T) {
 	require.Equal(t, testSettings.APIKey, loadedSettings.APIKey)
 	require.Equal(t, testSettings.BaseURL, loadedSettings.BaseURL)
 
-	updatedSettings := &interfaces.Settings{
+	updatedSettings := &domain.Settings{
 		WhatsappID: "new-whatsapp-id",
 		APIKey:     "new-api-key",
 		BaseURL:    "https://new-api.example.com",
