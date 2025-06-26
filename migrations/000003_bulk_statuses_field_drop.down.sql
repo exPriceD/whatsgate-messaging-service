@@ -1,0 +1,1 @@
+ALTER TABLE bulk_campaign_statuses ADD COLUMN message_id TEXT

@@ -1,0 +1,1 @@
+ALTER TABLE bulk_campaign_statuses DROP COLUMN message_id
