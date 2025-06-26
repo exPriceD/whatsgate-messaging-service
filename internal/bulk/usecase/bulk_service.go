@@ -14,14 +14,19 @@ import (
 	"time"
 
 	"whatsapp-service/internal/bulk/domain"
+	"whatsapp-service/internal/bulk/interfaces"
 	"whatsapp-service/internal/logger"
+
+	"github.com/google/uuid"
 )
 
 // BulkService содержит зависимости для bulk-рассылки через интерфейсы
 type BulkService struct {
 	Logger          logger.Logger
-	WhatsGateClient domain.WhatsGateClient
-	FileParser      domain.FileParser
+	WhatsGateClient interfaces.WhatsGateClient
+	FileParser      interfaces.FileParser
+	CampaignStorage interfaces.BulkCampaignStorage
+	StatusStorage   interfaces.BulkCampaignStatusStorage
 }
 
 // HandleBulkSendMultipart — обработка multipart bulk-рассылки
@@ -58,31 +63,70 @@ func (s *BulkService) HandleBulkSendMultipart(ctx context.Context, params domain
 		return domain.BulkSendResult{}, errors.New("messages_per_hour must be > 0")
 	}
 
-	return s.handleBulkSendCore(ctx, message, async, messagesPerHour, phones, media, log)
+	campaignID := uuid.NewString()
+	var mediaFilename, mediaMime, mediaType *string
+	if media != nil {
+		mediaFilename = &media.Filename
+		mediaMime = &media.MimeType
+		mediaType = &media.MessageType
+	}
+	campaign := &domain.BulkCampaign{
+		ID:              campaignID,
+		Message:         message,
+		Total:           len(phones),
+		Status:          "started",
+		MediaFilename:   mediaFilename,
+		MediaMime:       mediaMime,
+		MediaType:       mediaType,
+		MessagesPerHour: messagesPerHour,
+	}
+	err = s.CampaignStorage.Create(campaign)
+	if err != nil {
+		return domain.BulkSendResult{}, err
+	}
+	for _, phone := range phones {
+		status := &domain.BulkCampaignStatus{
+			CampaignID:  campaignID,
+			PhoneNumber: phone,
+			Status:      "pending",
+		}
+		err := s.StatusStorage.Create(status)
+		if err != nil {
+			return domain.BulkSendResult{}, err
+		}
+	}
+
+	return s.handleBulkSendCore(ctx, message, async, messagesPerHour, phones, media, log, campaignID)
 }
 
 // handleBulkSendCore — общая логика bulk-рассылки (rate limit, sync/async, отправка)
 func (s *BulkService) handleBulkSendCore(
 	ctx context.Context, message string, async bool, messagesPerHour int,
-	phones []string, media *domain.BulkMedia, log logger.Logger,
+	phones []string, media *domain.BulkMedia, log logger.Logger, campaignID string,
 ) (domain.BulkSendResult, error) {
 	client := s.WhatsGateClient
-
-	sendMedia := func(ctx context.Context, phone string) domain.SingleSendResult {
+	statusRepo := s.StatusStorage
+	sendMedia := func(ctx context.Context, phone string, statusID string) domain.SingleSendResult {
 		decoded, _ := base64.StdEncoding.DecodeString(media.FileData)
 		res, err := client.SendMediaMessage(ctx, phone, media.MessageType, message, media.Filename, decoded, media.MimeType, async)
+		var nowStr = time.Now().Format(time.RFC3339)
 		if err != nil {
 			log.Error(fmt.Sprintf("Failed to send media message: phone=%s, error=%v", phone, err))
+			_ = statusRepo.Update(statusID, "failed", &[]string{err.Error()}[0], &nowStr)
 			return domain.SingleSendResult{PhoneNumber: phone, Success: false, Error: err.Error()}
 		}
+		_ = statusRepo.Update(statusID, "sent", nil, &nowStr)
 		return res
 	}
-	sendText := func(ctx context.Context, phone string) domain.SingleSendResult {
+	sendText := func(ctx context.Context, phone string, statusID string) domain.SingleSendResult {
 		res, err := client.SendTextMessage(ctx, phone, message, async)
+		var nowStr = time.Now().Format(time.RFC3339)
 		if err != nil {
 			log.Error(fmt.Sprintf("Failed to send text message: phone=%s, error=%v", phone, err))
+			_ = statusRepo.Update(statusID, "failed", &[]string{err.Error()}[0], &nowStr)
 			return domain.SingleSendResult{PhoneNumber: phone, Success: false, Error: err.Error()}
 		}
+		_ = statusRepo.Update(statusID, "sent", nil, &nowStr)
 		return res
 	}
 
@@ -96,10 +140,21 @@ func (s *BulkService) handleBulkSendCore(
 			}
 			batch := phones[i:end]
 			for _, phone := range batch {
+				statuses, _ := statusRepo.ListByCampaignID(campaignID)
+				var statusID string
+				for _, s := range statuses {
+					if s.PhoneNumber == phone {
+						statusID = s.ID
+						break
+					}
+				}
+				if statusID == "" {
+					continue
+				}
 				if media != nil {
-					sendMedia(ctx, phone)
+					sendMedia(ctx, phone, statusID)
 				} else {
-					sendText(ctx, phone)
+					sendText(ctx, phone, statusID)
 				}
 				time.Sleep(time.Second)
 			}
@@ -109,12 +164,13 @@ func (s *BulkService) handleBulkSendCore(
 			}
 		}
 		log.Info("Bulk send finished in background")
+		_ = s.CampaignStorage.UpdateStatus(campaignID, "finished")
 	}()
 	return domain.BulkSendResult{Started: true, Message: "Bulk send started in background", Total: len(phones)}, nil
 }
 
 // parsePhonesFromFile — парсит номера из xlsx-файла через FileParser
-func parsePhonesFromFile(file *multipart.FileHeader, parser domain.FileParser, log logger.Logger) ([]string, error) {
+func parsePhonesFromFile(file *multipart.FileHeader, parser interfaces.FileParser, log logger.Logger) ([]string, error) {
 	if file == nil {
 		return nil, errors.New("numbers_file is required")
 	}
