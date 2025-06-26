@@ -7,7 +7,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ServiceHealthHandler возвращает gin.HandlerFunc
+// ServiceHealthHandler godoc
+// @Summary Проверка работоспособности сервиса
+// @Description Проверяет работоспособность сервиса
+// @Tags health
+// @Accept json
+// @Produce json
+// @Success 200 {object} types.HealthResponse "OK"
+// @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
+// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /health [get]
 func ServiceHealthHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		response := HealthResponse{
@@ -18,7 +27,14 @@ func ServiceHealthHandler() gin.HandlerFunc {
 	}
 }
 
-// StatusHandler возвращает gin.HandlerFunc
+// StatusHandler godoc
+// @Summary Статус сервиса
+// @Description Возвращает текущий статус и информацию о сервисе
+// @Tags status
+// @Accept json
+// @Produce json
+// @Success 200 {object} types.StatusResponse "OK"
+// @Router /status [get]
 func StatusHandler(version string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		response := StatusResponse{
