@@ -5,13 +5,13 @@ import (
 	domain "whatsapp-service/internal/bulk/domain"
 	"whatsapp-service/internal/logger"
 	"whatsapp-service/internal/parser"
-	whatsgateDomain "whatsapp-service/internal/whatsgate/domain"
+	usecase "whatsapp-service/internal/whatsgate/usecase"
 )
 
 // WhatGateClientAdapter — адаптер для реального клиента WhatGate
 // Использует существующий SettingsService
 type WhatGateClientAdapter struct {
-	Service *whatsgateDomain.SettingsService
+	Service *usecase.SettingsUsecase
 }
 
 func (a *WhatGateClientAdapter) SendTextMessage(ctx context.Context, phoneNumber, text string, async bool) (domain.SingleSendResult, error) {
@@ -25,7 +25,7 @@ func (a *WhatGateClientAdapter) SendTextMessage(ctx context.Context, phoneNumber
 		return domain.SingleSendResult{PhoneNumber: phoneNumber, Success: false, Error: err.Error()}, err
 	}
 
-	return domain.SingleSendResult{PhoneNumber: phoneNumber, Success: true, MessageID: resp.ID, Status: resp.Status}, nil
+	return domain.SingleSendResult{PhoneNumber: phoneNumber, Success: true, Status: resp.Status}, nil
 }
 
 func (a *WhatGateClientAdapter) SendMediaMessage(ctx context.Context, phoneNumber, messageType, text, filename string, fileData []byte, mimeType string, async bool) (domain.SingleSendResult, error) {
@@ -39,7 +39,7 @@ func (a *WhatGateClientAdapter) SendMediaMessage(ctx context.Context, phoneNumbe
 		return domain.SingleSendResult{PhoneNumber: phoneNumber, Success: false, Error: err.Error()}, err
 	}
 
-	return domain.SingleSendResult{PhoneNumber: phoneNumber, Success: true, MessageID: resp.ID, Status: resp.Status}, nil
+	return domain.SingleSendResult{PhoneNumber: phoneNumber, Success: true, Status: resp.Status}, nil
 }
 
 // FileParserAdapter — адаптер для реального парсера Excel-файлов
