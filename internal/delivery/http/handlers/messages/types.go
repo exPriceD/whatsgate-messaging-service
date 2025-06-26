@@ -66,3 +66,10 @@ type ErrorResponse struct {
 	Error   string `json:"error" example:"Validation error"`
 	Message string `json:"message" example:"Подробное описание ошибки"`
 }
+
+// BulkSendStartResponse — быстрый ответ после запуска массовой рассылки
+type BulkSendStartResponse struct {
+	Success bool   `json:"success" example:"true"`
+	Message string `json:"message" example:"Bulk send started in background"`
+	Total   int    `json:"total" example:"123"`
+}

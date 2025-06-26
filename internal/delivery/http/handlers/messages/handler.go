@@ -153,7 +153,7 @@ func SendMediaMessageHandler(whatsgateService *whatsgateDomain.SettingsService) 
 // @Param messages_per_hour formData int true "Сколько сообщений в час (обязателен, > 0)"
 // @Param numbers_file formData file true "Файл с номерами (xlsx)"
 // @Param media_file formData file false "Медиа-файл (опционально, тип определяется по mime_type)"
-// @Success 200 {object} map[string]interface{} "Результат рассылки"
+// @Success 200 {object} BulkSendStartResponse "Запуск рассылки"
 // @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
 // @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/bulk-send [post]
@@ -212,7 +212,11 @@ func BulkSendHandler(whatsgateService *whatsgateDomain.SettingsService) gin.Hand
 			}
 
 			if result.Started {
-				c.JSON(http.StatusOK, gin.H{"success": true, "message": result.Message, "total": result.Total})
+				c.JSON(http.StatusOK, BulkSendStartResponse{
+					Success: true,
+					Message: result.Message,
+					Total:   result.Total,
+				})
 			} else {
 				c.JSON(http.StatusOK, gin.H{"success": true, "message": result.Message, "total": result.Total, "results": result.Results})
 			}
