@@ -1,7 +1,5 @@
 package domain
 
-import "context"
-
 // BulkSendParams содержит параметры для bulk-рассылки
 // NumbersFile и MediaFile — абстракции для файлов (например, *multipart.FileHeader)
 type BulkSendParams struct {
@@ -36,18 +34,6 @@ type BulkSendResult struct {
 type SingleSendResult struct {
 	PhoneNumber string
 	Success     bool
-	MessageID   string
 	Status      string
 	Error       string
-}
-
-// WhatsGateClient — интерфейс для отправки сообщений через WhatsGate или другой сервис
-type WhatsGateClient interface {
-	SendTextMessage(ctx context.Context, phoneNumber, text string, async bool) (SingleSendResult, error)
-	SendMediaMessage(ctx context.Context, phoneNumber, messageType, text, filename string, fileData []byte, mimeType string, async bool) (SingleSendResult, error)
-}
-
-// FileParser — интерфейс для парсинга номеров из файла
-type FileParser interface {
-	ParsePhonesFromExcel(filePath string, columnName string) ([]string, error)
 }
