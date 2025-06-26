@@ -7,13 +7,15 @@ import (
 	"syscall"
 	"time"
 
+	bulkInfra "whatsapp-service/internal/bulk/infra"
+	bulkInterfaces "whatsapp-service/internal/bulk/interfaces"
 	"whatsapp-service/internal/config"
 	"whatsapp-service/internal/database"
 	"whatsapp-service/internal/delivery/http"
 	appErr "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
-	whatsgateDomain "whatsapp-service/internal/whatsgate/domain"
-	whatsgateInfra "whatsapp-service/internal/whatsgate/infra"
+	infra "whatsapp-service/internal/whatsgate/infra"
+	usecase "whatsapp-service/internal/whatsgate/usecase"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -25,7 +27,9 @@ type App struct {
 	Logger           logger.Logger
 	DB               database.DB
 	DBPool           *pgxpool.Pool // Пул для прямого доступа к БД
-	WhatsGateService *whatsgateDomain.SettingsService
+	WhatsGateService *usecase.SettingsUsecase
+	BulkCampaignRepo bulkInterfaces.BulkCampaignStorage
+	BulkStatusRepo   bulkInterfaces.BulkCampaignStatusStorage
 	Server           *http.Server
 }
 
@@ -69,12 +73,12 @@ func InitDB(ctx context.Context, cfg config.DatabaseConfig) (database.DB, *pgxpo
 }
 
 // InitWhatsGateService инициализирует сервис настроек WhatGate
-func InitWhatsGateService(pool *pgxpool.Pool, log logger.Logger) (*whatsgateDomain.SettingsService, error) {
+func InitWhatsGateService(pool *pgxpool.Pool, log logger.Logger) (*usecase.SettingsUsecase, error) {
 	// Создаем репозиторий
-	repo := whatsgateInfra.NewSettingsRepository(pool, log)
+	repo := infra.NewSettingsRepository(pool, log)
 
 	// Создаем сервис с БД хранилищем
-	service := whatsgateDomain.NewSettingsService(repo, log)
+	service := usecase.NewSettingsUsecase(repo, log)
 
 	// Инициализируем таблицу
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -89,9 +93,18 @@ func InitWhatsGateService(pool *pgxpool.Pool, log logger.Logger) (*whatsgateDoma
 	return service, nil
 }
 
+// InitBulkRepositories инициализирует bulk-репозитории и storage
+func InitBulkRepositories(pool *pgxpool.Pool, log logger.Logger) (bulkInterfaces.BulkCampaignStorage, bulkInterfaces.BulkCampaignStatusStorage) {
+	repo := bulkInfra.NewBulkCampaignRepository(pool, log)
+	statusRepo := bulkInfra.NewBulkCampaignStatusRepository(pool, log)
+	storage := bulkInfra.NewBulkCampaignStorage(repo)
+	statusStorage := bulkInfra.NewBulkCampaignStatusStorage(statusRepo)
+	return storage, statusStorage
+}
+
 // InitServer инициализирует HTTP-сервер приложения.
-func InitServer(cfg config.HTTPConfig, log logger.Logger, whatsgateService *whatsgateDomain.SettingsService) *http.Server {
-	return http.NewServer(cfg, log, whatsgateService)
+func InitServer(cfg config.HTTPConfig, log logger.Logger, whatsgateService *usecase.SettingsUsecase, bulkRepo bulkInterfaces.BulkCampaignStorage, statusRepo bulkInterfaces.BulkCampaignStatusStorage) *http.Server {
+	return http.NewServer(cfg, log, whatsgateService, bulkRepo, statusRepo)
 }
 
 // BuildApp инициализирует все зависимости приложения.
@@ -116,7 +129,9 @@ func BuildApp(ctx context.Context, configPath string) (*App, error) {
 		return nil, err
 	}
 
-	server := InitServer(cfg.HTTP, log, whatsgateService)
+	bulkStorage, statusStorage := InitBulkRepositories(pool, log)
+
+	server := InitServer(cfg.HTTP, log, whatsgateService, bulkStorage, statusStorage)
 
 	return &App{
 		Config:           cfg,
@@ -124,6 +139,8 @@ func BuildApp(ctx context.Context, configPath string) (*App, error) {
 		DB:               db,
 		DBPool:           pool,
 		WhatsGateService: whatsgateService,
+		BulkCampaignRepo: bulkStorage,
+		BulkStatusRepo:   statusStorage,
 		Server:           server,
 	}, nil
 }
