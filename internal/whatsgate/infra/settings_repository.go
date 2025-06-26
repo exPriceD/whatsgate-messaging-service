@@ -6,7 +6,7 @@ import (
 
 	appErr "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
-	"whatsapp-service/internal/whatsgate/interfaces"
+	domain "whatsapp-service/internal/whatsgate/domain"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -52,7 +52,7 @@ func (r *SettingsRepository) InitTable(ctx context.Context) error {
 }
 
 // Load загружает настройки из базы данных
-func (r *SettingsRepository) Load(ctx context.Context) (*interfaces.Settings, error) {
+func (r *SettingsRepository) Load(ctx context.Context) (*domain.Settings, error) {
 	r.Logger.Debug("Loading settings from database")
 	query := `
 		SELECT whatsapp_id, api_key, base_url
@@ -60,7 +60,7 @@ func (r *SettingsRepository) Load(ctx context.Context) (*interfaces.Settings, er
 		ORDER BY created_at DESC
 		LIMIT 1
 	`
-	var settings interfaces.Settings
+	var settings domain.Settings
 	err := r.pool.QueryRow(ctx, query).Scan(
 		&settings.WhatsappID,
 		&settings.APIKey,
@@ -68,7 +68,7 @@ func (r *SettingsRepository) Load(ctx context.Context) (*interfaces.Settings, er
 	)
 	if err != nil {
 		if err.Error() == "no rows in result set" {
-			return &interfaces.Settings{
+			return &domain.Settings{
 				BaseURL: "https://whatsgate.ru/api/v1",
 			}, nil
 		}
@@ -80,7 +80,7 @@ func (r *SettingsRepository) Load(ctx context.Context) (*interfaces.Settings, er
 }
 
 // Save сохраняет настройки в базу данных
-func (r *SettingsRepository) Save(ctx context.Context, settings *interfaces.Settings) error {
+func (r *SettingsRepository) Save(ctx context.Context, settings *domain.Settings) error {
 	r.Logger.Debug("Saving settings to database", zap.String("whatsapp_id", settings.WhatsappID))
 	var count int
 	err := r.pool.QueryRow(ctx, "SELECT COUNT(*) FROM whatsgate_settings").Scan(&count)
@@ -142,7 +142,7 @@ func (r *SettingsRepository) IsConfigured(ctx context.Context) bool {
 }
 
 // GetSettingsHistory возвращает историю изменений настроек
-func (r *SettingsRepository) GetSettingsHistory(ctx context.Context) ([]interfaces.Settings, error) {
+func (r *SettingsRepository) GetSettingsHistory(ctx context.Context) ([]domain.Settings, error) {
 	r.Logger.Debug("Getting settings history from database")
 	query := `
 		SELECT whatsapp_id, api_key, base_url, created_at
@@ -155,9 +155,9 @@ func (r *SettingsRepository) GetSettingsHistory(ctx context.Context) ([]interfac
 		return nil, appErr.New("DB_HISTORY_ERROR", "failed to get settings history", err)
 	}
 	defer rows.Close()
-	var history []interfaces.Settings
+	var history []domain.Settings
 	for rows.Next() {
-		var settings interfaces.Settings
+		var settings domain.Settings
 		var createdAt time.Time
 		err := rows.Scan(
 			&settings.WhatsappID,
