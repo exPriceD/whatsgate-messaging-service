@@ -8,14 +8,17 @@ import (
 
 	appErr "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
-	whatsgateDomain "whatsapp-service/internal/whatsgate/domain"
+	whatsgateService "whatsapp-service/internal/whatsgate/usecase"
 
 	"go.uber.org/zap"
 
 	"mime/multipart"
 	"whatsapp-service/internal/bulk/domain"
-	"whatsapp-service/internal/bulk/infra"
-	"whatsapp-service/internal/bulk/usecase"
+	bulkInfra "whatsapp-service/internal/bulk/infra"
+	"whatsapp-service/internal/bulk/interfaces"
+	bulkService "whatsapp-service/internal/bulk/usecase"
+
+	whatsgateInfra "whatsapp-service/internal/whatsgate/infra"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,7 +34,7 @@ import (
 // @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
 // @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/send [post]
-func SendMessageHandler(whatsgateService *whatsgateDomain.SettingsService) gin.HandlerFunc {
+func SendMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := c.MustGet("logger").(logger.Logger)
 		log.Debug("Incoming SendMessage request")
@@ -41,7 +44,7 @@ func SendMessageHandler(whatsgateService *whatsgateDomain.SettingsService) gin.H
 			c.Error(appErr.NewValidationError("Invalid request body: " + err.Error()))
 			return
 		}
-		if err := whatsgateDomain.ValidatePhoneNumber(request.PhoneNumber); err != nil {
+		if err := whatsgateInfra.ValidatePhoneNumber(request.PhoneNumber); err != nil {
 			log.Error("Invalid phone number", zap.String("phone", request.PhoneNumber), zap.Error(err))
 			c.Error(err)
 			return
@@ -51,7 +54,7 @@ func SendMessageHandler(whatsgateService *whatsgateDomain.SettingsService) gin.H
 			c.Error(appErr.NewValidationError("Message text is required"))
 			return
 		}
-		client, err := whatsgateService.GetClient()
+		client, err := ws.GetClient()
 		if err != nil {
 			log.Error("Failed to get WhatGate client", zap.Error(err))
 			c.Error(err)
@@ -85,7 +88,7 @@ func SendMessageHandler(whatsgateService *whatsgateDomain.SettingsService) gin.H
 // @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
 // @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/send-media [post]
-func SendMediaMessageHandler(whatsgateService *whatsgateDomain.SettingsService) gin.HandlerFunc {
+func SendMediaMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := c.MustGet("logger").(logger.Logger)
 		log.Debug("Incoming SendMediaMessage request")
@@ -95,12 +98,12 @@ func SendMediaMessageHandler(whatsgateService *whatsgateDomain.SettingsService) 
 			c.Error(appErr.NewValidationError("Invalid request body: " + err.Error()))
 			return
 		}
-		if err := whatsgateDomain.ValidatePhoneNumber(request.PhoneNumber); err != nil {
+		if err := whatsgateInfra.ValidatePhoneNumber(request.PhoneNumber); err != nil {
 			log.Error("Invalid phone number", zap.String("phone", request.PhoneNumber), zap.Error(err))
 			c.Error(err)
 			return
 		}
-		if err := whatsgateDomain.ValidateMessageType(request.MessageType); err != nil {
+		if err := whatsgateInfra.ValidateMessageType(request.MessageType); err != nil {
 			log.Error("Invalid message type", zap.String("type", request.MessageType), zap.Error(err))
 			c.Error(err)
 			return
@@ -111,7 +114,7 @@ func SendMediaMessageHandler(whatsgateService *whatsgateDomain.SettingsService) 
 			c.Error(appErr.NewValidationError("File data must be base64 encoded"))
 			return
 		}
-		client, err := whatsgateService.GetClient()
+		client, err := ws.GetClient()
 		if err != nil {
 			log.Error("Failed to get WhatGate client", zap.Error(err))
 			c.Error(err)
@@ -157,15 +160,17 @@ func SendMediaMessageHandler(whatsgateService *whatsgateDomain.SettingsService) 
 // @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
 // @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/bulk-send [post]
-func BulkSendHandler(whatsgateService *whatsgateDomain.SettingsService) gin.HandlerFunc {
+func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage interfaces.BulkCampaignStorage, statusStorage interfaces.BulkCampaignStatusStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := c.MustGet("logger").(logger.Logger)
 		log.Debug("Incoming BulkSend request (refactored)")
 
-		bulkService := &usecase.BulkService{
+		bs := &bulkService.BulkService{
 			Logger:          log,
-			WhatsGateClient: &infra.WhatGateClientAdapter{Service: (*whatsgateDomain.SettingsService)(whatsgateService)},
-			FileParser:      &infra.FileParserAdapter{Logger: log},
+			WhatsGateClient: &bulkInfra.WhatGateClientAdapter{Service: wgService},
+			FileParser:      &bulkInfra.FileParserAdapter{Logger: log},
+			CampaignStorage: bulkStorage,
+			StatusStorage:   statusStorage,
 		}
 
 		contentType := c.ContentType()
@@ -205,7 +210,7 @@ func BulkSendHandler(whatsgateService *whatsgateDomain.SettingsService) gin.Hand
 				MediaFile:       mediaFile,
 			}
 
-			result, err := bulkService.HandleBulkSendMultipart(c.Request.Context(), params)
+			result, err := bs.HandleBulkSendMultipart(c.Request.Context(), params)
 			if err != nil {
 				c.Error(appErr.NewValidationError("Bulk send error: " + err.Error()))
 				return

@@ -4,8 +4,8 @@ import (
 	"net/http"
 	appErr "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
-	whatsgateDomain "whatsapp-service/internal/whatsgate/domain"
-	"whatsapp-service/internal/whatsgate/interfaces"
+	"whatsapp-service/internal/whatsgate/domain"
+	whatsgateService "whatsapp-service/internal/whatsgate/usecase"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -19,10 +19,10 @@ import (
 // @Produce json
 // @Success 200 {object} types.WhatGateSettings "OK"
 // @Router /settings [get]
-func GetSettingsHandler(whatsgateService *whatsgateDomain.SettingsService) gin.HandlerFunc {
+func GetSettingsHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := c.MustGet("logger").(logger.Logger)
-		settings := whatsgateService.GetSettings()
+		settings := ws.GetSettings()
 		log.Info("Get settings", zap.String("whatsapp_id", settings.WhatsappID))
 		response := WhatsGateSettings{
 			WhatsappID: settings.WhatsappID,
@@ -43,7 +43,7 @@ func GetSettingsHandler(whatsgateService *whatsgateDomain.SettingsService) gin.H
 // @Success 200 {object} types.WhatGateSettings "OK"
 // @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
 // @Router /settings [put]
-func UpdateSettingsHandler(whatsgateService *whatsgateDomain.SettingsService) gin.HandlerFunc {
+func UpdateSettingsHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := c.MustGet("logger").(logger.Logger)
 		var request WhatsGateSettings
@@ -52,12 +52,12 @@ func UpdateSettingsHandler(whatsgateService *whatsgateDomain.SettingsService) gi
 			c.Error(appErr.NewValidationError("Invalid request body: " + err.Error()))
 			return
 		}
-		whatsgateSettings := &interfaces.Settings{
+		whatsgateSettings := &domain.Settings{
 			WhatsappID: request.WhatsappID,
 			APIKey:     request.APIKey,
 			BaseURL:    request.BaseURL,
 		}
-		if err := whatsgateService.UpdateSettings(whatsgateSettings); err != nil {
+		if err := ws.UpdateSettings(whatsgateSettings); err != nil {
 			log.Error("Failed to update settings", zap.Error(err))
 			c.Error(err)
 			return
@@ -76,10 +76,10 @@ func UpdateSettingsHandler(whatsgateService *whatsgateDomain.SettingsService) gi
 // @Success 200 {object} types.SuccessResponse "OK"
 // @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
 // @Router /settings/reset [delete]
-func ResetSettingsHandler(whatsgateService *whatsgateDomain.SettingsService) gin.HandlerFunc {
+func ResetSettingsHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := c.MustGet("logger").(logger.Logger)
-		if err := whatsgateService.ResetSettings(); err != nil {
+		if err := ws.ResetSettings(); err != nil {
 			log.Error("Failed to reset settings", zap.Error(err))
 			c.Error(appErr.New("RESET_ERROR", "Failed to reset settings", err))
 			return

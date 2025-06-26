@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+	"whatsapp-service/internal/bulk/interfaces"
 	"whatsapp-service/internal/config"
 	"whatsapp-service/internal/delivery/http/handlers"
 	"whatsapp-service/internal/logger"
-	whatsgate_domain "whatsapp-service/internal/whatsgate/domain"
-
-	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
+	whatsgateService "whatsapp-service/internal/whatsgate/usecase"
 )
 
 // Server представляет HTTP-сервер приложения.
@@ -21,22 +21,26 @@ type Server struct {
 	logger           logger.Logger
 	config           config.HTTPConfig
 	handlers         *handlers.Server
-	whatsgateService *whatsgate_domain.SettingsService
+	whatsgateService *whatsgateService.SettingsUsecase
+	bulkStorage      interfaces.BulkCampaignStorage
+	statusStorage    interfaces.BulkCampaignStatusStorage
 }
 
 // NewServer создает новый HTTP-сервер.
-func NewServer(cfg config.HTTPConfig, log logger.Logger, whatsgateService *whatsgate_domain.SettingsService) *Server {
+func NewServer(cfg config.HTTPConfig, log logger.Logger, ws *whatsgateService.SettingsUsecase, bulkStorage interfaces.BulkCampaignStorage, statusStorage interfaces.BulkCampaignStatusStorage) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 
-	handlersServer := handlers.NewServer(log, whatsgateService)
+	handlersServer := handlers.NewServer(log, ws, bulkStorage, statusStorage)
 
 	server := &Server{
 		engine:           engine,
 		logger:           log,
 		config:           cfg,
 		handlers:         handlersServer,
-		whatsgateService: whatsgateService,
+		whatsgateService: ws,
+		bulkStorage:      bulkStorage,
+		statusStorage:    statusStorage,
 		server: &http.Server{
 			Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 			Handler:      engine,

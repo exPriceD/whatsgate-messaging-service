@@ -26,7 +26,7 @@ func (s *Server) setupRoutes() {
 	s.engine.DELETE("/settings/reset", settings.ResetSettingsHandler(s.whatsgateService))
 	s.engine.POST("/messages/send", messages.SendMessageHandler(s.whatsgateService))
 	s.engine.POST("/messages/send-media", messages.SendMediaMessageHandler(s.whatsgateService))
-	s.engine.POST("/messages/bulk-send", messages.BulkSendHandler(s.whatsgateService))
+	s.engine.POST("/messages/bulk-send", messages.BulkSendHandler(s.whatsgateService, s.bulkStorage, s.statusStorage))
 
 	// API v1 (версионированные роуты)
 	v1 := s.engine.Group("/api/v1")
@@ -42,6 +42,6 @@ func (s *Server) setupRoutes() {
 		// Отправка сообщений
 		v1.POST("/messages/send", messages.SendMessageHandler(s.whatsgateService))
 		v1.POST("/messages/send-media", messages.SendMediaMessageHandler(s.whatsgateService))
-		v1.POST("/messages/bulk-send", messages.BulkSendHandler(s.whatsgateService))
+		v1.POST("/messages/bulk-send", messages.BulkSendHandler(s.whatsgateService, s.bulkStorage, s.statusStorage))
 	}
 }
