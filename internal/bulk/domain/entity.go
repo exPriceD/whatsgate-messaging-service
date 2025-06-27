@@ -4,6 +4,7 @@ package domain
 type BulkCampaign struct {
 	ID              string
 	CreatedAt       string
+	Name            string
 	Message         string
 	Total           int
 	Status          string

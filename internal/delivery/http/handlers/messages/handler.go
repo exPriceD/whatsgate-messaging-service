@@ -178,6 +178,7 @@ func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage in
 
 		contentType := c.ContentType()
 		if strings.HasPrefix(contentType, "multipart/form-data") {
+			name := c.PostForm("name")
 			message := c.PostForm("message")
 			async := c.PostForm("async") == "true"
 			messagesPerHourStr := c.PostForm("messages_per_hour")
@@ -206,6 +207,7 @@ func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage in
 				mediaFile = mf
 			}
 			params := domain.BulkSendParams{
+				Name:            name,
 				Message:         message,
 				Async:           async,
 				MessagesPerHour: messagesPerHour,

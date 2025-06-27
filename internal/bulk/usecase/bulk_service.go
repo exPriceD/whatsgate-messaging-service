@@ -72,6 +72,7 @@ func (s *BulkService) HandleBulkSendMultipart(ctx context.Context, params domain
 	}
 	campaign := &domain.BulkCampaign{
 		ID:              campaignID,
+		Name:            params.Name,
 		Message:         message,
 		Total:           len(phones),
 		Status:          "started",
