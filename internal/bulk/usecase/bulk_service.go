@@ -10,8 +10,8 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
+	"whatsapp-service/internal/utils"
 
 	"whatsapp-service/internal/bulk/domain"
 	"whatsapp-service/internal/bulk/interfaces"
@@ -210,36 +210,6 @@ func parsePhonesFromFile(file *multipart.FileHeader, parser interfaces.FileParse
 	return phones, nil
 }
 
-// Список поддерживаемых mimetype
-var allowedMimeTypes = map[string]struct{}{
-	"application/ogg":               {},
-	"application/pdf":               {},
-	"application/zip":               {},
-	"application/gzip":              {},
-	"application/msword":            {},
-	"audio/mp4":                     {},
-	"audio/aac":                     {},
-	"audio/mpeg":                    {},
-	"audio/ogg":                     {},
-	"audio/webm":                    {},
-	"image/gif":                     {},
-	"image/jpeg":                    {},
-	"image/pjpeg":                   {},
-	"image/png":                     {},
-	"image/svg+xml":                 {},
-	"image/tiff":                    {},
-	"image/webp":                    {},
-	"video/mpeg":                    {},
-	"video/mp4":                     {},
-	"video/ogg":                     {},
-	"video/quicktime":               {},
-	"video/webm":                    {},
-	"video/x-ms-wmv":                {},
-	"video/x-flv":                   {},
-	"application/vnd.ms-excel":      {},
-	"application/vnd.ms-powerpoint": {},
-}
-
 // parseMediaFromFile — читает медиа-файл и возвращает BulkMedia с корректным MessageType
 func parseMediaFromFile(file *multipart.FileHeader) (*domain.BulkMedia, error) {
 	if file == nil {
@@ -269,23 +239,8 @@ func parseMediaFromFile(file *multipart.FileHeader) (*domain.BulkMedia, error) {
 		}
 	}
 
-	messageType := "doc"
-	if _, ok := allowedMimeTypes[mediaMimeType]; ok {
-		if strings.HasPrefix(mediaMimeType, "image/") {
-			messageType = "image"
-		} else if strings.HasPrefix(mediaMimeType, "audio/") {
-			messageType = "voice"
-		} else if strings.HasPrefix(mediaMimeType, "video/") {
-			messageType = "doc"
-		} else if strings.HasPrefix(mediaMimeType, "application/") {
-			messageType = "doc"
-		}
-	} else {
-		messageType = "doc"
-	}
-
 	return &domain.BulkMedia{
-		MessageType: messageType,
+		MessageType: utils.DetectMessageType(mediaMimeType),
 		Filename:    mediaFilename,
 		MimeType:    mediaMimeType,
 		FileData:    base64.StdEncoding.EncodeToString(mediaBytes),
