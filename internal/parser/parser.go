@@ -52,6 +52,7 @@ func ParsePhonesFromExcel(filePath string, columnName string, log logger.Logger)
 	}
 
 	var result ParseResult
+	seen := make(map[string]struct{})
 	for rowIdx, row := range rows[1:] {
 		if phoneCol >= len(row) {
 			log.Error("Row does not have enough columns", zap.Int("row", rowIdx+2))
@@ -60,7 +61,10 @@ func ParsePhonesFromExcel(filePath string, columnName string, log logger.Logger)
 		raw := row[phoneCol]
 		normalized := normalizePhone(raw)
 		if isValidPhone(normalized) {
-			result.ValidPhones = append(result.ValidPhones, normalized)
+			if _, exists := seen[normalized]; !exists {
+				result.ValidPhones = append(result.ValidPhones, normalized)
+				seen[normalized] = struct{}{}
+			}
 		} else {
 			log.Info("Invalid phone found", zap.String("raw", raw), zap.Int("row", rowIdx+2))
 			result.InvalidPhones = append(result.InvalidPhones, raw)
