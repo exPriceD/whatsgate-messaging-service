@@ -96,7 +96,7 @@ func (s *BulkService) HandleBulkSendMultipart(ctx context.Context, params domain
 		}
 	}
 
-	return s.handleBulkSendCore(ctx, message, async, messagesPerHour, phones, media, log, campaignID)
+	return s.handleBulkSendCore(context.Background(), message, async, messagesPerHour, phones, media, log, campaignID)
 }
 
 // handleBulkSendCore — общая логика bulk-рассылки (rate limit, sync/async, отправка)

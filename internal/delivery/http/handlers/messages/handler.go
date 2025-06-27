@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
 	appErr "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
 	whatsgateService "whatsapp-service/internal/whatsgate/usecase"
@@ -120,8 +119,9 @@ func SendMediaMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFu
 			c.Error(err)
 			return
 		}
+		ctx := c.Request.Context()
 		response, err := client.SendMediaMessage(
-			c.Request.Context(),
+			ctx,
 			request.PhoneNumber,
 			request.MessageType,
 			request.Message,
@@ -210,7 +210,8 @@ func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage in
 				MediaFile:       mediaFile,
 			}
 
-			result, err := bs.HandleBulkSendMultipart(c.Request.Context(), params)
+			ctx := c.Request.Context()
+			result, err := bs.HandleBulkSendMultipart(ctx, params)
 			if err != nil {
 				c.Error(appErr.NewValidationError("Bulk send error: " + err.Error()))
 				return

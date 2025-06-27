@@ -34,7 +34,7 @@ func (s *Server) setupRoutes() {
 		v1.GET("/health", health.ServiceHealthHandler())
 		v1.GET("/status", health.StatusHandler(apiVersion))
 
-		// Настройки WhatGate
+		// Настройки
 		v1.GET("/settings", settings.GetSettingsHandler(s.whatsgateService))
 		v1.PUT("/settings", settings.UpdateSettingsHandler(s.whatsgateService))
 		v1.DELETE("/settings/reset", settings.ResetSettingsHandler(s.whatsgateService))
