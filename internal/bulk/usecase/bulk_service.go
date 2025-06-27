@@ -139,6 +139,7 @@ func (s *BulkService) handleBulkSendCore(
 				end = len(phones)
 			}
 			batch := phones[i:end]
+			sentCount := 0
 			for _, phone := range batch {
 				statuses, _ := statusRepo.ListByCampaignID(campaignID)
 				var statusID string
@@ -151,15 +152,19 @@ func (s *BulkService) handleBulkSendCore(
 				if statusID == "" {
 					continue
 				}
+				var res domain.SingleSendResult
 				if media != nil {
-					sendMedia(ctx, phone, statusID)
+					res = sendMedia(ctx, phone, statusID)
 				} else {
-					sendText(ctx, phone, statusID)
+					res = sendText(ctx, phone, statusID)
+				}
+				if res.Success {
+					sentCount++
 				}
 				time.Sleep(time.Second)
 			}
-			if end < len(phones) {
-				log.Info(fmt.Sprintf("Bulk send sleeping for 1 hour: sent=%d", end))
+			if sentCount >= batchSize && end < len(phones) {
+				log.Info(fmt.Sprintf("Bulk send sleeping for 1 hour: sent=%d", sentCount))
 				time.Sleep(time.Hour)
 			}
 		}
