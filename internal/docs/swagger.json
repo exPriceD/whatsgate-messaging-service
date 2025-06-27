@@ -215,6 +215,63 @@
                 }
             }
         },
+        "/messages/test-send": {
+            "post": {
+                "description": "Отправляет тестовое сообщение на один номер, принимает multipart/form-data (phone, message, media_file)",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Тестовая отправка сообщения (текст/медиа)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Номер телефона",
+                        "name": "phone",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Текст сообщения",
+                        "name": "message",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Медиа-файл (опционально)",
+                        "name": "media_file",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешный ответ",
+                        "schema": {
+                            "$ref": "#/definitions/messages.SendMessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Ошибка валидации",
+                        "schema": {
+                            "$ref": "#/definitions/messages.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/messages.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/settings": {
             "get": {
                 "description": "Возвращает текущие настройки WhatGate API",

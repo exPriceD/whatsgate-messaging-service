@@ -43,5 +43,6 @@ func (s *Server) setupRoutes() {
 		v1.POST("/messages/send", messages.SendMessageHandler(s.whatsgateService))
 		v1.POST("/messages/send-media", messages.SendMediaMessageHandler(s.whatsgateService))
 		v1.POST("/messages/bulk-send", messages.BulkSendHandler(s.whatsgateService, s.bulkStorage, s.statusStorage))
+		v1.POST("/messages/test-send", messages.TestSendHandler(s.whatsgateService))
 	}
 }

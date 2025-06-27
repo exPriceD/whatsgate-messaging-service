@@ -48,10 +48,24 @@ export function initBulkForm(showToast) {
   mediaInput.onchange = () => {
     mediaName.textContent = mediaInput.files[0]?.name || 'Файл не выбран';
   };
-  // Тестовый запрос отключён, т.к. нет эндпоинта в swagger
+
   const testBtn = document.getElementById('send-test');
-  testBtn.disabled = true;
-  form.testPhone.disabled = true;
+  testBtn.disabled = false;
+  form.testPhone.disabled = false;
+  testBtn.onclick = async () => {
+    const testPhone = form.testPhone.value.trim();
+    if (!testPhone) return showToast('Введите номер для теста', 'danger');
+    const fd = new FormData();
+    fd.append('phone', testPhone);
+    fd.append('message', form.message.value);
+    if (form.media_file.files[0]) fd.append('media_file', form.media_file.files[0]);
+    fetch('/api/v1/messages/test-send', {
+      method: 'POST',
+      body: fd
+    })
+      .then(r => r.ok ? showToast('Тестовое сообщение отправлено', 'success') : r.json().then(d => Promise.reject(d)))
+      .catch(() => showToast('Ошибка отправки теста', 'danger'));
+  };
   form.onsubmit = e => {
     e.preventDefault();
     const fd = new FormData();

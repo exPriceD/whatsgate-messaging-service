@@ -1,12 +1,15 @@
 package messages
 
 import (
+	"context"
 	"encoding/base64"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	appErr "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
+	"whatsapp-service/internal/utils"
 	whatsgateService "whatsapp-service/internal/whatsgate/usecase"
 
 	"go.uber.org/zap"
@@ -229,5 +232,103 @@ func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage in
 			return
 		}
 		c.Error(appErr.NewValidationError("Only multipart supported"))
+	}
+}
+
+// TestSendHandler godoc
+// @Summary Тестовая отправка сообщения (текст/медиа)
+// @Description Отправляет тестовое сообщение на один номер, принимает multipart/form-data (phone, message, media_file)
+// @Tags messages
+// @Accept multipart/form-data
+// @Produce json
+// @Param phone formData string true "Номер телефона"
+// @Param message formData string true "Текст сообщения"
+// @Param media_file formData file false "Медиа-файл (опционально)"
+// @Success 200 {object} SendMessageResponse "Успешный ответ"
+// @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
+// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /messages/test-send [post]
+func TestSendHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := c.MustGet("logger").(logger.Logger)
+		phone := c.PostForm("phone")
+		message := c.PostForm("message")
+		file, err := c.FormFile("media_file")
+		if err == nil && file != nil {
+			// Медиа-файл есть
+			opened, err := file.Open()
+			if err != nil {
+				log.Error("Failed to open media file", zap.Error(err))
+				c.Error(appErr.NewValidationError("Failed to open media file: " + err.Error()))
+				return
+			}
+			defer opened.Close()
+			data, err := io.ReadAll(opened)
+			if err != nil {
+				log.Error("Failed to read media file", zap.Error(err))
+				c.Error(appErr.NewValidationError("Failed to read media file: " + err.Error()))
+				return
+			}
+			fileData := base64.StdEncoding.EncodeToString(data)
+			payload := SendMediaMessageRequest{
+				PhoneNumber: phone,
+				Message:     message,
+				MessageType: utils.DetectMessageType(file.Header.Get("Content-Type")),
+				Filename:    file.Filename,
+				FileData:    fileData,
+				MimeType:    file.Header.Get("Content-Type"),
+				Async:       false,
+			}
+			client, err := ws.GetClient()
+			if err != nil {
+				log.Error("Failed to get WhatGate client", zap.Error(err))
+				c.Error(err)
+				return
+			}
+			response, err := client.SendMediaMessage(
+				context.Background(),
+				payload.PhoneNumber,
+				payload.MessageType,
+				payload.Message,
+				payload.Filename,
+				data,
+				payload.MimeType,
+				payload.Async,
+			)
+			if err != nil {
+				log.Error("Failed to send media message", zap.Error(err))
+				c.Error(appErr.New("SEND_ERROR", "Failed to send media message", err))
+				return
+			}
+			log.Info("Test media message sent successfully", zap.String("phone", payload.PhoneNumber), zap.String("id", response.ID))
+			c.JSON(http.StatusOK, SendMessageResponse{
+				Success: true,
+				Message: "Test media message sent successfully",
+				ID:      response.ID,
+				Status:  response.Status,
+			})
+			return
+		}
+		// Если файла нет — обычный текст
+		client, err := ws.GetClient()
+		if err != nil {
+			log.Error("Failed to get WhatGate client", zap.Error(err))
+			c.Error(err)
+			return
+		}
+		ctx := c.Request.Context()
+		response, err := client.SendTextMessage(ctx, phone, message, false)
+		if err != nil {
+			log.Error("Failed to send test message", zap.Error(err))
+			c.Error(appErr.New("SEND_ERROR", "Failed to send test message", err))
+			return
+		}
+		log.Info("Test message sent successfully", zap.String("phone", phone), zap.String("id", response.ID))
+		c.JSON(http.StatusOK, SendMessageResponse{
+			Success: true,
+			Message: "Test message sent successfully",
+			ID:      response.ID,
+			Status:  response.Status,
+		})
 	}
 }

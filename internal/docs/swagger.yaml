@@ -275,6 +275,45 @@ paths:
       summary: Отправить медиа-сообщение
       tags:
       - messages
+  /messages/test-send:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Отправляет тестовое сообщение на один номер, принимает multipart/form-data
+        (phone, message, media_file)
+      parameters:
+      - description: Номер телефона
+        in: formData
+        name: phone
+        required: true
+        type: string
+      - description: Текст сообщения
+        in: formData
+        name: message
+        required: true
+        type: string
+      - description: Медиа-файл (опционально)
+        in: formData
+        name: media_file
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешный ответ
+          schema:
+            $ref: '#/definitions/messages.SendMessageResponse'
+        "400":
+          description: Ошибка валидации
+          schema:
+            $ref: '#/definitions/messages.ErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/messages.ErrorResponse'
+      summary: Тестовая отправка сообщения (текст/медиа)
+      tags:
+      - messages
   /settings:
     get:
       consumes:
