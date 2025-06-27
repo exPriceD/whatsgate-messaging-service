@@ -16,7 +16,6 @@ CREATE TABLE IF NOT EXISTS bulk_campaign_statuses (
     campaign_id UUID NOT NULL REFERENCES bulk_campaigns(id) ON DELETE CASCADE,
     phone_number TEXT NOT NULL,
     status TEXT NOT NULL,
-    message_id TEXT,
     error TEXT,
     sent_at TIMESTAMP
 );
