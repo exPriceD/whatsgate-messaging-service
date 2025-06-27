@@ -42,34 +42,107 @@ export function initBulkForm(showToast) {
   const fileName = document.getElementById('file-name-xlsx');
   fileInput.onchange = () => {
     fileName.textContent = fileInput.files[0]?.name || 'Файл не выбран';
+    if (fileInput.files[0]) fileName.style.color = '#2ecc40';
+    else fileName.style.color = '#b0b0b0';
   };
   const mediaInput = form.querySelector('input[name="media_file"]');
   const mediaName = document.getElementById('file-name-media');
   mediaInput.onchange = () => {
     mediaName.textContent = mediaInput.files[0]?.name || 'Файл не выбран';
+    if (mediaInput.files[0]) mediaName.style.color = '#2ecc40';
+    else mediaName.style.color = '#b0b0b0';
   };
 
   const testBtn = document.getElementById('send-test');
   testBtn.disabled = false;
   form.testPhone.disabled = false;
+  form.testPhone.placeholder = '7XXXXXXXXXX';
+
+  // Вспомогательная функция для спиннера
+  function setLoading(isLoading, btn) {
+    if (isLoading) {
+      btn.disabled = true;
+      btn.innerHTML = 'Отправка... <span class="spinner"></span>';
+    } else {
+      btn.disabled = false;
+      btn.textContent = btn.id === 'send-test' ? 'Отправить тест' : 'Отправить';
+    }
+  }
+
   testBtn.onclick = async () => {
     const testPhone = form.testPhone.value.trim();
-    if (!testPhone) return showToast('Введите номер для теста', 'danger');
+    const message = form.message.value.trim();
+    // Валидация номера
+    if (!/^7\d{10}$/.test(testPhone)) {
+      showToast('Введите корректный номер: 11 цифр, начинается с 7', 'danger');
+      form.testPhone.classList.add('error');
+      form.testPhone.focus();
+      return;
+    } else {
+      form.testPhone.classList.remove('error');
+    }
+    // Валидация сообщения
+    if (!message) {
+      showToast('Введите текст сообщения', 'danger');
+      form.message.classList.add('error');
+      form.message.focus();
+      return;
+    } else {
+      form.message.classList.remove('error');
+    }
+    // Валидация медиа (если есть)
+    if (form.media_file.files[0]) {
+      const file = form.media_file.files[0];
+      if (file.size > 20 * 1024 * 1024) {
+        showToast('Медиафайл не должен превышать 20 МБ', 'danger');
+        return;
+      }
+    }
+    setLoading(true, testBtn);
     const fd = new FormData();
     fd.append('phone', testPhone);
-    fd.append('message', form.message.value);
+    fd.append('message', message);
     if (form.media_file.files[0]) fd.append('media_file', form.media_file.files[0]);
     fetch('/api/v1/messages/test-send', {
       method: 'POST',
       body: fd
     })
       .then(r => r.ok ? showToast('Тестовое сообщение отправлено', 'success') : r.json().then(d => Promise.reject(d)))
-      .catch(() => showToast('Ошибка отправки теста', 'danger'));
+      .catch(() => showToast('Ошибка отправки теста', 'danger'))
+      .finally(() => setLoading(false, testBtn));
   };
+
   form.onsubmit = e => {
     e.preventDefault();
+    // Валидация массовой рассылки
+    const message = form.message.value.trim();
+    if (!message) {
+      showToast('Введите текст сообщения', 'danger');
+      form.message.classList.add('error');
+      form.message.focus();
+      return;
+    } else {
+      form.message.classList.remove('error');
+    }
+    if (!form.numbers_file.files[0]) {
+      showToast('Выберите файл номеров', 'danger');
+      form.numbers_file.classList.add('error');
+      form.numbers_file.focus();
+      return;
+    } else {
+      form.numbers_file.classList.remove('error');
+    }
+    if (form.media_file.files[0]) {
+      const file = form.media_file.files[0];
+      if (file.size > 20 * 1024 * 1024) {
+        showToast('Медиафайл не должен превышать 20 МБ', 'danger');
+        return;
+      }
+    }
+    setLoading(true, form.querySelector('button[type="submit"]'));
     const fd = new FormData();
-    fd.append('message', form.message.value);
+    fd.append('name', form.name.value.trim());
+    fd.append('message', message);
     fd.append('messages_per_hour', form.messages_per_hour.value);
     fd.append('numbers_file', form.numbers_file.files[0]);
     if (form.media_file.files[0]) fd.append('media_file', form.media_file.files[0]);
@@ -79,6 +152,7 @@ export function initBulkForm(showToast) {
       body: fd
     })
       .then(r => r.ok ? showToast('Рассылка запущена', 'success') : r.json().then(d => Promise.reject(d)))
-      .catch(() => showToast('Ошибка запуска рассылки', 'danger'));
+      .catch(() => showToast('Ошибка запуска рассылки', 'danger'))
+      .finally(() => setLoading(false, form.querySelector('button[type="submit"]')));
   };
 } 
