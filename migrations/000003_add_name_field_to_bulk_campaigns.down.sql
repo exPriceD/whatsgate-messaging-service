@@ -1,0 +1,1 @@
+ALTER TABLE bulk_campaigns DROP COLUMN name;
