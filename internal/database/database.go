@@ -40,7 +40,7 @@ func NewPostgresPool(ctx context.Context, dbCfg Config) (DB, error) {
 		return nil, appErr.New("DB_CONFIG_INVALID", "invalid database config", err)
 	}
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s&timezone=Europe/Moscow",
 		dbCfg.User, dbCfg.Password, dbCfg.Host, dbCfg.Port, dbCfg.Name, dbCfg.SSLMode)
 
 	poolCfg, err := pgxpool.ParseConfig(dsn)

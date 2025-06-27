@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"fmt"
 	"sync"
 	"whatsapp-service/internal/bulk/domain"
 )
@@ -28,8 +29,9 @@ func (m *MockBulkCampaignStorage) UpdateStatus(id, status string) error {
 	defer m.mu.Unlock()
 	if campaign, exists := m.Campaigns[id]; exists {
 		campaign.Status = status
+		return nil
 	}
-	return nil
+	return fmt.Errorf("campaign not found: %s", id)
 }
 
 func (m *MockBulkCampaignStorage) GetByID(id string) (*domain.BulkCampaign, error) {
@@ -39,6 +41,26 @@ func (m *MockBulkCampaignStorage) GetByID(id string) (*domain.BulkCampaign, erro
 		return campaign, nil
 	}
 	return nil, nil
+}
+
+func (m *MockBulkCampaignStorage) List() ([]*domain.BulkCampaign, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var result []*domain.BulkCampaign
+	for _, campaign := range m.Campaigns {
+		result = append(result, campaign)
+	}
+	return result, nil
+}
+
+func (m *MockBulkCampaignStorage) UpdateProcessedCount(id string, processedCount int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if campaign, exists := m.Campaigns[id]; exists {
+		campaign.ProcessedCount = processedCount
+		return nil
+	}
+	return fmt.Errorf("campaign not found: %s", id)
 }
 
 type MockBulkCampaignStatusStorage struct {

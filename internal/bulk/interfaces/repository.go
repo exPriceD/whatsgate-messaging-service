@@ -9,7 +9,9 @@ import (
 type BulkCampaignRepository interface {
 	Create(ctx context.Context, campaign *domain.BulkCampaign) error
 	UpdateStatus(ctx context.Context, id string, status string) error
+	UpdateProcessedCount(ctx context.Context, id string, processedCount int) error
 	GetByID(ctx context.Context, id string) (*domain.BulkCampaign, error)
+	List(ctx context.Context) ([]*domain.BulkCampaign, error)
 }
 
 // BulkCampaignStatusRepository — интерфейс для работы со статусами номеров

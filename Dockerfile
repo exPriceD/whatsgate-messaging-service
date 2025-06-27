@@ -4,6 +4,12 @@ COPY . .
 RUN go build -o app ./cmd/main.go
 
 FROM alpine:latest
+# Устанавливаем timezone для московского времени
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime && \
+    echo "Europe/Moscow" > /etc/timezone && \
+    apk del tzdata
+
 WORKDIR /app
 COPY --from=builder /app/app .
 COPY config/config.yaml config/config.yaml

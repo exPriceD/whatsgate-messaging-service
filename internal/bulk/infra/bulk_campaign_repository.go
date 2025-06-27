@@ -28,6 +28,7 @@ func (r *BulkCampaignRepository) InitTable(ctx context.Context) error {
 			name TEXT,
 			message TEXT NOT NULL,
 			total INT NOT NULL,
+			processed_count INT NOT NULL DEFAULT 0,
 			status TEXT NOT NULL,
 			media_filename TEXT,
 			media_mime TEXT,
@@ -47,13 +48,14 @@ func (r *BulkCampaignRepository) InitTable(ctx context.Context) error {
 func (r *BulkCampaignRepository) Create(ctx context.Context, campaign *domain.BulkCampaign) error {
 	r.Logger.Debug("Creating bulk campaign", zap.String("message", campaign.Message))
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO bulk_campaigns (id, created_at, name, message, total, status, media_filename, media_mime, media_type, messages_per_hour, initiator)
-		VALUES ($1, now(), $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO bulk_campaigns (id, created_at, name, message, total, processed_count, status, media_filename, media_mime, media_type, messages_per_hour, initiator)
+		VALUES ($1, now(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`,
 		campaign.ID,
 		campaign.Name,
 		campaign.Message,
 		campaign.Total,
+		campaign.ProcessedCount,
 		campaign.Status,
 		campaign.MediaFilename,
 		campaign.MediaMime,
@@ -78,12 +80,22 @@ func (r *BulkCampaignRepository) UpdateStatus(ctx context.Context, id string, st
 	return nil
 }
 
+func (r *BulkCampaignRepository) UpdateProcessedCount(ctx context.Context, id string, processedCount int) error {
+	r.Logger.Debug("Updating bulk campaign processed count", zap.String("id", id), zap.Int("processed", processedCount))
+	_, err := r.pool.Exec(ctx, `UPDATE bulk_campaigns SET processed_count=$1 WHERE id=$2`, processedCount, id)
+	if err != nil {
+		r.Logger.Error("Failed to update bulk campaign processed count", zap.Error(err))
+		return appErr.New("DB_BULK_UPDATE_PROCESSED_ERROR", "failed to update bulk campaign processed count", err)
+	}
+	return nil
+}
+
 func (r *BulkCampaignRepository) GetByID(ctx context.Context, id string) (*domain.BulkCampaign, error) {
 	r.Logger.Debug("Getting bulk campaign by id", zap.String("id", id))
-	row := r.pool.QueryRow(ctx, `SELECT id, created_at, name, message, total, status, media_filename, media_mime, media_type, messages_per_hour, initiator FROM bulk_campaigns WHERE id=$1`, id)
+	row := r.pool.QueryRow(ctx, `SELECT id, created_at, name, message, total, processed_count, status, media_filename, media_mime, media_type, messages_per_hour, initiator FROM bulk_campaigns WHERE id=$1`, id)
 	var c domain.BulkCampaign
 	var createdAt time.Time
-	err := row.Scan(&c.ID, &createdAt, &c.Name, &c.Message, &c.Total, &c.Status, &c.MediaFilename, &c.MediaMime, &c.MediaType, &c.MessagesPerHour, &c.Initiator)
+	err := row.Scan(&c.ID, &createdAt, &c.Name, &c.Message, &c.Total, &c.ProcessedCount, &c.Status, &c.MediaFilename, &c.MediaMime, &c.MediaType, &c.MessagesPerHour, &c.Initiator)
 	if err != nil {
 		r.Logger.Error("Failed to get bulk campaign", zap.Error(err))
 		return nil, appErr.New("DB_BULK_GET_ERROR", "failed to get bulk campaign", err)
@@ -94,7 +106,7 @@ func (r *BulkCampaignRepository) GetByID(ctx context.Context, id string) (*domai
 
 func (r *BulkCampaignRepository) List(ctx context.Context) ([]*domain.BulkCampaign, error) {
 	r.Logger.Debug("Listing all bulk campaigns")
-	rows, err := r.pool.Query(ctx, `SELECT id, created_at, name, message, total, status, media_filename, media_mime, media_type, messages_per_hour, initiator FROM bulk_campaigns ORDER BY created_at DESC`)
+	rows, err := r.pool.Query(ctx, `SELECT id, created_at, name, message, total, processed_count, status, media_filename, media_mime, media_type, messages_per_hour, initiator FROM bulk_campaigns ORDER BY created_at DESC`)
 	if err != nil {
 		r.Logger.Error("Failed to list bulk campaigns", zap.Error(err))
 		return nil, appErr.New("DB_BULK_LIST_ERROR", "failed to list bulk campaigns", err)
@@ -104,7 +116,7 @@ func (r *BulkCampaignRepository) List(ctx context.Context) ([]*domain.BulkCampai
 	for rows.Next() {
 		var c domain.BulkCampaign
 		var createdAt time.Time
-		if err := rows.Scan(&c.ID, &createdAt, &c.Name, &c.Message, &c.Total, &c.Status, &c.MediaFilename, &c.MediaMime, &c.MediaType, &c.MessagesPerHour, &c.Initiator); err != nil {
+		if err := rows.Scan(&c.ID, &createdAt, &c.Name, &c.Message, &c.Total, &c.ProcessedCount, &c.Status, &c.MediaFilename, &c.MediaMime, &c.MediaType, &c.MessagesPerHour, &c.Initiator); err != nil {
 			r.Logger.Error("Failed to scan bulk campaign row", zap.Error(err))
 			return nil, appErr.New("DB_BULK_SCAN_ERROR", "failed to scan bulk campaign row", err)
 		}

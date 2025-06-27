@@ -334,3 +334,103 @@ func TestSendHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 		})
 	}
 }
+
+// GetBulkCampaignsHandler godoc
+// @Summary Получить список рассылок
+// @Description Возвращает список всех массовых рассылок с их статусами
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Success 200 {array} BulkCampaignResponse "Список рассылок"
+// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /messages/campaigns [get]
+func GetBulkCampaignsHandler(bulkStorage interfaces.BulkCampaignStorage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := c.MustGet("logger").(logger.Logger)
+		log.Debug("Getting bulk campaigns list")
+
+		campaigns, err := bulkStorage.List()
+		if err != nil {
+			log.Error("Failed to get bulk campaigns", zap.Error(err))
+			c.Error(appErr.New("LIST_ERROR", "Failed to get bulk campaigns", err))
+			return
+		}
+
+		if campaigns == nil {
+			log.Info("No campaigns found, returning empty array")
+			c.JSON(http.StatusOK, []interface{}{})
+			return
+		}
+
+		var response []BulkCampaignResponse
+		for _, campaign := range campaigns {
+			response = append(response, BulkCampaignResponse{
+				ID:              campaign.ID,
+				Name:            campaign.Name,
+				CreatedAt:       campaign.CreatedAt,
+				Message:         campaign.Message,
+				Total:           campaign.Total,
+				ProcessedCount:  campaign.ProcessedCount,
+				Status:          campaign.Status,
+				MediaFilename:   campaign.MediaFilename,
+				MediaMime:       campaign.MediaMime,
+				MediaType:       campaign.MediaType,
+				MessagesPerHour: campaign.MessagesPerHour,
+				Initiator:       campaign.Initiator,
+			})
+		}
+
+		log.Info("Bulk campaigns list retrieved", zap.Int("count", len(response)))
+		c.JSON(http.StatusOK, response)
+	}
+}
+
+// GetBulkCampaignHandler godoc
+// @Summary Получить детали рассылки
+// @Description Возвращает детальную информацию о конкретной рассылке по ID
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Param id path string true "ID рассылки"
+// @Success 200 {object} BulkCampaignResponse "Детали рассылки"
+// @Failure 404 {object} messages.ErrorResponse "Рассылка не найдена"
+// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Router /messages/campaigns/{id} [get]
+func GetBulkCampaignHandler(bulkStorage interfaces.BulkCampaignStorage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := c.MustGet("logger").(logger.Logger)
+		campaignID := c.Param("id")
+		log.Debug("Getting bulk campaign details", zap.String("id", campaignID))
+
+		campaign, err := bulkStorage.GetByID(campaignID)
+		if err != nil {
+			log.Error("Failed to get bulk campaign", zap.String("id", campaignID), zap.Error(err))
+			c.Error(appErr.New("NOT_FOUND", "Campaign not found", err))
+			return
+		}
+
+		if campaign == nil {
+			log.Error("Campaign not found", zap.String("id", campaignID))
+			c.Error(appErr.New("NOT_FOUND", "Campaign not found", nil))
+			return
+		}
+
+		response := BulkCampaignResponse{
+			ID:              campaign.ID,
+			Name:            campaign.Name,
+			CreatedAt:       campaign.CreatedAt,
+			Message:         campaign.Message,
+			Total:           campaign.Total,
+			ProcessedCount:  campaign.ProcessedCount,
+			Status:          campaign.Status,
+			MediaFilename:   campaign.MediaFilename,
+			MediaMime:       campaign.MediaMime,
+			MediaType:       campaign.MediaType,
+			MessagesPerHour: campaign.MessagesPerHour,
+			Initiator:       campaign.Initiator,
+		}
+
+		log.Info("Bulk campaign details retrieved", zap.String("id", campaignID))
+		c.JSON(http.StatusOK, response)
+	}
+}

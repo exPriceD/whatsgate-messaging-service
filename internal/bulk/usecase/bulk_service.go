@@ -75,6 +75,7 @@ func (s *BulkService) HandleBulkSendMultipart(ctx context.Context, params domain
 		Name:            params.Name,
 		Message:         message,
 		Total:           len(phones),
+		ProcessedCount:  0,
 		Status:          "started",
 		MediaFilename:   mediaFilename,
 		MediaMime:       mediaMime,
@@ -134,6 +135,8 @@ func (s *BulkService) handleBulkSendCore(
 	go func() {
 		log.Info(fmt.Sprintf("Bulk send started in background: total=%d, rate=%d", len(phones), messagesPerHour))
 		batchSize := messagesPerHour
+		processedCount := 0
+
 		for i := 0; i < len(phones); i += batchSize {
 			end := i + batchSize
 			if end > len(phones) {
@@ -141,6 +144,7 @@ func (s *BulkService) handleBulkSendCore(
 			}
 			batch := phones[i:end]
 			sentCount := 0
+
 			for _, phone := range batch {
 				statuses, _ := statusRepo.ListByCampaignID(campaignID)
 				var statusID string
@@ -153,23 +157,31 @@ func (s *BulkService) handleBulkSendCore(
 				if statusID == "" {
 					continue
 				}
+
 				var res domain.SingleSendResult
 				if media != nil {
 					res = sendMedia(ctx, phone, statusID)
 				} else {
 					res = sendText(ctx, phone, statusID)
 				}
+
+				// Увеличиваем счетчик обработанных номеров
+				processedCount++
+				_ = s.CampaignStorage.UpdateProcessedCount(campaignID, processedCount)
+
 				if res.Success {
 					sentCount++
 				}
 				time.Sleep(time.Second)
 			}
+
 			if sentCount >= batchSize && end < len(phones) {
-				log.Info(fmt.Sprintf("Bulk send sleeping for 1 hour: sent=%d", sentCount))
+				log.Info(fmt.Sprintf("Bulk send sleeping for 1 hour: sent=%d, processed=%d", sentCount, processedCount))
 				time.Sleep(time.Hour)
 			}
 		}
-		log.Info("Bulk send finished in background")
+
+		log.Info(fmt.Sprintf("Bulk send finished in background: total processed=%d", processedCount))
 		_ = s.CampaignStorage.UpdateStatus(campaignID, "finished")
 	}()
 	return domain.BulkSendResult{Started: true, Message: "Bulk send started in background", Total: len(phones)}, nil

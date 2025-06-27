@@ -73,3 +73,19 @@ type BulkSendStartResponse struct {
 	Message string `json:"message" example:"Bulk send started in background"`
 	Total   int    `json:"total" example:"123"`
 }
+
+// BulkCampaignResponse — информация о рассылке для истории
+type BulkCampaignResponse struct {
+	ID              string  `json:"id" example:"uuid"`
+	Name            string  `json:"name" example:"Летняя акция"`
+	CreatedAt       string  `json:"created_at" example:"2023-01-01T12:00:00Z"`
+	Message         string  `json:"message" example:"Текст сообщения"`
+	Total           int     `json:"total" example:"100"`
+	ProcessedCount  int     `json:"processed_count" example:"45"`
+	Status          string  `json:"status" example:"started"`
+	MediaFilename   *string `json:"media_filename,omitempty" example:"image.jpg"`
+	MediaMime       *string `json:"media_mime,omitempty" example:"image/jpeg"`
+	MediaType       *string `json:"media_type,omitempty" example:"image"`
+	MessagesPerHour int     `json:"messages_per_hour" example:"20"`
+	Initiator       *string `json:"initiator,omitempty" example:"user@example.com"`
+}

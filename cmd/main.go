@@ -52,6 +52,8 @@ import (
 // @description Введите токен в формате: Bearer {token}
 
 func main() {
+	os.Setenv("TZ", "Europe/Moscow")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

@@ -27,6 +27,8 @@ func (s *Server) setupRoutes() {
 	s.engine.POST("/messages/send", messages.SendMessageHandler(s.whatsgateService))
 	s.engine.POST("/messages/send-media", messages.SendMediaMessageHandler(s.whatsgateService))
 	s.engine.POST("/messages/bulk-send", messages.BulkSendHandler(s.whatsgateService, s.bulkStorage, s.statusStorage))
+	s.engine.GET("/messages/campaigns", messages.GetBulkCampaignsHandler(s.bulkStorage))
+	s.engine.GET("/messages/campaigns/:id", messages.GetBulkCampaignHandler(s.bulkStorage))
 
 	// API v1 (версионированные роуты)
 	v1 := s.engine.Group("/api/v1")
@@ -44,5 +46,7 @@ func (s *Server) setupRoutes() {
 		v1.POST("/messages/send-media", messages.SendMediaMessageHandler(s.whatsgateService))
 		v1.POST("/messages/bulk-send", messages.BulkSendHandler(s.whatsgateService, s.bulkStorage, s.statusStorage))
 		v1.POST("/messages/test-send", messages.TestSendHandler(s.whatsgateService))
+		v1.GET("/messages/campaigns", messages.GetBulkCampaignsHandler(s.bulkStorage))
+		v1.GET("/messages/campaigns/:id", messages.GetBulkCampaignHandler(s.bulkStorage))
 	}
 }

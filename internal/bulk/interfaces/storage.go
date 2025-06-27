@@ -6,7 +6,9 @@ import "whatsapp-service/internal/bulk/domain"
 type BulkCampaignStorage interface {
 	Create(campaign *domain.BulkCampaign) error
 	UpdateStatus(id, status string) error
+	UpdateProcessedCount(id string, processedCount int) error
 	GetByID(id string) (*domain.BulkCampaign, error)
+	List() ([]*domain.BulkCampaign, error)
 }
 
 // BulkCampaignStatusStorage — интерфейс для storage-слоя (thread-safe)

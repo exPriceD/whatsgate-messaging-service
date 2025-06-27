@@ -7,6 +7,7 @@ type BulkCampaign struct {
 	Name            string
 	Message         string
 	Total           int
+	ProcessedCount  int
 	Status          string
 	MediaFilename   *string
 	MediaMime       *string
