@@ -16,6 +16,7 @@ func (s *Server) loggerToContextMiddleware() gin.HandlerFunc {
 
 // setupMiddleware настраивает middleware для сервера.
 func (s *Server) setupMiddleware() {
+	s.engine.Use(middleware.RequestIDMiddleware())
 	s.engine.Use(s.loggerToContextMiddleware())
 	s.engine.Use(middleware.Recovery(s.logger))
 	s.engine.Use(middleware.ErrorHandler(s.logger))
