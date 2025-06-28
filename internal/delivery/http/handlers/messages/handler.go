@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"whatsapp-service/internal/delivery/http/types"
 	appErrors "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
 	"whatsapp-service/internal/utils"
@@ -458,33 +459,30 @@ func GetBulkCampaignsHandler(bulkStorage interfaces.BulkCampaignStorage) gin.Han
 func GetBulkCampaignHandler(bulkStorage interfaces.BulkCampaignStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := c.MustGet("logger").(logger.Logger)
+		log.Debug("Incoming GetBulkCampaign request")
+
 		campaignID := c.Param("id")
-		log.Debug("Getting bulk campaign details", zap.String("id", campaignID))
+		if campaignID == "" {
+			c.Error(appErrors.NewValidationError("Campaign ID is required"))
+			return
+		}
 
 		campaign, err := bulkStorage.GetByID(campaignID)
 		if err != nil {
-			log.Error("Failed to get bulk campaign", zap.String("id", campaignID), zap.Error(err))
-			appErr := appErrors.NewDatabaseError("get_bulk_campaign", err).
-				WithContext(appErrors.FromContext(c.Request.Context())).
-				WithMetadata("component", "get_bulk_campaign_handler").
-				WithMetadata("campaign_id", campaignID)
-			c.Error(appErr)
+			log.Error("Failed to get bulk campaign", zap.String("campaign_id", campaignID), zap.Error(err))
+			c.Error(err)
 			return
 		}
 
 		if campaign == nil {
-			log.Error("Campaign not found", zap.String("id", campaignID))
-			appErr := appErrors.NewBulkCampaignNotFoundError(campaignID).
-				WithContext(appErrors.FromContext(c.Request.Context())).
-				WithMetadata("component", "get_bulk_campaign_handler")
-			c.Error(appErr)
+			c.Error(appErrors.New(appErrors.ErrorTypeValidation, "NOT_FOUND", "Campaign not found", nil))
 			return
 		}
 
 		response := BulkCampaignResponse{
 			ID:              campaign.ID,
-			Name:            campaign.Name,
 			CreatedAt:       campaign.CreatedAt,
+			Name:            campaign.Name,
 			Message:         campaign.Message,
 			Total:           campaign.Total,
 			ProcessedCount:  campaign.ProcessedCount,
@@ -496,7 +494,52 @@ func GetBulkCampaignHandler(bulkStorage interfaces.BulkCampaignStorage) gin.Hand
 			Initiator:       campaign.Initiator,
 		}
 
-		log.Info("Bulk campaign details retrieved", zap.String("id", campaignID))
 		c.JSON(http.StatusOK, response)
+	}
+}
+
+// CancelBulkCampaignHandler godoc
+// @Summary Отменить рассылку
+// @Description Отменяет активную рассылку по ID
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Param id path string true "ID рассылки"
+// @Success 200 {object} types.SuccessResponse "Рассылка отменена"
+// @Failure 400 {object} types.ClientErrorResponse "Ошибка валидации"
+// @Failure 404 {object} types.ClientErrorResponse "Рассылка не найдена"
+// @Failure 500 {object} types.ClientErrorResponse "Внутренняя ошибка сервера"
+// @Router /messages/campaigns/{id}/cancel [post]
+func CancelBulkCampaignHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage interfaces.BulkCampaignStorage, statusStorage interfaces.BulkCampaignStatusStorage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := c.MustGet("logger").(logger.Logger)
+		log.Debug("Incoming CancelBulkCampaign request")
+
+		campaignID := c.Param("id")
+		if campaignID == "" {
+			c.Error(appErrors.NewValidationError("Campaign ID is required"))
+			return
+		}
+
+		// Создаем экземпляр BulkService для отмены
+		bs := &bulkService.BulkService{
+			Logger:          log,
+			WhatsGateClient: &bulkInfra.WhatGateClientAdapter{Service: wgService},
+			FileParser:      &bulkInfra.FileParserAdapter{Logger: log},
+			CampaignStorage: bulkStorage,
+			StatusStorage:   statusStorage,
+		}
+
+		err := bs.CancelCampaign(c.Request.Context(), campaignID)
+		if err != nil {
+			log.Error("Failed to cancel bulk campaign", zap.String("campaign_id", campaignID), zap.Error(err))
+			c.Error(err)
+			return
+		}
+
+		c.JSON(http.StatusOK, types.SuccessResponse{
+			Success: true,
+			Message: "Campaign cancelled successfully",
+		})
 	}
 }

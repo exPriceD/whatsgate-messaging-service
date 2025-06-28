@@ -1,4 +1,4 @@
-import { apiGet } from '../ui/api.js';
+import { apiGet, apiPost } from '../ui/api.js';
 
 // Страница истории рассылок
 export function renderHistoryPage() {
@@ -351,7 +351,7 @@ export function initHistoryPage(showToast) {
           </div>
           
           ${campaign.media_filename ? `
-          <div class="detail-section" style="padding-bottom: 25px;">
+          <div class="detail-section" ${campaign.status === 'finished' ? 'style="padding-bottom: 25px;"':''}>
             <h4>📎 Медиа файл</h4>
             <div class="media-info">
               <div class="media-item">
@@ -360,6 +360,21 @@ export function initHistoryPage(showToast) {
                   <div class="media-name">${campaign.media_filename}</div>
                   <div class="media-type">${campaign.media_type} (${campaign.media_mime})</div>
                 </div>
+              </div>
+            </div>
+          </div>
+          ` : ''}
+          
+          ${campaign.status === 'started' ? `
+          <div class="detail-section" style="padding-bottom: 25px;">
+            <h4>⚡ Действия</h4>
+            <div class="actions-container">
+              <button class="cancel-campaign-btn" onclick="cancelCampaign('${campaign.id}', '${campaign.name || 'Без названия'}')">
+                <span class="cancel-icon">🚫</span>
+                <span class="cancel-text">Отменить рассылку</span>
+              </button>
+              <div class="cancel-warning">
+                ⚠️ Отмена остановит отправку всех неотправленных сообщений
               </div>
             </div>
           </div>
@@ -379,7 +394,8 @@ export function initHistoryPage(showToast) {
       'started': '🔄',
       'finished': '✅',
       'failed': '❌',
-      'pending': '⏳'
+      'pending': '⏳',
+      'cancelled': '🚫'
     };
     return iconMap[status] || '❓';
   }
@@ -389,7 +405,8 @@ export function initHistoryPage(showToast) {
       'started': 'Запущена',
       'finished': 'Завершена',
       'failed': 'Ошибка',
-      'pending': 'Ожидает'
+      'pending': 'Ожидает',
+      'cancelled': 'Отменена'
     };
     return statusMap[status] || status;
   }
@@ -426,4 +443,23 @@ export function initHistoryPage(showToast) {
 
   // Делаем функцию loadHistory доступной глобально для кнопки повтора
   window.loadHistory = loadHistory;
+  
+  // Функция для отмены рассылки (глобальная для доступа из onclick)
+  window.cancelCampaign = async function(campaignId, campaignName) {
+    if (!confirm(`Вы уверены, что хотите отменить рассылку "${campaignName}"?\n\nЭто действие нельзя отменить.`)) {
+      return;
+    }
+
+    try {
+      await apiPost(`/api/v1/messages/campaigns/${campaignId}/cancel`, {}, showToast);
+      showToast('Рассылка отменена', 'success');
+      // Закрываем модальное окно
+      modal.style.display = 'none';
+      // Перезагружаем историю
+      loadHistory();
+    } catch (error) {
+      console.error('Error cancelling campaign:', error);
+      // Ошибка уже обработана в apiPost
+    }
+  };
 } 

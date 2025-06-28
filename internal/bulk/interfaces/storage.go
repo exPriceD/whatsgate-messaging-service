@@ -9,6 +9,7 @@ type BulkCampaignStorage interface {
 	UpdateProcessedCount(id string, processedCount int) error
 	GetByID(id string) (*domain.BulkCampaign, error)
 	List() ([]*domain.BulkCampaign, error)
+	CancelCampaign(id string) error
 }
 
 // BulkCampaignStatusStorage — интерфейс для storage-слоя (thread-safe)
@@ -16,4 +17,5 @@ type BulkCampaignStatusStorage interface {
 	Create(status *domain.BulkCampaignStatus) error
 	Update(id string, status string, errMsg *string, sentAt *string) error
 	ListByCampaignID(campaignID string) ([]*domain.BulkCampaignStatus, error)
+	UpdateStatusesByCampaignID(campaignID string, oldStatus string, newStatus string) error
 }

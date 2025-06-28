@@ -76,7 +76,7 @@ func (s *BulkService) HandleBulkSendMultipart(ctx context.Context, params domain
 		Message:         message,
 		Total:           len(phones),
 		ProcessedCount:  0,
-		Status:          "started",
+		Status:          domain.CampaignStatusStarted,
 		MediaFilename:   mediaFilename,
 		MediaMime:       mediaMime,
 		MediaType:       mediaType,
@@ -90,7 +90,7 @@ func (s *BulkService) HandleBulkSendMultipart(ctx context.Context, params domain
 		status := &domain.BulkCampaignStatus{
 			CampaignID:  campaignID,
 			PhoneNumber: phone,
-			Status:      "pending",
+			Status:      domain.CampaignStatusPending,
 		}
 		err := s.StatusStorage.Create(status)
 		if err != nil {
@@ -138,6 +138,19 @@ func (s *BulkService) handleBulkSendCore(
 		processedCount := 0
 
 		for i := 0; i < len(phones); i += batchSize {
+			// Проверяем статус кампании перед обработкой батча
+			campaign, err := s.CampaignStorage.GetByID(campaignID)
+			if err != nil {
+				log.Error(fmt.Sprintf("Failed to get campaign status during processing: campaign_id=%s, error=%v", campaignID, err))
+				break
+			}
+
+			// Если кампания отменена, прекращаем обработку
+			if campaign.Status == domain.CampaignStatusCancelled {
+				log.Info(fmt.Sprintf("Campaign cancelled during processing: campaign_id=%s, processed=%d", campaignID, processedCount))
+				break
+			}
+
 			end := i + batchSize
 			if end > len(phones) {
 				end = len(phones)
@@ -146,6 +159,19 @@ func (s *BulkService) handleBulkSendCore(
 			sentCount := 0
 
 			for _, phone := range batch {
+				// Проверяем статус кампании перед отправкой каждого сообщения
+				campaign, err := s.CampaignStorage.GetByID(campaignID)
+				if err != nil {
+					log.Error(fmt.Sprintf("Failed to get campaign status during message sending: campaign_id=%s, error=%v", campaignID, err))
+					continue
+				}
+
+				// Если кампания отменена, прекращаем отправку
+				if campaign.Status == domain.CampaignStatusCancelled {
+					log.Info(fmt.Sprintf("Campaign cancelled during message sending: campaign_id=%s, processed=%d", campaignID, processedCount))
+					return
+				}
+
 				statuses, _ := statusRepo.ListByCampaignID(campaignID)
 				var statusID string
 				for _, s := range statuses {
@@ -181,8 +207,12 @@ func (s *BulkService) handleBulkSendCore(
 			}
 		}
 
-		log.Info(fmt.Sprintf("Bulk send finished in background: total processed=%d", processedCount))
-		_ = s.CampaignStorage.UpdateStatus(campaignID, "finished")
+		// Проверяем финальный статус кампании
+		campaign, err := s.CampaignStorage.GetByID(campaignID)
+		if err == nil && campaign.Status != domain.CampaignStatusCancelled {
+			log.Info(fmt.Sprintf("Bulk send finished in background: total processed=%d", processedCount))
+			_ = s.CampaignStorage.UpdateStatus(campaignID, "finished")
+		}
 	}()
 	return domain.BulkSendResult{Started: true, Message: "Bulk send started in background", Total: len(phones)}, nil
 }
@@ -258,4 +288,46 @@ func parseMediaFromFile(file *multipart.FileHeader) (*domain.BulkMedia, error) {
 		MimeType:    mediaMimeType,
 		FileData:    base64.StdEncoding.EncodeToString(mediaBytes),
 	}, nil
+}
+
+// CancelCampaign отменяет рассылку
+func (s *BulkService) CancelCampaign(ctx context.Context, campaignID string) error {
+	log := s.Logger
+
+	// Проверяем, что кампания существует
+	campaign, err := s.CampaignStorage.GetByID(campaignID)
+	if err != nil {
+		log.Error(fmt.Sprintf("Failed to get campaign for cancellation: campaign_id=%s, error=%v", campaignID, err))
+		return appErrors.New(appErrors.ErrorTypeValidation, "CAMPAIGN_NOT_FOUND", "campaign not found", err)
+	}
+
+	if campaign == nil {
+		log.Error(fmt.Sprintf("Campaign not found: campaign_id=%s", campaignID))
+		return appErrors.New(appErrors.ErrorTypeValidation, "CAMPAIGN_NOT_FOUND", "campaign not found", nil)
+	}
+
+	// Проверяем, что кампания может быть отменена
+	if campaign.Status == domain.CampaignStatusFinished ||
+		campaign.Status == domain.CampaignStatusFailed ||
+		campaign.Status == domain.CampaignStatusCancelled {
+		log.Error(fmt.Sprintf("Attempt to cancel campaign in invalid status: campaign_id=%s, status=%s", campaignID, campaign.Status))
+		return appErrors.New(appErrors.ErrorTypeValidation, "CAMPAIGN_ALREADY_FINISHED", "campaign cannot be cancelled in current status", nil)
+	}
+
+	// Отменяем кампанию
+	err = s.CampaignStorage.CancelCampaign(campaignID)
+	if err != nil {
+		log.Error(fmt.Sprintf("Failed to cancel campaign: campaign_id=%s, error=%v", campaignID, err))
+		return err
+	}
+
+	// Обновляем статусы всех pending номеров на cancelled
+	err = s.StatusStorage.UpdateStatusesByCampaignID(campaignID, domain.CampaignStatusPending, domain.CampaignStatusCancelled)
+	if err != nil {
+		log.Error(fmt.Sprintf("Failed to update statuses for cancelled campaign: campaign_id=%s, error=%v", campaignID, err))
+		// Не возвращаем ошибку, так как кампания уже отменена
+	}
+
+	log.Info(fmt.Sprintf("Campaign cancelled successfully: campaign_id=%s, name=%s", campaignID, campaign.Name))
+	return nil
 }

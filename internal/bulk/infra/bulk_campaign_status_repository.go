@@ -98,3 +98,15 @@ func (r *BulkCampaignStatusRepository) ListByCampaignID(ctx context.Context, cam
 	}
 	return result, nil
 }
+
+func (r *BulkCampaignStatusRepository) UpdateStatusesByCampaignID(ctx context.Context, campaignID string, oldStatus string, newStatus string) error {
+	r.Logger.Debug("Updating statuses by campaign id", zap.String("campaign_id", campaignID), zap.String("old_status", oldStatus), zap.String("new_status", newStatus))
+	_, err := r.pool.Exec(ctx, `
+		UPDATE bulk_campaign_statuses SET status=$1 WHERE campaign_id=$2 AND status=$3
+	`, newStatus, campaignID, oldStatus)
+	if err != nil {
+		r.Logger.Error("Failed to update campaign statuses", zap.Error(err))
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_STATUS_BULK_UPDATE_ERROR", "failed to update campaign statuses", err)
+	}
+	return nil
+}

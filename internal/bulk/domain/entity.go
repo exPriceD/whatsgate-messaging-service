@@ -1,5 +1,14 @@
 package domain
 
+// Константы статусов рассылок
+const (
+	CampaignStatusPending   = "pending"
+	CampaignStatusStarted   = "started"
+	CampaignStatusFinished  = "finished"
+	CampaignStatusFailed    = "failed"
+	CampaignStatusCancelled = "cancelled"
+)
+
 // BulkCampaign — сущность массовой рассылки
 type BulkCampaign struct {
 	ID              string

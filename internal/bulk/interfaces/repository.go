@@ -19,4 +19,5 @@ type BulkCampaignStatusRepository interface {
 	Create(ctx context.Context, status *domain.BulkCampaignStatus) error
 	Update(ctx context.Context, id string, status string, errMsg *string, sentAt *string) error
 	ListByCampaignID(ctx context.Context, campaignID string) ([]*domain.BulkCampaignStatus, error)
+	UpdateStatusesByCampaignID(ctx context.Context, campaignID string, oldStatus string, newStatus string) error
 }

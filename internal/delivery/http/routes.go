@@ -48,5 +48,6 @@ func (s *Server) setupRoutes() {
 		v1.POST("/messages/test-send", messages.TestSendHandler(s.whatsgateService))
 		v1.GET("/messages/campaigns", messages.GetBulkCampaignsHandler(s.bulkStorage))
 		v1.GET("/messages/campaigns/:id", messages.GetBulkCampaignHandler(s.bulkStorage))
+		v1.POST("/messages/campaigns/:id/cancel", messages.CancelBulkCampaignHandler(s.whatsgateService, s.bulkStorage, s.statusStorage))
 	}
 }

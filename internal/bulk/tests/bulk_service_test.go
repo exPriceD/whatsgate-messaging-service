@@ -291,3 +291,140 @@ func TestBulkService_HandleBulkSendMultipart_InvalidFileType(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "BULK_FILE_PARSE_ERROR")
 }
+
+func TestCancelCampaign_Success(t *testing.T) {
+	service, _, _, campaignStorage, _ := setupTestService()
+
+	// Создаем тестовую кампанию
+	campaign := &domain.BulkCampaign{
+		ID:     "test-campaign",
+		Name:   "Test Campaign",
+		Status: domain.CampaignStatusStarted,
+	}
+	campaignStorage.Create(campaign)
+
+	// Отменяем кампанию
+	err := service.CancelCampaign(context.Background(), "test-campaign")
+	assert.NoError(t, err)
+
+	// Проверяем, что статус изменился
+	updatedCampaign, _ := campaignStorage.GetByID("test-campaign")
+	assert.Equal(t, domain.CampaignStatusCancelled, updatedCampaign.Status)
+}
+
+func TestCancelCampaign_NotFound(t *testing.T) {
+	service, _, _, _, _ := setupTestService()
+
+	// Пытаемся отменить несуществующую кампанию
+	err := service.CancelCampaign(context.Background(), "non-existent")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "campaign not found")
+}
+
+func TestCancelCampaign_AlreadyFinished(t *testing.T) {
+	service, _, _, campaignStorage, _ := setupTestService()
+
+	// Создаем завершенную кампанию
+	campaign := &domain.BulkCampaign{
+		ID:     "finished-campaign",
+		Name:   "Finished Campaign",
+		Status: domain.CampaignStatusFinished,
+	}
+	campaignStorage.Create(campaign)
+
+	// Пытаемся отменить завершенную кампанию
+	err := service.CancelCampaign(context.Background(), "finished-campaign")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be cancelled")
+
+	// Проверяем, что статус не изменился
+	updatedCampaign, _ := campaignStorage.GetByID("finished-campaign")
+	assert.Equal(t, domain.CampaignStatusFinished, updatedCampaign.Status)
+}
+
+func TestCancelCampaign_AlreadyCancelled(t *testing.T) {
+	service, _, _, campaignStorage, _ := setupTestService()
+
+	// Создаем уже отмененную кампанию
+	campaign := &domain.BulkCampaign{
+		ID:     "cancelled-campaign",
+		Name:   "Cancelled Campaign",
+		Status: domain.CampaignStatusCancelled,
+	}
+	campaignStorage.Create(campaign)
+
+	// Пытаемся отменить уже отмененную кампанию
+	err := service.CancelCampaign(context.Background(), "cancelled-campaign")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot be cancelled")
+
+	// Проверяем, что статус не изменился
+	updatedCampaign, _ := campaignStorage.GetByID("cancelled-campaign")
+	assert.Equal(t, domain.CampaignStatusCancelled, updatedCampaign.Status)
+}
+
+func TestCancelCampaign_UpdatesPendingStatuses(t *testing.T) {
+	service, _, _, campaignStorage, statusStorage := setupTestService()
+
+	// Создаем тестовую кампанию
+	campaign := &domain.BulkCampaign{
+		ID:     "test-campaign-statuses",
+		Name:   "Test Campaign Statuses",
+		Status: domain.CampaignStatusStarted,
+	}
+	campaignStorage.Create(campaign)
+
+	// Создаем статусы для номеров
+	statuses := []*domain.BulkCampaignStatus{
+		{
+			CampaignID:  "test-campaign-statuses",
+			PhoneNumber: "1234567890",
+			Status:      domain.CampaignStatusPending,
+		},
+		{
+			CampaignID:  "test-campaign-statuses",
+			PhoneNumber: "0987654321",
+			Status:      domain.CampaignStatusPending,
+		},
+		{
+			CampaignID:  "test-campaign-statuses",
+			PhoneNumber: "5555555555",
+			Status:      "sent", // Уже отправленное сообщение
+		},
+	}
+
+	for _, status := range statuses {
+		statusStorage.Create(status)
+	}
+
+	// Отменяем кампанию
+	err := service.CancelCampaign(context.Background(), "test-campaign-statuses")
+	assert.NoError(t, err)
+
+	// Проверяем, что статус кампании изменился
+	updatedCampaign, _ := campaignStorage.GetByID("test-campaign-statuses")
+	assert.Equal(t, domain.CampaignStatusCancelled, updatedCampaign.Status)
+
+	// Проверяем, что pending статусы изменились на cancelled
+	allStatuses, _ := statusStorage.ListByCampaignID("test-campaign-statuses")
+	assert.Len(t, allStatuses, 3)
+
+	pendingCount := 0
+	cancelledCount := 0
+	sentCount := 0
+
+	for _, status := range allStatuses {
+		switch status.Status {
+		case domain.CampaignStatusPending:
+			pendingCount++
+		case domain.CampaignStatusCancelled:
+			cancelledCount++
+		case "sent":
+			sentCount++
+		}
+	}
+
+	assert.Equal(t, 0, pendingCount, "Should be no pending statuses")
+	assert.Equal(t, 2, cancelledCount, "Should have 2 cancelled statuses")
+	assert.Equal(t, 1, sentCount, "Should have 1 sent status")
+}

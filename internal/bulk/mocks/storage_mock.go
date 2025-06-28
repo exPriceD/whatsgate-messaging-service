@@ -63,6 +63,24 @@ func (m *MockBulkCampaignStorage) UpdateProcessedCount(id string, processedCount
 	return fmt.Errorf("campaign not found: %s", id)
 }
 
+func (m *MockBulkCampaignStorage) CancelCampaign(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if campaign, exists := m.Campaigns[id]; exists {
+		// Проверяем, что кампания может быть отменена
+		if campaign.Status == domain.CampaignStatusFinished ||
+			campaign.Status == domain.CampaignStatusFailed ||
+			campaign.Status == domain.CampaignStatusCancelled {
+			return fmt.Errorf("campaign cannot be cancelled in current status: %s", campaign.Status)
+		}
+
+		campaign.Status = domain.CampaignStatusCancelled
+		return nil
+	}
+	return fmt.Errorf("campaign not found: %s", id)
+}
+
 type MockBulkCampaignStatusStorage struct {
 	mu       sync.RWMutex
 	Statuses map[string]*domain.BulkCampaignStatus
@@ -105,4 +123,23 @@ func (m *MockBulkCampaignStatusStorage) ListByCampaignID(campaignID string) ([]*
 		}
 	}
 	return result, nil
+}
+
+func (m *MockBulkCampaignStatusStorage) UpdateStatusesByCampaignID(campaignID string, oldStatus string, newStatus string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	updatedCount := 0
+	for _, status := range m.Statuses {
+		if status.CampaignID == campaignID && status.Status == oldStatus {
+			status.Status = newStatus
+			updatedCount++
+		}
+	}
+
+	if updatedCount == 0 {
+		return fmt.Errorf("no statuses found to update for campaign %s with status %s", campaignID, oldStatus)
+	}
+
+	return nil
 }
