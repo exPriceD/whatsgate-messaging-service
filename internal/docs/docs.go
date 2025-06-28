@@ -41,19 +41,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.HealthResponse"
+                            "$ref": "#/definitions/health.HealthResponse"
                         }
                     },
                     "400": {
                         "description": "Ошибка валидации",
                         "schema": {
-                            "$ref": "#/definitions/messages.ErrorResponse"
+                            "$ref": "#/definitions/types.AppErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Внутренняя ошибка сервера",
                         "schema": {
-                            "$ref": "#/definitions/messages.ErrorResponse"
+                            "$ref": "#/definitions/types.AppErrorResponse"
                         }
                     }
                 }
@@ -117,13 +117,89 @@ const docTemplate = `{
                     "400": {
                         "description": "Ошибка валидации",
                         "schema": {
-                            "$ref": "#/definitions/messages.ErrorResponse"
+                            "$ref": "#/definitions/types.AppErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Внутренняя ошибка сервера",
                         "schema": {
-                            "$ref": "#/definitions/messages.ErrorResponse"
+                            "$ref": "#/definitions/types.AppErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/messages/campaigns": {
+            "get": {
+                "description": "Возвращает список всех массовых рассылок с их статусами",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Получить список рассылок",
+                "responses": {
+                    "200": {
+                        "description": "Список рассылок",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/messages.BulkCampaignResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/types.AppErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/messages/campaigns/{id}": {
+            "get": {
+                "description": "Возвращает детальную информацию о конкретной рассылке по ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "messages"
+                ],
+                "summary": "Получить детали рассылки",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID рассылки",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Детали рассылки",
+                        "schema": {
+                            "$ref": "#/definitions/messages.BulkCampaignResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Рассылка не найдена",
+                        "schema": {
+                            "$ref": "#/definitions/types.AppErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "$ref": "#/definitions/types.AppErrorResponse"
                         }
                     }
                 }
@@ -163,13 +239,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Ошибка валидации",
                         "schema": {
-                            "$ref": "#/definitions/messages.ErrorResponse"
+                            "$ref": "#/definitions/types.AppErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Внутренняя ошибка сервера",
                         "schema": {
-                            "$ref": "#/definitions/messages.ErrorResponse"
+                            "$ref": "#/definitions/types.AppErrorResponse"
                         }
                     }
                 }
@@ -209,13 +285,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Ошибка валидации",
                         "schema": {
-                            "$ref": "#/definitions/messages.ErrorResponse"
+                            "$ref": "#/definitions/types.AppErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Внутренняя ошибка сервера",
                         "schema": {
-                            "$ref": "#/definitions/messages.ErrorResponse"
+                            "$ref": "#/definitions/types.AppErrorResponse"
                         }
                     }
                 }
@@ -266,13 +342,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Ошибка валидации",
                         "schema": {
-                            "$ref": "#/definitions/messages.ErrorResponse"
+                            "$ref": "#/definitions/types.AppErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Внутренняя ошибка сервера",
                         "schema": {
-                            "$ref": "#/definitions/messages.ErrorResponse"
+                            "$ref": "#/definitions/types.AppErrorResponse"
                         }
                     }
                 }
@@ -295,7 +371,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.WhatGateSettings"
+                            "$ref": "#/definitions/settings.WhatsGateSettings"
                         }
                     }
                 }
@@ -319,7 +395,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.WhatGateSettings"
+                            "$ref": "#/definitions/settings.WhatsGateSettings"
                         }
                     }
                 ],
@@ -327,13 +403,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.WhatGateSettings"
+                            "$ref": "#/definitions/settings.WhatsGateSettings"
                         }
                     },
                     "400": {
                         "description": "Ошибка валидации",
                         "schema": {
-                            "$ref": "#/definitions/messages.ErrorResponse"
+                            "$ref": "#/definitions/types.AppErrorResponse"
                         }
                     }
                 }
@@ -362,7 +438,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Внутренняя ошибка сервера",
                         "schema": {
-                            "$ref": "#/definitions/messages.ErrorResponse"
+                            "$ref": "#/definitions/types.AppErrorResponse"
                         }
                     }
                 }
@@ -385,7 +461,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.StatusResponse"
+                            "$ref": "#/definitions/health.StatusResponse"
                         }
                     }
                 }
@@ -393,6 +469,89 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "health.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                },
+                "time": {
+                    "type": "string",
+                    "example": "2023-01-01T12:00:00Z"
+                }
+            }
+        },
+        "health.StatusResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "running"
+                },
+                "timestamp": {
+                    "type": "string",
+                    "example": "2023-01-01T12:00:00Z"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.0.0"
+                }
+            }
+        },
+        "messages.BulkCampaignResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2023-01-01T12:00:00Z"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "uuid"
+                },
+                "initiator": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "media_filename": {
+                    "type": "string",
+                    "example": "image.jpg"
+                },
+                "media_mime": {
+                    "type": "string",
+                    "example": "image/jpeg"
+                },
+                "media_type": {
+                    "type": "string",
+                    "example": "image"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Текст сообщения"
+                },
+                "messages_per_hour": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Летняя акция"
+                },
+                "processed_count": {
+                    "type": "integer",
+                    "example": 45
+                },
+                "status": {
+                    "type": "string",
+                    "example": "started"
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 100
+                }
+            }
+        },
         "messages.BulkSendStartResponse": {
             "type": "object",
             "properties": {
@@ -407,23 +566,6 @@ const docTemplate = `{
                 "total": {
                     "type": "integer",
                     "example": 123
-                }
-            }
-        },
-        "messages.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer",
-                    "example": 400
-                },
-                "error": {
-                    "type": "string",
-                    "example": "Validation error"
-                },
-                "message": {
-                    "type": "string",
-                    "example": "Подробное описание ошибки"
                 }
             }
         },
@@ -509,50 +651,7 @@ const docTemplate = `{
                 }
             }
         },
-        "types.HealthResponse": {
-            "type": "object",
-            "properties": {
-                "status": {
-                    "type": "string",
-                    "example": "ok"
-                },
-                "time": {
-                    "type": "string",
-                    "example": "2023-01-01T12:00:00Z"
-                }
-            }
-        },
-        "types.StatusResponse": {
-            "type": "object",
-            "properties": {
-                "status": {
-                    "type": "string",
-                    "example": "running"
-                },
-                "timestamp": {
-                    "type": "string",
-                    "example": "2023-01-01T12:00:00Z"
-                },
-                "version": {
-                    "type": "string",
-                    "example": "1.0.0"
-                }
-            }
-        },
-        "types.SuccessResponse": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "example": "Operation completed successfully"
-                },
-                "success": {
-                    "type": "boolean",
-                    "example": true
-                }
-            }
-        },
-        "types.WhatGateSettings": {
+        "settings.WhatsGateSettings": {
             "type": "object",
             "required": [
                 "api_key",
@@ -570,6 +669,141 @@ const docTemplate = `{
                 "whatsapp_id": {
                     "type": "string",
                     "example": "your_whatsapp_id"
+                }
+            }
+        },
+        "types.AppErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "INVALID_PHONE"
+                },
+                "context": {
+                    "description": "Контекстная информация",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/types.ErrorContext"
+                        }
+                    ]
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Phone number must be exactly 11 digits and start with 7"
+                },
+                "http_status": {
+                    "description": "HTTP информация",
+                    "type": "integer",
+                    "example": 400
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Invalid phone number format"
+                },
+                "severity": {
+                    "description": "Метаданные",
+                    "type": "string",
+                    "example": "MEDIUM"
+                },
+                "stack": {
+                    "description": "Техническая информация",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.StackFrame"
+                    }
+                },
+                "timestamp": {
+                    "type": "string",
+                    "example": "2023-01-01T12:00:00Z"
+                },
+                "type": {
+                    "description": "Основная информация",
+                    "type": "string",
+                    "example": "VALIDATION_ERROR"
+                },
+                "version": {
+                    "description": "Версионирование",
+                    "type": "string",
+                    "example": "1.0.0"
+                }
+            }
+        },
+        "types.ErrorContext": {
+            "type": "object",
+            "properties": {
+                "component": {
+                    "type": "string",
+                    "example": "send_message_handler"
+                },
+                "ip": {
+                    "type": "string",
+                    "example": "192.168.1.1"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "method": {
+                    "type": "string",
+                    "example": "POST"
+                },
+                "operation": {
+                    "type": "string",
+                    "example": "send_message"
+                },
+                "path": {
+                    "type": "string",
+                    "example": "/messages/send"
+                },
+                "request_id": {
+                    "type": "string",
+                    "example": "req-123"
+                },
+                "resource_id": {
+                    "type": "string",
+                    "example": "campaign-123"
+                },
+                "session_id": {
+                    "type": "string",
+                    "example": "sess-789"
+                },
+                "user_agent": {
+                    "type": "string",
+                    "example": "Mozilla/5.0..."
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "user-456"
+                }
+            }
+        },
+        "types.StackFrame": {
+            "type": "object",
+            "properties": {
+                "file": {
+                    "type": "string",
+                    "example": "main.go"
+                },
+                "function": {
+                    "type": "string",
+                    "example": "main.main"
+                },
+                "line": {
+                    "type": "integer",
+                    "example": 42
+                }
+            }
+        },
+        "types.SuccessResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Operation completed successfully"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
                 }
             }
         }

@@ -1,5 +1,65 @@
 basePath: /api/v1
 definitions:
+  health.HealthResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+      time:
+        example: "2023-01-01T12:00:00Z"
+        type: string
+    type: object
+  health.StatusResponse:
+    properties:
+      status:
+        example: running
+        type: string
+      timestamp:
+        example: "2023-01-01T12:00:00Z"
+        type: string
+      version:
+        example: 1.0.0
+        type: string
+    type: object
+  messages.BulkCampaignResponse:
+    properties:
+      created_at:
+        example: "2023-01-01T12:00:00Z"
+        type: string
+      id:
+        example: uuid
+        type: string
+      initiator:
+        example: user@example.com
+        type: string
+      media_filename:
+        example: image.jpg
+        type: string
+      media_mime:
+        example: image/jpeg
+        type: string
+      media_type:
+        example: image
+        type: string
+      message:
+        example: Текст сообщения
+        type: string
+      messages_per_hour:
+        example: 20
+        type: integer
+      name:
+        example: Летняя акция
+        type: string
+      processed_count:
+        example: 45
+        type: integer
+      status:
+        example: started
+        type: string
+      total:
+        example: 100
+        type: integer
+    type: object
   messages.BulkSendStartResponse:
     properties:
       message:
@@ -11,18 +71,6 @@ definitions:
       total:
         example: 123
         type: integer
-    type: object
-  messages.ErrorResponse:
-    properties:
-      code:
-        example: 400
-        type: integer
-      error:
-        example: Validation error
-        type: string
-      message:
-        example: Подробное описание ошибки
-        type: string
     type: object
   messages.SendMediaMessageRequest:
     properties:
@@ -84,37 +132,7 @@ definitions:
         example: true
         type: boolean
     type: object
-  types.HealthResponse:
-    properties:
-      status:
-        example: ok
-        type: string
-      time:
-        example: "2023-01-01T12:00:00Z"
-        type: string
-    type: object
-  types.StatusResponse:
-    properties:
-      status:
-        example: running
-        type: string
-      timestamp:
-        example: "2023-01-01T12:00:00Z"
-        type: string
-      version:
-        example: 1.0.0
-        type: string
-    type: object
-  types.SuccessResponse:
-    properties:
-      message:
-        example: Operation completed successfully
-        type: string
-      success:
-        example: true
-        type: boolean
-    type: object
-  types.WhatGateSettings:
+  settings.WhatsGateSettings:
     properties:
       api_key:
         example: your_api_key
@@ -128,6 +146,103 @@ definitions:
     required:
     - api_key
     - whatsapp_id
+    type: object
+  types.AppErrorResponse:
+    properties:
+      code:
+        example: INVALID_PHONE
+        type: string
+      context:
+        allOf:
+        - $ref: '#/definitions/types.ErrorContext'
+        description: Контекстная информация
+      description:
+        example: Phone number must be exactly 11 digits and start with 7
+        type: string
+      http_status:
+        description: HTTP информация
+        example: 400
+        type: integer
+      message:
+        example: Invalid phone number format
+        type: string
+      severity:
+        description: Метаданные
+        example: MEDIUM
+        type: string
+      stack:
+        description: Техническая информация
+        items:
+          $ref: '#/definitions/types.StackFrame'
+        type: array
+      timestamp:
+        example: "2023-01-01T12:00:00Z"
+        type: string
+      type:
+        description: Основная информация
+        example: VALIDATION_ERROR
+        type: string
+      version:
+        description: Версионирование
+        example: 1.0.0
+        type: string
+    type: object
+  types.ErrorContext:
+    properties:
+      component:
+        example: send_message_handler
+        type: string
+      ip:
+        example: 192.168.1.1
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      method:
+        example: POST
+        type: string
+      operation:
+        example: send_message
+        type: string
+      path:
+        example: /messages/send
+        type: string
+      request_id:
+        example: req-123
+        type: string
+      resource_id:
+        example: campaign-123
+        type: string
+      session_id:
+        example: sess-789
+        type: string
+      user_agent:
+        example: Mozilla/5.0...
+        type: string
+      user_id:
+        example: user-456
+        type: string
+    type: object
+  types.StackFrame:
+    properties:
+      file:
+        example: main.go
+        type: string
+      function:
+        example: main.main
+        type: string
+      line:
+        example: 42
+        type: integer
+    type: object
+  types.SuccessResponse:
+    properties:
+      message:
+        example: Operation completed successfully
+        type: string
+      success:
+        example: true
+        type: boolean
     type: object
 host: localhost:8080
 info:
@@ -154,15 +269,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.HealthResponse'
+            $ref: '#/definitions/health.HealthResponse'
         "400":
           description: Ошибка валидации
           schema:
-            $ref: '#/definitions/messages.ErrorResponse'
+            $ref: '#/definitions/types.AppErrorResponse'
         "500":
           description: Внутренняя ошибка сервера
           schema:
-            $ref: '#/definitions/messages.ErrorResponse'
+            $ref: '#/definitions/types.AppErrorResponse'
       summary: Проверка работоспособности сервиса
       tags:
       - health
@@ -207,12 +322,62 @@ paths:
         "400":
           description: Ошибка валидации
           schema:
-            $ref: '#/definitions/messages.ErrorResponse'
+            $ref: '#/definitions/types.AppErrorResponse'
         "500":
           description: Внутренняя ошибка сервера
           schema:
-            $ref: '#/definitions/messages.ErrorResponse'
+            $ref: '#/definitions/types.AppErrorResponse'
       summary: Массовая рассылка сообщений
+      tags:
+      - messages
+  /messages/campaigns:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает список всех массовых рассылок с их статусами
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список рассылок
+          schema:
+            items:
+              $ref: '#/definitions/messages.BulkCampaignResponse'
+            type: array
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/types.AppErrorResponse'
+      summary: Получить список рассылок
+      tags:
+      - messages
+  /messages/campaigns/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает детальную информацию о конкретной рассылке по ID
+      parameters:
+      - description: ID рассылки
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Детали рассылки
+          schema:
+            $ref: '#/definitions/messages.BulkCampaignResponse'
+        "404":
+          description: Рассылка не найдена
+          schema:
+            $ref: '#/definitions/types.AppErrorResponse'
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            $ref: '#/definitions/types.AppErrorResponse'
+      summary: Получить детали рассылки
       tags:
       - messages
   /messages/send:
@@ -237,11 +402,11 @@ paths:
         "400":
           description: Ошибка валидации
           schema:
-            $ref: '#/definitions/messages.ErrorResponse'
+            $ref: '#/definitions/types.AppErrorResponse'
         "500":
           description: Внутренняя ошибка сервера
           schema:
-            $ref: '#/definitions/messages.ErrorResponse'
+            $ref: '#/definitions/types.AppErrorResponse'
       summary: Отправить текстовое сообщение
       tags:
       - messages
@@ -267,11 +432,11 @@ paths:
         "400":
           description: Ошибка валидации
           schema:
-            $ref: '#/definitions/messages.ErrorResponse'
+            $ref: '#/definitions/types.AppErrorResponse'
         "500":
           description: Внутренняя ошибка сервера
           schema:
-            $ref: '#/definitions/messages.ErrorResponse'
+            $ref: '#/definitions/types.AppErrorResponse'
       summary: Отправить медиа-сообщение
       tags:
       - messages
@@ -306,11 +471,11 @@ paths:
         "400":
           description: Ошибка валидации
           schema:
-            $ref: '#/definitions/messages.ErrorResponse'
+            $ref: '#/definitions/types.AppErrorResponse'
         "500":
           description: Внутренняя ошибка сервера
           schema:
-            $ref: '#/definitions/messages.ErrorResponse'
+            $ref: '#/definitions/types.AppErrorResponse'
       summary: Тестовая отправка сообщения (текст/медиа)
       tags:
       - messages
@@ -325,7 +490,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.WhatGateSettings'
+            $ref: '#/definitions/settings.WhatsGateSettings'
       summary: Получить настройки WhatGate
       tags:
       - settings
@@ -339,18 +504,18 @@ paths:
         name: settings
         required: true
         schema:
-          $ref: '#/definitions/types.WhatGateSettings'
+          $ref: '#/definitions/settings.WhatsGateSettings'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.WhatGateSettings'
+            $ref: '#/definitions/settings.WhatsGateSettings'
         "400":
           description: Ошибка валидации
           schema:
-            $ref: '#/definitions/messages.ErrorResponse'
+            $ref: '#/definitions/types.AppErrorResponse'
       summary: Обновить настройки WhatGate
       tags:
       - settings
@@ -369,7 +534,7 @@ paths:
         "500":
           description: Внутренняя ошибка сервера
           schema:
-            $ref: '#/definitions/messages.ErrorResponse'
+            $ref: '#/definitions/types.AppErrorResponse'
       summary: Сбросить настройки WhatGate
       tags:
       - settings
@@ -384,7 +549,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.StatusResponse'
+            $ref: '#/definitions/health.StatusResponse'
       summary: Статус сервиса
       tags:
       - status
