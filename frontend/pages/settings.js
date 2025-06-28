@@ -1,3 +1,5 @@
+import { apiGet, apiPut, apiDelete } from '../ui/api.js';
+
 // Страница настроек
 export function renderSettingsPage() {
   return `
@@ -17,15 +19,21 @@ export function renderSettingsPage() {
 
 export function initSettingsForm(showToast) {
   const form = document.getElementById('settings-form');
-  fetch('/api/v1/settings')
-    .then(r => r.json())
+  
+  // Загрузка настроек
+  apiGet('/api/v1/settings', showToast)
     .then(data => {
       if (data && data.api_key) {
         form.apiKey.value = data.api_key;
         form.whatsappId.value = data.whatsapp_id;
         form.whatsgateUrl.value = data.base_url;
       }
+    })
+    .catch(error => {
+      console.error('Error loading settings:', error);
+      // Ошибка уже обработана в apiGet
     });
+
   form.onsubmit = e => {
     e.preventDefault();
     // Валидация
@@ -53,26 +61,40 @@ export function initSettingsForm(showToast) {
     } else {
       form.whatsgateUrl.classList.remove('error');
     }
+    
     const body = {
       api_key: form.apiKey.value.trim(),
       whatsapp_id: form.whatsappId.value.trim(),
       base_url: form.whatsgateUrl.value.trim()
     };
+    
     const btn = form.querySelector('button[type="submit"]');
     btn.disabled = true;
     btn.textContent = 'Сохранение...';
-    fetch('/api/v1/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-      .then(r => r.ok ? showToast('Настройки сохранены', 'success') : r.json().then(d => Promise.reject(d)))
-      .catch(() => showToast('Ошибка сохранения', 'danger'))
-      .finally(() => { btn.disabled = false; btn.textContent = 'Сохранить'; });
+    
+    apiPut('/api/v1/settings', body, showToast)
+      .then(() => {
+        showToast('Настройки сохранены', 'success');
+      })
+      .catch(error => {
+        console.error('Error saving settings:', error);
+        // Ошибка уже обработана в apiPut
+      })
+      .finally(() => { 
+        btn.disabled = false; 
+        btn.textContent = 'Сохранить'; 
+      });
   };
+  
   document.getElementById('reset-settings').onclick = () => {
-    fetch('/api/v1/settings/reset', { method: 'DELETE' })
-      .then(r => r.ok ? showToast('Настройки сброшены', 'success') : showToast('Ошибка сброса', 'danger'));
-    form.reset();
+    apiDelete('/api/v1/settings/reset', showToast)
+      .then(() => {
+        showToast('Настройки сброшены', 'success');
+        form.reset();
+      })
+      .catch(error => {
+        console.error('Error resetting settings:', error);
+        // Ошибка уже обработана в apiDelete
+      });
   };
 } 

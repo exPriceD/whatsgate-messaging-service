@@ -1,3 +1,5 @@
+import { apiPost } from '../ui/api.js';
+
 // Страница массовой рассылки
 const fileIcon = `<svg fill="none" viewBox="0 0 20 20"><rect width="16" height="18" x="2" y="1" fill="#fff" stroke="#2d8cff" stroke-width="1.5" rx="4"/><path stroke="#2d8cff" stroke-width="1.5" d="M6 6h8M6 10h8M6 14h5"/></svg>`;
 
@@ -37,6 +39,7 @@ export function renderBulkPage() {
 
 export function initBulkForm(showToast) {
   const form = document.getElementById('bulk-form');
+  
   // Кастомные file input'ы
   const fileInput = form.querySelector('input[name="numbers_file"]');
   const fileName = document.getElementById('file-name-xlsx');
@@ -98,21 +101,25 @@ export function initBulkForm(showToast) {
         return;
       }
     }
+    
     setLoading(true, testBtn);
     const fd = new FormData();
     fd.append('phone', testPhone);
     fd.append('message', message);
     if (form.media_file.files[0]) fd.append('media_file', form.media_file.files[0]);
-    fetch('/api/v1/messages/test-send', {
-      method: 'POST',
-      body: fd
-    })
-      .then(r => r.ok ? showToast('Тестовое сообщение отправлено', 'success') : r.json().then(d => Promise.reject(d)))
-      .catch(() => showToast('Ошибка отправки теста', 'danger'))
-      .finally(() => setLoading(false, testBtn));
+    
+    try {
+      await apiPost('/api/v1/messages/test-send', fd, showToast);
+      showToast('Тестовое сообщение отправлено', 'success');
+    } catch (error) {
+      console.error('Error sending test message:', error);
+      // Ошибка уже обработана в apiPost
+    } finally {
+      setLoading(false, testBtn);
+    }
   };
 
-  form.onsubmit = e => {
+  form.onsubmit = async e => {
     e.preventDefault();
     // Валидация массовой рассылки
     const message = form.message.value.trim();
@@ -139,6 +146,7 @@ export function initBulkForm(showToast) {
         return;
       }
     }
+    
     setLoading(true, form.querySelector('button[type="submit"]'));
     const fd = new FormData();
     fd.append('name', form.name.value.trim());
@@ -147,12 +155,15 @@ export function initBulkForm(showToast) {
     fd.append('numbers_file', form.numbers_file.files[0]);
     if (form.media_file.files[0]) fd.append('media_file', form.media_file.files[0]);
     fd.append('async', 'false');
-    fetch('/api/v1/messages/bulk-send', {
-      method: 'POST',
-      body: fd
-    })
-      .then(r => r.ok ? showToast('Рассылка запущена', 'success') : r.json().then(d => Promise.reject(d)))
-      .catch(() => showToast('Ошибка запуска рассылки', 'danger'))
-      .finally(() => setLoading(false, form.querySelector('button[type="submit"]')));
+    
+    try {
+      await apiPost('/api/v1/messages/bulk-send', fd, showToast);
+      showToast('Рассылка запущена', 'success');
+    } catch (error) {
+      console.error('Error starting bulk campaign:', error);
+      // Ошибка уже обработана в apiPost
+    } finally {
+      setLoading(false, form.querySelector('button[type="submit"]'));
+    }
   };
 } 

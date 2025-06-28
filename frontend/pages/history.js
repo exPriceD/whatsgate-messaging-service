@@ -1,3 +1,5 @@
+import { apiGet } from '../ui/api.js';
+
 // Страница истории рассылок
 export function renderHistoryPage() {
   return `
@@ -121,7 +123,7 @@ export function initHistoryPage(showToast) {
     }
   };
 
-  function loadHistory() {
+  async function loadHistory() {
     const tbody = document.getElementById('history-tbody');
     tbody.innerHTML = `
       <tr>
@@ -136,36 +138,28 @@ export function initHistoryPage(showToast) {
     refreshBtn.classList.add('refreshing');
     refreshBtn.disabled = true;
 
-    fetch('/api/v1/messages/campaigns')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Ошибка загрузки истории');
-        }
-        return response.json();
-      })
-      .then(campaigns => {
-        console.log('API response:', campaigns);
-        
-        // Проверяем, что campaigns существует и является массивом
-        if (!campaigns || !Array.isArray(campaigns)) {
-          console.log('Invalid response format:', typeof campaigns, campaigns);
-          showEmptyState();
-          return;
-        }
-        
-        allCampaigns = campaigns;
-        updateStats(campaigns);
-        renderCampaigns(campaigns);
-      })
-      .catch(error => {
-        console.error('Error loading history:', error);
-        showErrorState();
-        showToast('Ошибка загрузки истории', 'danger');
-      })
-      .finally(() => {
-        refreshBtn.classList.remove('refreshing');
-        refreshBtn.disabled = false;
-      });
+    try {
+      const campaigns = await apiGet('/api/v1/messages/campaigns', showToast);
+      console.log('API response:', campaigns);
+      
+      // Проверяем, что campaigns существует и является массивом
+      if (!campaigns || !Array.isArray(campaigns)) {
+        console.log('Invalid response format:', typeof campaigns, campaigns);
+        showEmptyState();
+        return;
+      }
+      
+      allCampaigns = campaigns;
+      updateStats(campaigns);
+      renderCampaigns(campaigns);
+    } catch (error) {
+      console.error('Error loading history:', error);
+      showErrorState();
+      // Ошибка уже обработана в apiGet
+    } finally {
+      refreshBtn.classList.remove('refreshing');
+      refreshBtn.disabled = false;
+    }
   }
 
   function updateStats(campaigns) {
@@ -289,102 +283,95 @@ export function initHistoryPage(showToast) {
     `;
   }
 
-  function showCampaignDetails(campaignId) {
+  async function showCampaignDetails(campaignId) {
     modal.style.display = 'block';
     modalTitle.textContent = 'Загрузка...';
     modalBody.innerHTML = '<div class="loading">Загрузка деталей...</div>';
 
-    fetch(`/api/v1/messages/campaigns/${campaignId}`)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Рассылка не найдена');
-        }
-        return response.json();
-      })
-      .then(campaign => {
-        modalTitle.textContent = campaign.name || 'Детали рассылки';
-        modalBody.innerHTML = `
-          <div class="campaign-details">
-            <div class="detail-section">
-              <h4>📋 Основная информация</h4>
-              <div class="detail-grid">
-                <div class="detail-item">
-                  <label>ID Рассылки:</label>
-                  <span class="detail-value">${campaign.id}</span>
-                </div>
-                <div class="detail-item">
-                  <label>Название:</label>
-                  <span class="detail-value">${campaign.name || 'Не указано'}</span>
-                </div>
-                <div class="detail-item">
-                  <label>Статус:</label>
-                  <span class="status status-${campaign.status}">${getStatusText(campaign.status)}</span>
-                </div>
-                <div class="detail-item">
-                  <label>Дата:</label>
-                  <span class="detail-value">${formatDate(campaign.created_at)}</span>
-                </div>
+    try {
+      const campaign = await apiGet(`/api/v1/messages/campaigns/${campaignId}`, showToast);
+      modalTitle.textContent = campaign.name || 'Детали рассылки';
+      modalBody.innerHTML = `
+        <div class="campaign-details">
+          <div class="detail-section">
+            <h4>📋 Основная информация</h4>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <label>ID Рассылки:</label>
+                <span class="detail-value">${campaign.id}</span>
+              </div>
+              <div class="detail-item">
+                <label>Название:</label>
+                <span class="detail-value">${campaign.name || 'Не указано'}</span>
+              </div>
+              <div class="detail-item">
+                <label>Статус:</label>
+                <span class="status status-${campaign.status}">${getStatusText(campaign.status)}</span>
+              </div>
+              <div class="detail-item">
+                <label>Дата:</label>
+                <span class="detail-value">${formatDate(campaign.created_at)}</span>
               </div>
             </div>
-            
-            <div class="detail-section">
-              <h4>📊 Статистика</h4>
-              <div class="detail-grid">
-                <div class="detail-item">
-                  <label>Прогресс обработки:</label>
-                  <div class="progress-detail">
-                    <div class="progress-numbers">
-                      <span class="processed-number">${campaign.processed_count}</span>
-                      <span class="separator">/</span>
-                      <span class="total-number">${campaign.total}</span>
-                      <span class="progress-percentage">(${getProgressPercentage(campaign.processed_count, campaign.total)}%)</span>
-                    </div>
-                    <div class="progress-bar">
-                      <div class="progress-fill" style="width: ${getProgressPercentage(campaign.processed_count, campaign.total)}%"></div>
-                    </div>
-                  </div>
-                </div>
-                <div class="detail-item">
-                  <label>Сообщений в час:</label>
-                  <span class="detail-value">${campaign.messages_per_hour}</span>
-                </div>
-                ${campaign.initiator ? `
-                <div class="detail-item">
-                  <label>Инициатор:</label>
-                  <span class="detail-value">${campaign.initiator}</span>
-                </div>
-                ` : ''}
-              </div>
-            </div>
-            
-            <div class="detail-section">
-              <h4>💬 Сообщение</h4>
-              <div class="message-preview">${campaign.message}</div>
-            </div>
-            
-            ${campaign.media_filename ? `
-            <div class="detail-section" style="padding-bottom: 25px;">
-              <h4>📎 Медиа файл</h4>
-              <div class="media-info">
-                <div class="media-item">
-                  <span class="media-icon">📎</span>
-                  <div class="media-details">
-                    <div class="media-name">${campaign.media_filename}</div>
-                    <div class="media-type">${campaign.media_type} (${campaign.media_mime})</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            ` : ''}
           </div>
-        `;
-      })
-      .catch(error => {
-        console.error('Error loading campaign details:', error);
-        modalTitle.textContent = 'Ошибка';
-        modalBody.innerHTML = '<div class="error">Ошибка загрузки деталей рассылки</div>';
-        showToast('Ошибка загрузки деталей', 'danger');
-      });
+          
+          <div class="detail-section">
+            <h4>📊 Статистика</h4>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <label>Прогресс обработки:</label>
+                <div class="progress-detail">
+                  <div class="progress-numbers">
+                    <span class="processed-number">${campaign.processed_count}</span>
+                    <span class="separator">/</span>
+                    <span class="total-number">${campaign.total}</span>
+                    <span class="progress-percentage">(${getProgressPercentage(campaign.processed_count, campaign.total)}%)</span>
+                  </div>
+                  <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${getProgressPercentage(campaign.processed_count, campaign.total)}%"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="detail-item">
+                <label>Сообщений в час:</label>
+                <span class="detail-value">${campaign.messages_per_hour}</span>
+              </div>
+              ${campaign.initiator ? `
+              <div class="detail-item">
+                <label>Инициатор:</label>
+                <span class="detail-value">${campaign.initiator}</span>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+          
+          <div class="detail-section">
+            <h4>💬 Сообщение</h4>
+            <div class="message-preview">${campaign.message}</div>
+          </div>
+          
+          ${campaign.media_filename ? `
+          <div class="detail-section" style="padding-bottom: 25px;">
+            <h4>📎 Медиа файл</h4>
+            <div class="media-info">
+              <div class="media-item">
+                <span class="media-icon">📎</span>
+                <div class="media-details">
+                  <div class="media-name">${campaign.media_filename}</div>
+                  <div class="media-type">${campaign.media_type} (${campaign.media_mime})</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          ` : ''}
+        </div>
+      `;
+    } catch (error) {
+      console.error('Error loading campaign details:', error);
+      modalTitle.textContent = 'Ошибка';
+      modalBody.innerHTML = '<div class="error">Ошибка загрузки деталей рассылки</div>';
+      // Ошибка уже обработана в apiGet
+    }
   }
 
   function getStatusIcon(status) {
