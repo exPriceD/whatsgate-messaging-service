@@ -72,6 +72,32 @@ func (s *BulkCampaignStorage) List() ([]*domain.BulkCampaign, error) {
 	return campaigns, nil
 }
 
+func (s *BulkCampaignStorage) CancelCampaign(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Сначала получаем кампанию, чтобы проверить её статус
+	campaign, err := s.repo.GetByID(s.ctx, id)
+	if err != nil {
+		return appErrors.New(appErrors.ErrorTypeStorage, "BULK_STORAGE_GET_ERROR", "failed to get bulk campaign for cancellation", err)
+	}
+
+	// Проверяем, что кампания может быть отменена
+	if campaign.Status == domain.CampaignStatusFinished ||
+		campaign.Status == domain.CampaignStatusFailed ||
+		campaign.Status == domain.CampaignStatusCancelled {
+		return appErrors.New(appErrors.ErrorTypeValidation, "CAMPAIGN_ALREADY_FINISHED", "campaign cannot be cancelled in current status", nil)
+	}
+
+	// Обновляем статус на cancelled
+	err = s.repo.UpdateStatus(s.ctx, id, domain.CampaignStatusCancelled)
+	if err != nil {
+		return appErrors.New(appErrors.ErrorTypeStorage, "BULK_STORAGE_CANCEL_ERROR", "failed to cancel bulk campaign", err)
+	}
+
+	return nil
+}
+
 // BulkCampaignStatusStorage реализует thread-safe storage для статусов номеров
 // Использует BulkCampaignStatusRepository (интерфейс)
 type BulkCampaignStatusStorage struct {
@@ -113,4 +139,13 @@ func (s *BulkCampaignStatusStorage) ListByCampaignID(campaignID string) ([]*doma
 		return nil, appErrors.New(appErrors.ErrorTypeStorage, "BULK_STATUS_STORAGE_LIST_ERROR", "failed to list campaign statuses", err)
 	}
 	return statuses, nil
+}
+
+func (s *BulkCampaignStatusStorage) UpdateStatusesByCampaignID(campaignID string, oldStatus string, newStatus string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.repo.UpdateStatusesByCampaignID(s.ctx, campaignID, oldStatus, newStatus); err != nil {
+		return appErrors.New(appErrors.ErrorTypeStorage, "BULK_STATUS_STORAGE_BULK_UPDATE_ERROR", "failed to update campaign statuses", err)
+	}
+	return nil
 }
