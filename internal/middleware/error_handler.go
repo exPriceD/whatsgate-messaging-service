@@ -20,6 +20,7 @@ func ErrorHandler(log logger.Logger) gin.HandlerFunc {
 		if len(c.Errors) > 0 {
 			err := c.Errors.Last().Err
 
+			// Логируем полную ошибку на сервере
 			log.Error("request error",
 				zap.String("method", c.Request.Method),
 				zap.String("path", c.Request.URL.Path),
@@ -27,7 +28,7 @@ func ErrorHandler(log logger.Logger) gin.HandlerFunc {
 			)
 
 			var statusCode int
-			var errorResponse types.AppErrorResponse
+			var clientErrorResponse types.ClientErrorResponse
 
 			var e *appErr.AppError
 			switch {
@@ -55,71 +56,37 @@ func ErrorHandler(log logger.Logger) gin.HandlerFunc {
 					statusCode = http.StatusInternalServerError
 				}
 
-				// Конвертируем AppError в AppErrorResponse
-				errorResponse = types.AppErrorResponse{
-					Type:        string(e.Type),
-					Code:        e.Code,
+				// Создаем упрощенную ошибку для клиента
+				clientErrorResponse = types.ClientErrorResponse{
 					Message:     e.Message,
 					Description: e.Description,
-					Severity:    string(e.Severity),
-					Context:     convertErrorContext(e.Context),
-					Stack:       convertStackFrames(e.Stack),
-					Timestamp:   e.Timestamp,
+					Code:        e.Code,
 					HTTPStatus:  statusCode,
-					Version:     e.Version,
+					Timestamp:   e.Timestamp,
 				}
+
+				// Дополнительно логируем детальную ошибку на сервере
+				log.Error("detailed error",
+					zap.String("type", string(e.Type)),
+					zap.String("code", e.Code),
+					zap.String("severity", string(e.Severity)),
+					zap.Any("context", e.Context),
+					zap.Any("stack", e.Stack),
+					zap.String("version", e.Version),
+				)
 			default:
 				statusCode = http.StatusInternalServerError
-				errorResponse = types.AppErrorResponse{
-					Type:        "INTERNAL_ERROR",
+				clientErrorResponse = types.ClientErrorResponse{
+					Message:     "An unexpected error occurred",
+					Description: "Please try again later or contact support if the problem persists",
 					Code:        "INTERNAL_ERROR",
-					Message:     err.Error(),
-					Description: "An unexpected error occurred",
-					Severity:    "HIGH",
-					Timestamp:   time.Now(),
 					HTTPStatus:  statusCode,
-					Version:     "1.0.0",
+					Timestamp:   time.Now(),
 				}
 			}
 
-			c.JSON(statusCode, errorResponse)
+			c.JSON(statusCode, clientErrorResponse)
 			c.Abort()
 		}
 	}
-}
-
-// convertErrorContext конвертирует ErrorContext в types.ErrorContext
-func convertErrorContext(ctx *appErr.ErrorContext) *types.ErrorContext {
-	if ctx == nil {
-		return nil
-	}
-	return &types.ErrorContext{
-		RequestID:  ctx.RequestID,
-		UserID:     ctx.UserID,
-		SessionID:  ctx.SessionID,
-		ResourceID: ctx.ResourceID,
-		Operation:  ctx.Operation,
-		Component:  ctx.Component,
-		Method:     ctx.Method,
-		Path:       ctx.Path,
-		IP:         ctx.IP,
-		UserAgent:  ctx.UserAgent,
-		Metadata:   ctx.Metadata,
-	}
-}
-
-// convertStackFrames конвертирует []Frame в []StackFrame
-func convertStackFrames(frames []appErr.Frame) []types.StackFrame {
-	if frames == nil {
-		return nil
-	}
-	result := make([]types.StackFrame, len(frames))
-	for i, frame := range frames {
-		result[i] = types.StackFrame{
-			Function: frame.Function,
-			File:     frame.File,
-			Line:     frame.Line,
-		}
-	}
-	return result
 }

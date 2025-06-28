@@ -12,13 +12,15 @@ import (
 	"go.uber.org/zap"
 )
 
-// GetSettingsHandler godoc
-// @Summary Получить настройки WhatGate
-// @Description Возвращает текущие настройки WhatGate API
+// GetSettingsHandler возвращает текущие настройки
+// @Summary Получить настройки
+// @Description Возвращает текущие настройки WhatsGate
 // @Tags settings
 // @Accept json
 // @Produce json
-// @Success 200 {object} WhatsGateSettings "OK"
+// @Success 200 {object} SettingsResponse "Настройки получены"
+// @Failure 400 {object} types.ClientErrorResponse "Ошибка валидации"
+// @Failure 500 {object} types.ClientErrorResponse "Внутренняя ошибка сервера"
 // @Router /settings [get]
 func GetSettingsHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -34,15 +36,16 @@ func GetSettingsHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	}
 }
 
-// UpdateSettingsHandler godoc
-// @Summary Обновить настройки WhatGate
-// @Description Обновляет настройки WhatGate API
+// UpdateSettingsHandler обновляет настройки
+// @Summary Обновить настройки
+// @Description Обновляет настройки WhatsGate
 // @Tags settings
 // @Accept json
 // @Produce json
-// @Param settings body WhatsGateSettings true "Настройки WhatGate"
-// @Success 200 {object} WhatsGateSettings "OK"
-// @Failure 400 {object} types.AppErrorResponse "Ошибка валидации"
+// @Param settings body UpdateSettingsRequest true "Новые настройки"
+// @Success 200 {object} types.SuccessResponse "Настройки обновлены"
+// @Failure 400 {object} types.ClientErrorResponse "Ошибка валидации"
+// @Failure 500 {object} types.ClientErrorResponse "Внутренняя ошибка сервера"
 // @Router /settings [put]
 func UpdateSettingsHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {

@@ -33,6 +33,23 @@ type AppErrorResponse struct {
 	Version string `json:"version" example:"1.0.0"`
 }
 
+// ClientErrorResponse представляет упрощенную ошибку для клиента
+// без технических деталей и чувствительной информации
+type ClientErrorResponse struct {
+	// Основная информация для пользователя
+	Message     string `json:"message" example:"Invalid phone number format"`
+	Description string `json:"description,omitempty" example:"Phone number must be exactly 11 digits and start with 7"`
+
+	// Код ошибки для клиентской логики (без технических деталей)
+	Code string `json:"code" example:"INVALID_PHONE"`
+
+	// HTTP статус
+	HTTPStatus int `json:"http_status,omitempty" example:"400"`
+
+	// Временная метка
+	Timestamp time.Time `json:"timestamp" example:"2023-01-01T12:00:00Z"`
+}
+
 // ErrorContext содержит контекстную информацию об ошибке
 type ErrorContext struct {
 	RequestID  string                 `json:"request_id,omitempty" example:"req-123"`

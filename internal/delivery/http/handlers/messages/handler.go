@@ -33,8 +33,8 @@ import (
 // @Produce json
 // @Param request body SendMessageRequest true "Параметры сообщения"
 // @Success 200 {object} SendMessageResponse "Успешный ответ"
-// @Failure 400 {object} types.AppErrorResponse "Ошибка валидации"
-// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
+// @Failure 400 {object} types.ClientErrorResponse "Ошибка валидации"
+// @Failure 500 {object} types.ClientErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/send [post]
 func SendMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -109,8 +109,8 @@ func SendMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 // @Produce json
 // @Param request body SendMediaMessageRequest true "Параметры медиа-сообщения"
 // @Success 200 {object} SendMessageResponse "Успешный ответ"
-// @Failure 400 {object} types.AppErrorResponse "Ошибка валидации"
-// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
+// @Failure 400 {object} types.ClientErrorResponse "Ошибка валидации"
+// @Failure 500 {object} types.ClientErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/send-media [post]
 func SendMediaMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -209,8 +209,8 @@ func SendMediaMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFu
 // @Param numbers_file formData file true "Файл с номерами (xlsx)"
 // @Param media_file formData file false "Медиа-файл (опционально, тип определяется по mime_type)"
 // @Success 200 {object} BulkSendStartResponse "Запуск рассылки"
-// @Failure 400 {object} types.AppErrorResponse "Ошибка валидации"
-// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
+// @Failure 400 {object} types.ClientErrorResponse "Ошибка валидации"
+// @Failure 500 {object} types.ClientErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/bulk-send [post]
 func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage interfaces.BulkCampaignStorage, statusStorage interfaces.BulkCampaignStatusStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -296,8 +296,8 @@ func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage in
 // @Param message formData string true "Текст сообщения"
 // @Param media_file formData file false "Медиа-файл (опционально)"
 // @Success 200 {object} SendMessageResponse "Успешный ответ"
-// @Failure 400 {object} types.AppErrorResponse "Ошибка валидации"
-// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
+// @Failure 400 {object} types.ClientErrorResponse "Ошибка валидации"
+// @Failure 500 {object} types.ClientErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/test-send [post]
 func TestSendHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -398,7 +398,7 @@ func TestSendHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 // @Accept json
 // @Produce json
 // @Success 200 {array} BulkCampaignResponse "Список рассылок"
-// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
+// @Failure 500 {object} types.ClientErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/campaigns [get]
 func GetBulkCampaignsHandler(bulkStorage interfaces.BulkCampaignStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -452,8 +452,8 @@ func GetBulkCampaignsHandler(bulkStorage interfaces.BulkCampaignStorage) gin.Han
 // @Produce json
 // @Param id path string true "ID рассылки"
 // @Success 200 {object} BulkCampaignResponse "Детали рассылки"
-// @Failure 404 {object} types.AppErrorResponse "Рассылка не найдена"
-// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
+// @Failure 404 {object} types.ClientErrorResponse "Рассылка не найдена"
+// @Failure 500 {object} types.ClientErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/campaigns/{id} [get]
 func GetBulkCampaignHandler(bulkStorage interfaces.BulkCampaignStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
