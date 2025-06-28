@@ -13,9 +13,9 @@ import (
 // @Tags health
 // @Accept json
 // @Produce json
-// @Success 200 {object} types.HealthResponse "OK"
-// @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
-// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Success 200 {object} HealthResponse "OK"
+// @Failure 400 {object} types.AppErrorResponse "Ошибка валидации"
+// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
 // @Router /health [get]
 func ServiceHealthHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -33,7 +33,7 @@ func ServiceHealthHandler() gin.HandlerFunc {
 // @Tags status
 // @Accept json
 // @Produce json
-// @Success 200 {object} types.StatusResponse "OK"
+// @Success 200 {object} StatusResponse "OK"
 // @Router /status [get]
 func StatusHandler(version string) gin.HandlerFunc {
 	return func(c *gin.Context) {

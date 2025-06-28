@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -15,6 +14,7 @@ import (
 
 	"whatsapp-service/internal/bulk/domain"
 	"whatsapp-service/internal/bulk/interfaces"
+	appErrors "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
 
 	"github.com/google/uuid"
@@ -38,7 +38,7 @@ func (s *BulkService) HandleBulkSendMultipart(ctx context.Context, params domain
 
 	numbersFile, ok := params.NumbersFile.(*multipart.FileHeader)
 	if !ok {
-		return domain.BulkSendResult{}, errors.New("numbers_file must be *multipart.FileHeader")
+		return domain.BulkSendResult{}, appErrors.NewBulkFileParseError("numbers_file", "must be *multipart.FileHeader")
 	}
 
 	phones, err := parsePhonesFromFile(numbersFile, s.FileParser, log)
@@ -46,7 +46,7 @@ func (s *BulkService) HandleBulkSendMultipart(ctx context.Context, params domain
 		return domain.BulkSendResult{}, err
 	}
 	if len(phones) == 0 {
-		return domain.BulkSendResult{}, errors.New("no valid phone numbers found in file")
+		return domain.BulkSendResult{}, appErrors.NewBulkNoValidNumbersError()
 	}
 
 	var mediaFile *multipart.FileHeader
@@ -60,7 +60,7 @@ func (s *BulkService) HandleBulkSendMultipart(ctx context.Context, params domain
 	}
 
 	if messagesPerHour <= 0 {
-		return domain.BulkSendResult{}, errors.New("messages_per_hour must be > 0")
+		return domain.BulkSendResult{}, appErrors.NewBulkRateLimitExceededError(messagesPerHour)
 	}
 
 	campaignID := uuid.NewString()
@@ -190,7 +190,7 @@ func (s *BulkService) handleBulkSendCore(
 // parsePhonesFromFile — парсит номера из xlsx-файла через FileParser
 func parsePhonesFromFile(file *multipart.FileHeader, parser interfaces.FileParser, log logger.Logger) ([]string, error) {
 	if file == nil {
-		return nil, errors.New("numbers_file is required")
+		return nil, appErrors.NewBulkFileParseError("numbers_file", "is required")
 	}
 	numbersTmp, err := file.Open()
 
@@ -253,7 +253,7 @@ func parseMediaFromFile(file *multipart.FileHeader) (*domain.BulkMedia, error) {
 	}
 
 	return &domain.BulkMedia{
-		MessageType: utils.DetectMessageType(mediaMimeType),
+		MessageType: string(utils.DetectMessageType(mediaMimeType)),
 		Filename:    mediaFilename,
 		MimeType:    mediaMimeType,
 		FileData:    base64.StdEncoding.EncodeToString(mediaBytes),

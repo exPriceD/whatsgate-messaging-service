@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 	"whatsapp-service/internal/bulk/domain"
-	appErr "whatsapp-service/internal/errors"
+	appErrors "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -40,7 +40,7 @@ func (r *BulkCampaignRepository) InitTable(ctx context.Context) error {
 	_, err := r.pool.Exec(ctx, query)
 	if err != nil {
 		r.Logger.Error("Failed to create bulk_campaigns table", zap.Error(err))
-		return appErr.New("DB_BULK_INIT_ERROR", "failed to create bulk_campaigns table", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_INIT_ERROR", "failed to create bulk_campaigns table", err)
 	}
 	return nil
 }
@@ -65,7 +65,7 @@ func (r *BulkCampaignRepository) Create(ctx context.Context, campaign *domain.Bu
 	)
 	if err != nil {
 		r.Logger.Error("Failed to create bulk campaign", zap.Error(err))
-		return appErr.New("DB_BULK_CREATE_ERROR", "failed to create bulk campaign", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_CREATE_ERROR", "failed to create bulk campaign", err)
 	}
 	return nil
 }
@@ -75,7 +75,7 @@ func (r *BulkCampaignRepository) UpdateStatus(ctx context.Context, id string, st
 	_, err := r.pool.Exec(ctx, `UPDATE bulk_campaigns SET status=$1 WHERE id=$2`, status, id)
 	if err != nil {
 		r.Logger.Error("Failed to update bulk campaign status", zap.Error(err))
-		return appErr.New("DB_BULK_UPDATE_STATUS_ERROR", "failed to update bulk campaign status", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_UPDATE_STATUS_ERROR", "failed to update bulk campaign status", err)
 	}
 	return nil
 }
@@ -85,7 +85,7 @@ func (r *BulkCampaignRepository) UpdateProcessedCount(ctx context.Context, id st
 	_, err := r.pool.Exec(ctx, `UPDATE bulk_campaigns SET processed_count=$1 WHERE id=$2`, processedCount, id)
 	if err != nil {
 		r.Logger.Error("Failed to update bulk campaign processed count", zap.Error(err))
-		return appErr.New("DB_BULK_UPDATE_PROCESSED_ERROR", "failed to update bulk campaign processed count", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_UPDATE_PROCESSED_ERROR", "failed to update bulk campaign processed count", err)
 	}
 	return nil
 }
@@ -98,7 +98,7 @@ func (r *BulkCampaignRepository) GetByID(ctx context.Context, id string) (*domai
 	err := row.Scan(&c.ID, &createdAt, &c.Name, &c.Message, &c.Total, &c.ProcessedCount, &c.Status, &c.MediaFilename, &c.MediaMime, &c.MediaType, &c.MessagesPerHour, &c.Initiator)
 	if err != nil {
 		r.Logger.Error("Failed to get bulk campaign", zap.Error(err))
-		return nil, appErr.New("DB_BULK_GET_ERROR", "failed to get bulk campaign", err)
+		return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_GET_ERROR", "failed to get bulk campaign", err)
 	}
 	c.CreatedAt = createdAt.Format(time.RFC3339)
 	return &c, nil
@@ -109,7 +109,7 @@ func (r *BulkCampaignRepository) List(ctx context.Context) ([]*domain.BulkCampai
 	rows, err := r.pool.Query(ctx, `SELECT id, created_at, name, message, total, processed_count, status, media_filename, media_mime, media_type, messages_per_hour, initiator FROM bulk_campaigns ORDER BY created_at DESC`)
 	if err != nil {
 		r.Logger.Error("Failed to list bulk campaigns", zap.Error(err))
-		return nil, appErr.New("DB_BULK_LIST_ERROR", "failed to list bulk campaigns", err)
+		return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_LIST_ERROR", "failed to list bulk campaigns", err)
 	}
 	defer rows.Close()
 	var result []*domain.BulkCampaign
@@ -118,7 +118,7 @@ func (r *BulkCampaignRepository) List(ctx context.Context) ([]*domain.BulkCampai
 		var createdAt time.Time
 		if err := rows.Scan(&c.ID, &createdAt, &c.Name, &c.Message, &c.Total, &c.ProcessedCount, &c.Status, &c.MediaFilename, &c.MediaMime, &c.MediaType, &c.MessagesPerHour, &c.Initiator); err != nil {
 			r.Logger.Error("Failed to scan bulk campaign row", zap.Error(err))
-			return nil, appErr.New("DB_BULK_SCAN_ERROR", "failed to scan bulk campaign row", err)
+			return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_SCAN_ERROR", "failed to scan bulk campaign row", err)
 		}
 		c.CreatedAt = createdAt.Format(time.RFC3339)
 		result = append(result, &c)

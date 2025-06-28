@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	appErr "whatsapp-service/internal/errors"
+	appErrors "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
 	"whatsapp-service/internal/utils"
 	whatsgateService "whatsapp-service/internal/whatsgate/usecase"
@@ -33,42 +33,64 @@ import (
 // @Produce json
 // @Param request body SendMessageRequest true "Параметры сообщения"
 // @Success 200 {object} SendMessageResponse "Успешный ответ"
-// @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
-// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Failure 400 {object} types.AppErrorResponse "Ошибка валидации"
+// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/send [post]
 func SendMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := c.MustGet("logger").(logger.Logger)
 		log.Debug("Incoming SendMessage request")
+
 		var request SendMessageRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
 			log.Error("Invalid request body", zap.Error(err))
-			c.Error(appErr.NewValidationError("Invalid request body: " + err.Error()))
+			appErr := appErrors.NewValidationError("Invalid request body", err.Error()).
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "send_message_handler")
+			c.Error(appErr)
 			return
 		}
+
 		if err := whatsgateInfra.ValidatePhoneNumber(request.PhoneNumber); err != nil {
 			log.Error("Invalid phone number", zap.String("phone", request.PhoneNumber), zap.Error(err))
-			c.Error(err)
+			appErr := appErrors.NewWhatsAppInvalidPhoneError(request.PhoneNumber).
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "send_message_handler")
+			c.Error(appErr)
 			return
 		}
+
 		if request.Message == "" {
 			log.Error("Message text is required")
-			c.Error(appErr.NewValidationError("Message text is required"))
+			appErr := appErrors.NewValidationError("Message text is required").
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "send_message_handler")
+			c.Error(appErr)
 			return
 		}
+
 		client, err := ws.GetClient()
 		if err != nil {
 			log.Error("Failed to get WhatGate client", zap.Error(err))
-			c.Error(err)
+			appErr := appErrors.NewWhatsAppNotConfiguredError().
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "send_message_handler")
+			c.Error(appErr)
 			return
 		}
+
 		ctx := c.Request.Context()
 		response, err := client.SendTextMessage(ctx, request.PhoneNumber, request.Message, request.Async)
 		if err != nil {
 			log.Error("Failed to send message", zap.Error(err))
-			c.Error(appErr.New("SEND_ERROR", "Failed to send message", err))
+			appErr := appErrors.NewExternalServiceError("WhatsApp", "send_text_message", err).
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "send_message_handler").
+				WithMetadata("phone_number", request.PhoneNumber)
+			c.Error(appErr)
 			return
 		}
+
 		log.Info("Message sent successfully", zap.String("phone", request.PhoneNumber), zap.String("id", response.ID))
 		c.JSON(http.StatusOK, SendMessageResponse{
 			Success: true,
@@ -87,41 +109,62 @@ func SendMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 // @Produce json
 // @Param request body SendMediaMessageRequest true "Параметры медиа-сообщения"
 // @Success 200 {object} SendMessageResponse "Успешный ответ"
-// @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
-// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Failure 400 {object} types.AppErrorResponse "Ошибка валидации"
+// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/send-media [post]
 func SendMediaMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		log := c.MustGet("logger").(logger.Logger)
 		log.Debug("Incoming SendMediaMessage request")
+
 		var request SendMediaMessageRequest
 		if err := c.ShouldBindJSON(&request); err != nil {
 			log.Error("Invalid request body", zap.Error(err))
-			c.Error(appErr.NewValidationError("Invalid request body: " + err.Error()))
+			appErr := appErrors.NewValidationError("Invalid request body", err.Error()).
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "send_media_message_handler")
+			c.Error(appErr)
 			return
 		}
+
 		if err := whatsgateInfra.ValidatePhoneNumber(request.PhoneNumber); err != nil {
 			log.Error("Invalid phone number", zap.String("phone", request.PhoneNumber), zap.Error(err))
-			c.Error(err)
+			appErr := appErrors.NewWhatsAppInvalidPhoneError(request.PhoneNumber).
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "send_media_message_handler")
+			c.Error(appErr)
 			return
 		}
+
 		if err := whatsgateInfra.ValidateMessageType(request.MessageType); err != nil {
 			log.Error("Invalid message type", zap.String("type", request.MessageType), zap.Error(err))
-			c.Error(err)
+			appErr := appErrors.NewWhatsAppMediaError(request.MessageType, err.Error()).
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "send_media_message_handler")
+			c.Error(appErr)
 			return
 		}
+
 		fileData, err := base64.StdEncoding.DecodeString(request.FileData)
 		if err != nil {
 			log.Error("File data must be base64 encoded", zap.Error(err))
-			c.Error(appErr.NewValidationError("File data must be base64 encoded"))
+			appErr := appErrors.NewValidationError("File data must be base64 encoded").
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "send_media_message_handler")
+			c.Error(appErr)
 			return
 		}
+
 		client, err := ws.GetClient()
 		if err != nil {
 			log.Error("Failed to get WhatGate client", zap.Error(err))
-			c.Error(err)
+			appErr := appErrors.NewWhatsAppNotConfiguredError().
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "send_media_message_handler")
+			c.Error(appErr)
 			return
 		}
+
 		ctx := c.Request.Context()
 		response, err := client.SendMediaMessage(
 			ctx,
@@ -135,9 +178,15 @@ func SendMediaMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFu
 		)
 		if err != nil {
 			log.Error("Failed to send media message", zap.Error(err))
-			c.Error(appErr.New("SEND_ERROR", "Failed to send media message", err))
+			appErr := appErrors.NewExternalServiceError("WhatsApp", "send_media_message", err).
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "send_media_message_handler").
+				WithMetadata("phone_number", request.PhoneNumber).
+				WithMetadata("media_type", request.MessageType)
+			c.Error(appErr)
 			return
 		}
+
 		log.Info("Media message sent successfully", zap.String("phone", request.PhoneNumber), zap.String("id", response.ID))
 		c.JSON(http.StatusOK, SendMessageResponse{
 			Success: true,
@@ -160,8 +209,8 @@ func SendMediaMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFu
 // @Param numbers_file formData file true "Файл с номерами (xlsx)"
 // @Param media_file formData file false "Медиа-файл (опционально, тип определяется по mime_type)"
 // @Success 200 {object} BulkSendStartResponse "Запуск рассылки"
-// @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
-// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Failure 400 {object} types.AppErrorResponse "Ошибка валидации"
+// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/bulk-send [post]
 func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage interfaces.BulkCampaignStorage, statusStorage interfaces.BulkCampaignStatusStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -191,14 +240,14 @@ func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage in
 			}
 			if messagesPerHour <= 0 {
 				log.Error("messages_per_hour is required and must be > 0")
-				c.Error(appErr.NewValidationError("messages_per_hour is required and must be > 0"))
+				c.Error(appErrors.NewValidationError("messages_per_hour is required and must be > 0"))
 				return
 			}
 
 			numbersFile, err := c.FormFile("numbers_file")
 			if err != nil {
 				log.Error("numbers_file is required", zap.Error(err))
-				c.Error(appErr.NewValidationError("numbers_file is required"))
+				c.Error(appErrors.NewValidationError("numbers_file is required"))
 				return
 			}
 
@@ -218,7 +267,7 @@ func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage in
 			ctx := c.Request.Context()
 			result, err := bs.HandleBulkSendMultipart(ctx, params)
 			if err != nil {
-				c.Error(appErr.NewValidationError("Bulk send error: " + err.Error()))
+				c.Error(appErrors.NewValidationError("Bulk send error: " + err.Error()))
 				return
 			}
 
@@ -233,7 +282,7 @@ func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage in
 			}
 			return
 		}
-		c.Error(appErr.NewValidationError("Only multipart supported"))
+		c.Error(appErrors.NewValidationError("Only multipart supported"))
 	}
 }
 
@@ -247,8 +296,8 @@ func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage in
 // @Param message formData string true "Текст сообщения"
 // @Param media_file formData file false "Медиа-файл (опционально)"
 // @Success 200 {object} SendMessageResponse "Успешный ответ"
-// @Failure 400 {object} messages.ErrorResponse "Ошибка валидации"
-// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Failure 400 {object} types.AppErrorResponse "Ошибка валидации"
+// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/test-send [post]
 func TestSendHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -261,21 +310,21 @@ func TestSendHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 			opened, err := file.Open()
 			if err != nil {
 				log.Error("Failed to open media file", zap.Error(err))
-				c.Error(appErr.NewValidationError("Failed to open media file: " + err.Error()))
+				c.Error(appErrors.NewValidationError("Failed to open media file: " + err.Error()))
 				return
 			}
 			defer opened.Close()
 			data, err := io.ReadAll(opened)
 			if err != nil {
 				log.Error("Failed to read media file", zap.Error(err))
-				c.Error(appErr.NewValidationError("Failed to read media file: " + err.Error()))
+				c.Error(appErrors.NewValidationError("Failed to read media file: " + err.Error()))
 				return
 			}
 			fileData := base64.StdEncoding.EncodeToString(data)
 			payload := SendMediaMessageRequest{
 				PhoneNumber: phone,
 				Message:     message,
-				MessageType: utils.DetectMessageType(file.Header.Get("Content-Type")),
+				MessageType: string(utils.DetectMessageType(file.Header.Get("Content-Type"))),
 				Filename:    file.Filename,
 				FileData:    fileData,
 				MimeType:    file.Header.Get("Content-Type"),
@@ -299,7 +348,11 @@ func TestSendHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 			)
 			if err != nil {
 				log.Error("Failed to send media message", zap.Error(err))
-				c.Error(appErr.New("SEND_ERROR", "Failed to send media message", err))
+				c.Error(appErrors.NewExternalServiceError("WhatsApp", "send_media_message", err).
+					WithContext(appErrors.FromContext(c.Request.Context())).
+					WithMetadata("component", "test_send_handler").
+					WithMetadata("phone_number", payload.PhoneNumber).
+					WithMetadata("media_type", payload.MessageType))
 				return
 			}
 			log.Info("Test media message sent successfully", zap.String("phone", payload.PhoneNumber), zap.String("id", response.ID))
@@ -322,7 +375,10 @@ func TestSendHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 		response, err := client.SendTextMessage(ctx, phone, message, false)
 		if err != nil {
 			log.Error("Failed to send test message", zap.Error(err))
-			c.Error(appErr.New("SEND_ERROR", "Failed to send test message", err))
+			c.Error(appErrors.NewExternalServiceError("WhatsApp", "send_text_message", err).
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "test_send_handler").
+				WithMetadata("phone_number", phone))
 			return
 		}
 		log.Info("Test message sent successfully", zap.String("phone", phone), zap.String("id", response.ID))
@@ -342,7 +398,7 @@ func TestSendHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFunc {
 // @Accept json
 // @Produce json
 // @Success 200 {array} BulkCampaignResponse "Список рассылок"
-// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/campaigns [get]
 func GetBulkCampaignsHandler(bulkStorage interfaces.BulkCampaignStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -352,7 +408,10 @@ func GetBulkCampaignsHandler(bulkStorage interfaces.BulkCampaignStorage) gin.Han
 		campaigns, err := bulkStorage.List()
 		if err != nil {
 			log.Error("Failed to get bulk campaigns", zap.Error(err))
-			c.Error(appErr.New("LIST_ERROR", "Failed to get bulk campaigns", err))
+			appErr := appErrors.NewDatabaseError("list_bulk_campaigns", err).
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "get_bulk_campaigns_handler")
+			c.Error(appErr)
 			return
 		}
 
@@ -393,8 +452,8 @@ func GetBulkCampaignsHandler(bulkStorage interfaces.BulkCampaignStorage) gin.Han
 // @Produce json
 // @Param id path string true "ID рассылки"
 // @Success 200 {object} BulkCampaignResponse "Детали рассылки"
-// @Failure 404 {object} messages.ErrorResponse "Рассылка не найдена"
-// @Failure 500 {object} messages.ErrorResponse "Внутренняя ошибка сервера"
+// @Failure 404 {object} types.AppErrorResponse "Рассылка не найдена"
+// @Failure 500 {object} types.AppErrorResponse "Внутренняя ошибка сервера"
 // @Router /messages/campaigns/{id} [get]
 func GetBulkCampaignHandler(bulkStorage interfaces.BulkCampaignStorage) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -405,13 +464,20 @@ func GetBulkCampaignHandler(bulkStorage interfaces.BulkCampaignStorage) gin.Hand
 		campaign, err := bulkStorage.GetByID(campaignID)
 		if err != nil {
 			log.Error("Failed to get bulk campaign", zap.String("id", campaignID), zap.Error(err))
-			c.Error(appErr.New("NOT_FOUND", "Campaign not found", err))
+			appErr := appErrors.NewDatabaseError("get_bulk_campaign", err).
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "get_bulk_campaign_handler").
+				WithMetadata("campaign_id", campaignID)
+			c.Error(appErr)
 			return
 		}
 
 		if campaign == nil {
 			log.Error("Campaign not found", zap.String("id", campaignID))
-			c.Error(appErr.New("NOT_FOUND", "Campaign not found", nil))
+			appErr := appErrors.NewBulkCampaignNotFoundError(campaignID).
+				WithContext(appErrors.FromContext(c.Request.Context())).
+				WithMetadata("component", "get_bulk_campaign_handler")
+			c.Error(appErr)
 			return
 		}
 

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"whatsapp-service/internal/bulk/domain"
 	"whatsapp-service/internal/bulk/interfaces"
-	appErr "whatsapp-service/internal/errors"
+	appErrors "whatsapp-service/internal/errors"
 )
 
 // BulkCampaignStorage реализует thread-safe storage для рассылок
@@ -27,7 +27,7 @@ func (s *BulkCampaignStorage) Create(campaign *domain.BulkCampaign) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.repo.Create(s.ctx, campaign); err != nil {
-		return appErr.New("BULK_STORAGE_CREATE_ERROR", "failed to create bulk campaign", err)
+		return appErrors.New(appErrors.ErrorTypeStorage, "BULK_STORAGE_CREATE_ERROR", "failed to create bulk campaign", err)
 	}
 	return nil
 }
@@ -37,7 +37,7 @@ func (s *BulkCampaignStorage) UpdateStatus(id, status string) error {
 	defer s.mu.Unlock()
 	err := s.repo.UpdateStatus(s.ctx, id, status)
 	if err != nil {
-		return appErr.New("BULK_STORAGE_UPDATE_STATUS_ERROR", "failed to update bulk campaign status", err)
+		return appErrors.New(appErrors.ErrorTypeStorage, "BULK_STORAGE_UPDATE_STATUS_ERROR", "failed to update bulk campaign status", err)
 	}
 	return nil
 }
@@ -47,7 +47,7 @@ func (s *BulkCampaignStorage) UpdateProcessedCount(id string, processedCount int
 	defer s.mu.Unlock()
 	err := s.repo.UpdateProcessedCount(s.ctx, id, processedCount)
 	if err != nil {
-		return appErr.New("BULK_STORAGE_UPDATE_PROCESSED_ERROR", "failed to update bulk campaign processed count", err)
+		return appErrors.New(appErrors.ErrorTypeStorage, "BULK_STORAGE_UPDATE_PROCESSED_ERROR", "failed to update bulk campaign processed count", err)
 	}
 	return nil
 }
@@ -57,7 +57,7 @@ func (s *BulkCampaignStorage) GetByID(id string) (*domain.BulkCampaign, error) {
 	defer s.mu.RUnlock()
 	campaign, err := s.repo.GetByID(s.ctx, id)
 	if err != nil {
-		return nil, appErr.New("BULK_STORAGE_GET_ERROR", "failed to get bulk campaign", err)
+		return nil, appErrors.New(appErrors.ErrorTypeStorage, "BULK_STORAGE_GET_ERROR", "failed to get bulk campaign", err)
 	}
 	return campaign, nil
 }
@@ -67,7 +67,7 @@ func (s *BulkCampaignStorage) List() ([]*domain.BulkCampaign, error) {
 	defer s.mu.RUnlock()
 	campaigns, err := s.repo.List(s.ctx)
 	if err != nil {
-		return nil, appErr.New("BULK_STORAGE_LIST_ERROR", "failed to list bulk campaigns", err)
+		return nil, appErrors.New(appErrors.ErrorTypeStorage, "BULK_STORAGE_LIST_ERROR", "failed to list bulk campaigns", err)
 	}
 	return campaigns, nil
 }
@@ -91,7 +91,7 @@ func (s *BulkCampaignStatusStorage) Create(status *domain.BulkCampaignStatus) er
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.repo.Create(s.ctx, status); err != nil {
-		return appErr.New("BULK_STATUS_STORAGE_CREATE_ERROR", "failed to create bulk campaign status", err)
+		return appErrors.New(appErrors.ErrorTypeStorage, "BULK_STATUS_STORAGE_CREATE_ERROR", "failed to create bulk campaign status", err)
 	}
 	return nil
 }
@@ -100,7 +100,7 @@ func (s *BulkCampaignStatusStorage) Update(id string, status string, errMsg *str
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.repo.Update(s.ctx, id, status, errMsg, sentAt); err != nil {
-		return appErr.New("BULK_STATUS_STORAGE_UPDATE_ERROR", "failed to update bulk campaign status", err)
+		return appErrors.New(appErrors.ErrorTypeStorage, "BULK_STATUS_STORAGE_UPDATE_ERROR", "failed to update bulk campaign status", err)
 	}
 	return nil
 }
@@ -110,7 +110,7 @@ func (s *BulkCampaignStatusStorage) ListByCampaignID(campaignID string) ([]*doma
 	defer s.mu.RUnlock()
 	statuses, err := s.repo.ListByCampaignID(s.ctx, campaignID)
 	if err != nil {
-		return nil, appErr.New("BULK_STATUS_STORAGE_LIST_ERROR", "failed to list campaign statuses", err)
+		return nil, appErrors.New(appErrors.ErrorTypeStorage, "BULK_STATUS_STORAGE_LIST_ERROR", "failed to list campaign statuses", err)
 	}
 	return statuses, nil
 }

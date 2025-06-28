@@ -1,5 +1,8 @@
 package messages
 
+// Этот файл больше не используется, так как все структуры перенесены в types пакет
+// Оставляем пустой файл для совместимости
+
 // SendMessageRequest представляет запрос на отправку текстового сообщения.
 type SendMessageRequest struct {
 	PhoneNumber string `json:"phone_number" binding:"required" example:"79991234567"`
@@ -58,13 +61,6 @@ type BulkSendResponse struct {
 	SuccessCount int              `json:"success_count" example:"8"`
 	FailedCount  int              `json:"failed_count" example:"2"`
 	Results      []BulkSendResult `json:"results"`
-}
-
-// ErrorResponse представляет стандартный ответ об ошибке для всех эндпоинтов.
-type ErrorResponse struct {
-	Code    int    `json:"code" example:"400"`
-	Error   string `json:"error" example:"Validation error"`
-	Message string `json:"message" example:"Подробное описание ошибки"`
 }
 
 // BulkSendStartResponse — быстрый ответ после запуска массовой рассылки

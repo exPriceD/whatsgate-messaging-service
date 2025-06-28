@@ -2,87 +2,55 @@ package types
 
 import "time"
 
-// --- Health ---
-type HealthResponse struct {
-	Status string    `json:"status" example:"ok"`
-	Time   time.Time `json:"time" example:"2023-01-01T12:00:00Z"`
-}
-
-type StatusResponse struct {
-	Status    string    `json:"status" example:"running"`
-	Timestamp time.Time `json:"timestamp" example:"2023-01-01T12:00:00Z"`
-	Version   string    `json:"version" example:"1.0.0"`
-}
-
-// --- Settings ---
-type WhatGateSettings struct {
-	WhatsappID string `json:"whatsapp_id" binding:"required" example:"your_whatsapp_id"`
-	APIKey     string `json:"api_key" binding:"required" example:"your_api_key"`
-	BaseURL    string `json:"base_url" example:"https://whatsgate.ru/api/v1"`
-}
-
-// --- Messages ---
-type SendMessageRequest struct {
-	PhoneNumber string `json:"phone_number" binding:"required" example:"79991234567"`
-	Message     string `json:"message" binding:"required" example:"Привет! Это тестовое сообщение"`
-	Async       bool   `json:"async" example:"true"`
-}
-
-type SendMediaMessageRequest struct {
-	PhoneNumber string `json:"phone_number" binding:"required" example:"79991234567"`
-	Message     string `json:"message" example:"Сообщение с медиа"`
-	MessageType string `json:"message_type" binding:"required" example:"image"`
-	Filename    string `json:"filename" binding:"required" example:"image.png"`
-	MimeType    string `json:"mime_type" binding:"required" example:"image/png"`
-	FileData    string `json:"file_data" binding:"required" example:"base64_encoded_data"`
-	Async       bool   `json:"async" example:"true"`
-}
-
-type SendMessageResponse struct {
-	Success bool   `json:"success" example:"true"`
-	Message string `json:"message" example:"Message sent successfully"`
-	ID      string `json:"id,omitempty" example:"message_id_123"`
-	Status  string `json:"status,omitempty" example:"sent"`
-}
-
-type BulkSendRequest struct {
-	PhoneNumbers []string       `json:"phone_numbers" binding:"required" example:"79991234567,79998765432"`
-	Message      string         `json:"message" binding:"required" example:"Массовое сообщение"`
-	Async        bool           `json:"async" example:"true"`
-	Media        *BulkSendMedia `json:"media,omitempty"`
-}
-
-type BulkSendMedia struct {
-	MessageType string `json:"message_type" binding:"required" example:"image"`
-	Filename    string `json:"filename" binding:"required" example:"image.png"`
-	MimeType    string `json:"mime_type" binding:"required" example:"image/png"`
-	FileData    string `json:"file_data" binding:"required" example:"base64_encoded_data"`
-}
-
-type BulkSendResult struct {
-	PhoneNumber string `json:"phone_number" example:"79991234567"`
-	Success     bool   `json:"success" example:"true"`
-	MessageID   string `json:"message_id,omitempty" example:"message_id_123"`
-	Status      string `json:"status,omitempty" example:"sent"`
-	Error       string `json:"error,omitempty" example:"Invalid phone number"`
-}
-
-type BulkSendResponse struct {
-	Success      bool             `json:"success" example:"true"`
-	TotalCount   int              `json:"total_count" example:"10"`
-	SuccessCount int              `json:"success_count" example:"8"`
-	FailedCount  int              `json:"failed_count" example:"2"`
-	Results      []BulkSendResult `json:"results"`
-}
-
 // --- Common ---
-type ErrorResponse struct {
-	Error   string `json:"error" example:"Something went wrong"`
-	Message string `json:"message" example:"Detailed error message"`
-	Code    int    `json:"code" example:"400"`
-}
-
 type SuccessResponse struct {
 	Success bool   `json:"success" example:"true"`
 	Message string `json:"message" example:"Operation completed successfully"`
+}
+
+// AppErrorResponse представляет структурированную ошибку приложения для API
+type AppErrorResponse struct {
+	// Основная информация
+	Type        string `json:"type" example:"VALIDATION_ERROR"`
+	Code        string `json:"code" example:"INVALID_PHONE"`
+	Message     string `json:"message" example:"Invalid phone number format"`
+	Description string `json:"description,omitempty" example:"Phone number must be exactly 11 digits and start with 7"`
+
+	// Метаданные
+	Severity string `json:"severity" example:"MEDIUM"`
+
+	// Контекстная информация
+	Context *ErrorContext `json:"context,omitempty"`
+
+	// Техническая информация
+	Stack     []StackFrame `json:"stack,omitempty"`
+	Timestamp time.Time    `json:"timestamp" example:"2023-01-01T12:00:00Z"`
+
+	// HTTP информация
+	HTTPStatus int `json:"http_status,omitempty" example:"400"`
+
+	// Версионирование
+	Version string `json:"version" example:"1.0.0"`
+}
+
+// ErrorContext содержит контекстную информацию об ошибке
+type ErrorContext struct {
+	RequestID  string                 `json:"request_id,omitempty" example:"req-123"`
+	UserID     string                 `json:"user_id,omitempty" example:"user-456"`
+	SessionID  string                 `json:"session_id,omitempty" example:"sess-789"`
+	ResourceID string                 `json:"resource_id,omitempty" example:"campaign-123"`
+	Operation  string                 `json:"operation,omitempty" example:"send_message"`
+	Component  string                 `json:"component,omitempty" example:"send_message_handler"`
+	Method     string                 `json:"method,omitempty" example:"POST"`
+	Path       string                 `json:"path,omitempty" example:"/messages/send"`
+	IP         string                 `json:"ip,omitempty" example:"192.168.1.1"`
+	UserAgent  string                 `json:"user_agent,omitempty" example:"Mozilla/5.0..."`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// StackFrame представляет кадр стека вызовов
+type StackFrame struct {
+	Function string `json:"function" example:"main.main"`
+	File     string `json:"file" example:"main.go"`
+	Line     int    `json:"line" example:"42"`
 }

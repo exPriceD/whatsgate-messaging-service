@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	appErr "whatsapp-service/internal/errors"
+	appErrors "whatsapp-service/internal/errors"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -37,7 +37,7 @@ func (p *PoolDB) GetPool() *pgxpool.Pool {
 // NewPostgresPool создает PoolDB (адаптер).
 func NewPostgresPool(ctx context.Context, dbCfg Config) (DB, error) {
 	if err := dbCfg.Validate(); err != nil {
-		return nil, appErr.New("DB_CONFIG_INVALID", "invalid database config", err)
+		return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_CONFIG_INVALID", "invalid database config", err)
 	}
 
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s&timezone=Europe/Moscow",
@@ -45,7 +45,7 @@ func NewPostgresPool(ctx context.Context, dbCfg Config) (DB, error) {
 
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, appErr.New("DB_POOL_PARSE_ERROR", "failed to parse pool config", err)
+		return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_POOL_PARSE_ERROR", "failed to parse pool config", err)
 	}
 
 	poolCfg.MaxConns = int32(dbCfg.MaxOpenConns)
@@ -54,7 +54,7 @@ func NewPostgresPool(ctx context.Context, dbCfg Config) (DB, error) {
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
-		return nil, appErr.New("DB_POOL_CREATE_ERROR", "failed to create pool", err)
+		return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_POOL_CREATE_ERROR", "failed to create pool", err)
 	}
 
 	return &PoolDB{pool: pool}, nil

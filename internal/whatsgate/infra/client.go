@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	appErr "whatsapp-service/internal/errors"
+	appErrors "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
 	"whatsapp-service/internal/whatsgate/domain"
 
@@ -75,12 +75,12 @@ func (c *ClientImpl) SendMediaMessage(ctx context.Context, phoneNumber, messageT
 func (c *ClientImpl) sendMessage(ctx context.Context, request domain.SendMessageRequest) (*domain.SendMessageResponse, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {
-		return nil, appErr.New("MARSHAL_ERROR", "failed to marshal request", err)
+		return nil, appErrors.New(appErrors.ErrorTypeExternalService, "MARSHAL_ERROR", "failed to marshal request", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/send", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, appErr.New("REQUEST_ERROR", "failed to create request", err)
+		return nil, appErrors.New(appErrors.ErrorTypeExternalService, "REQUEST_ERROR", "failed to create request", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -92,7 +92,7 @@ func (c *ClientImpl) sendMessage(ctx context.Context, request domain.SendMessage
 	resp, err := c.httpClient.Do(req)
 	latency := time.Since(start)
 	if err != nil {
-		return nil, appErr.New("NETWORK_ERROR", "failed to send request", err)
+		return nil, appErrors.New(appErrors.ErrorTypeExternalService, "NETWORK_ERROR", "failed to send request", err)
 	}
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
@@ -100,7 +100,7 @@ func (c *ClientImpl) sendMessage(ctx context.Context, request domain.SendMessage
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, appErr.New("READ_ERROR", "failed to read response", err)
+		return nil, appErrors.New(appErrors.ErrorTypeExternalService, "READ_ERROR", "failed to read response", err)
 	}
 
 	c.Logger.Info("WhatGate API request",
@@ -122,31 +122,31 @@ func (c *ClientImpl) sendMessage(ctx context.Context, request domain.SendMessage
 			Message: "Message sent successfully",
 		}, nil
 	case http.StatusUnauthorized:
-		return nil, appErr.New("UNAUTHORIZED", "Your request was made with invalid credentials.", nil)
+		return nil, appErrors.New(appErrors.ErrorTypeUnauthorized, "UNAUTHORIZED", "Your request was made with invalid credentials.", nil)
 	case http.StatusInternalServerError:
-		return nil, appErr.New("SERVER_ERROR", "Server error: "+string(body), nil)
+		return nil, appErrors.New(appErrors.ErrorTypeInternal, "SERVER_ERROR", "Server error: "+string(body), nil)
 	default:
-		return nil, appErr.New("API_ERROR", "API request failed with status "+resp.Status, nil)
+		return nil, appErrors.New(appErrors.ErrorTypeExternalService, "API_ERROR", "API request failed with status "+resp.Status, nil)
 	}
 }
 
 func ValidatePhoneNumber(phone string) error {
 	if phone == "" {
-		return appErr.NewValidationError("phone number is required")
+		return appErrors.NewValidationError("phone number is required")
 	}
 
 	for _, char := range phone {
 		if char < '0' || char > '9' {
-			return appErr.NewValidationError("phone number must contain only digits")
+			return appErrors.NewValidationError("phone number must contain only digits")
 		}
 	}
 
 	if len(phone) != 11 {
-		return appErr.NewValidationError("phone number must be exactly 11 digits")
+		return appErrors.NewValidationError("phone number must be exactly 11 digits")
 	}
 
 	if phone[0] != '7' {
-		return appErr.NewValidationError("phone number must start with 7")
+		return appErrors.NewValidationError("phone number must start with 7")
 	}
 
 	return nil
@@ -162,7 +162,7 @@ var allowedTypes = map[string]struct{}{
 
 func ValidateMessageType(messageType string) error {
 	if _, ok := allowedTypes[messageType]; !ok {
-		return appErr.NewValidationError("invalid message type")
+		return appErrors.NewValidationError("invalid message type")
 	}
 	return nil
 }

@@ -11,8 +11,8 @@ import (
 	bulkInterfaces "whatsapp-service/internal/bulk/interfaces"
 	"whatsapp-service/internal/config"
 	"whatsapp-service/internal/database"
-	"whatsapp-service/internal/delivery/http"
-	appErr "whatsapp-service/internal/errors"
+	httpDelivery "whatsapp-service/internal/delivery/http"
+	appErrors "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
 	infra "whatsapp-service/internal/whatsgate/infra"
 	usecase "whatsapp-service/internal/whatsgate/usecase"
@@ -30,14 +30,14 @@ type App struct {
 	WhatsGateService *usecase.SettingsUsecase
 	BulkCampaignRepo bulkInterfaces.BulkCampaignStorage
 	BulkStatusRepo   bulkInterfaces.BulkCampaignStatusStorage
-	Server           *http.Server
+	Server           *httpDelivery.Server
 }
 
 // InitConfig инициализирует конфиг приложения.
 func InitConfig(path string) (*config.Config, error) {
 	cfg, err := config.LoadConfig(path)
 	if err != nil {
-		return nil, appErr.New("CONFIG_LOAD_ERROR", "failed to load config", err)
+		return nil, appErrors.New(appErrors.ErrorTypeConfiguration, "CONFIG_LOAD_ERROR", "failed to load config", err)
 	}
 	return cfg, nil
 }
@@ -47,7 +47,7 @@ func InitLogger(cfg config.LoggingConfig) (logger.Logger, error) {
 	logCfg := logger.NewConfigFromAppConfig(cfg)
 	log, err := logger.NewZapLogger(logCfg)
 	if err != nil {
-		return nil, appErr.New("LOGGER_INIT_ERROR", "failed to init logger", err)
+		return nil, appErrors.New(appErrors.ErrorTypeInternal, "LOGGER_INIT_ERROR", "failed to init logger", err)
 	}
 	return log, nil
 }
@@ -57,13 +57,13 @@ func InitDB(ctx context.Context, cfg config.DatabaseConfig) (database.DB, *pgxpo
 	dbCfg := database.NewConfigFromAppConfig(cfg)
 	db, err := database.NewPostgresPool(ctx, dbCfg)
 	if err != nil {
-		return nil, nil, appErr.New("DB_INIT_ERROR", "failed to init database", err)
+		return nil, nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_INIT_ERROR", "failed to init database", err)
 	}
 
 	// Получаем прямой доступ к пулу для WhatGate
 	poolDB, ok := db.(*database.PoolDB)
 	if !ok {
-		return nil, nil, appErr.New("DB_POOL_ERROR", "failed to get database pool", nil)
+		return nil, nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_POOL_ERROR", "failed to get database pool", nil)
 	}
 
 	// Получаем pgxpool.Pool из адаптера
@@ -86,7 +86,7 @@ func InitWhatsGateService(pool *pgxpool.Pool, log logger.Logger) (*usecase.Setti
 
 	if err := service.InitDatabase(ctx); err != nil {
 		log.Error("failed to initialize WhatGate database table", zap.Error(err))
-		return nil, appErr.New("WHATSGATE_DB_INIT_ERROR", "failed to initialize WhatGate database", err)
+		return nil, appErrors.New(appErrors.ErrorTypeDatabase, "WHATSGATE_DB_INIT_ERROR", "failed to initialize WhatGate database", err)
 	}
 
 	log.Info("WhatGate database table initialized successfully")
@@ -103,8 +103,8 @@ func InitBulkRepositories(pool *pgxpool.Pool, log logger.Logger) (bulkInterfaces
 }
 
 // InitServer инициализирует HTTP-сервер приложения.
-func InitServer(cfg config.HTTPConfig, log logger.Logger, whatsgateService *usecase.SettingsUsecase, bulkRepo bulkInterfaces.BulkCampaignStorage, statusRepo bulkInterfaces.BulkCampaignStatusStorage) *http.Server {
-	return http.NewServer(cfg, log, whatsgateService, bulkRepo, statusRepo)
+func InitServer(cfg config.HTTPConfig, log logger.Logger, whatsgateService *usecase.SettingsUsecase, bulkRepo bulkInterfaces.BulkCampaignStorage, statusRepo bulkInterfaces.BulkCampaignStatusStorage) *httpDelivery.Server {
+	return httpDelivery.NewServer(cfg, log, whatsgateService, bulkRepo, statusRepo)
 }
 
 // BuildApp инициализирует все зависимости приложения.
@@ -179,4 +179,21 @@ func (a *App) Shutdown(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// New создает новый экземпляр приложения
+func New() (*App, error) {
+	// Инициализируем систему ошибок
+	appErrors.InitErrorSystem()
+
+	// Создаем контекст для инициализации
+	ctx := context.Background()
+
+	// Строим приложение с конфигом по умолчанию
+	app, err := BuildApp(ctx, "config/config.yaml")
+	if err != nil {
+		return nil, err
+	}
+
+	return app, nil
 }

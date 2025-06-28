@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 	"whatsapp-service/internal/bulk/domain"
-	appErr "whatsapp-service/internal/errors"
+	appErrors "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -35,7 +35,7 @@ func (r *BulkCampaignStatusRepository) InitTable(ctx context.Context) error {
 	_, err := r.pool.Exec(ctx, query)
 	if err != nil {
 		r.Logger.Error("Failed to create bulk_campaign_statuses table", zap.Error(err))
-		return appErr.New("DB_BULK_STATUS_INIT_ERROR", "failed to create bulk_campaign_statuses table", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_STATUS_INIT_ERROR", "failed to create bulk_campaign_statuses table", err)
 	}
 	return nil
 }
@@ -54,7 +54,7 @@ func (r *BulkCampaignStatusRepository) Create(ctx context.Context, status *domai
 	)
 	if err != nil {
 		r.Logger.Error("Failed to create bulk campaign status", zap.Error(err))
-		return appErr.New("DB_BULK_STATUS_CREATE_ERROR", "failed to create bulk campaign status", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_STATUS_CREATE_ERROR", "failed to create bulk campaign status", err)
 	}
 	return nil
 }
@@ -66,7 +66,7 @@ func (r *BulkCampaignStatusRepository) Update(ctx context.Context, id string, st
 	`, statusStr, errMsg, sentAt, id)
 	if err != nil {
 		r.Logger.Error("Failed to update bulk campaign status", zap.Error(err))
-		return appErr.New("DB_BULK_STATUS_UPDATE_ERROR", "failed to update bulk campaign status", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_STATUS_UPDATE_ERROR", "failed to update bulk campaign status", err)
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func (r *BulkCampaignStatusRepository) ListByCampaignID(ctx context.Context, cam
 	`, campaignID)
 	if err != nil {
 		r.Logger.Error("Failed to list statuses", zap.Error(err))
-		return nil, appErr.New("DB_BULK_STATUS_LIST_ERROR", "failed to list statuses", err)
+		return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_STATUS_LIST_ERROR", "failed to list statuses", err)
 	}
 	defer rows.Close()
 	var result []*domain.BulkCampaignStatus
@@ -88,7 +88,7 @@ func (r *BulkCampaignStatusRepository) ListByCampaignID(ctx context.Context, cam
 		var sentAt *time.Time
 		if err := rows.Scan(&s.ID, &s.CampaignID, &s.PhoneNumber, &s.Status, &s.Error, &sentAt); err != nil {
 			r.Logger.Error("Failed to scan status row", zap.Error(err))
-			return nil, appErr.New("DB_BULK_STATUS_SCAN_ERROR", "failed to scan status row", err)
+			return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_BULK_STATUS_SCAN_ERROR", "failed to scan status row", err)
 		}
 		if sentAt != nil {
 			t := sentAt.Format(time.RFC3339)

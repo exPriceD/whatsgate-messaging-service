@@ -3,7 +3,7 @@ package infra
 import (
 	"context"
 	"sync"
-	appErr "whatsapp-service/internal/errors"
+	appErrors "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/whatsgate/domain"
 	"whatsapp-service/internal/whatsgate/interfaces"
 )
@@ -19,7 +19,7 @@ func (d *DatabaseSettingsStorage) Load() (*domain.Settings, error) {
 	defer d.mu.RUnlock()
 	settings, err := d.repo.Load(d.ctx)
 	if err != nil {
-		return nil, appErr.New("DB_STORAGE_ERROR", "failed to load settings from database", err)
+		return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_STORAGE_ERROR", "failed to load settings from database", err)
 	}
 	return settings, nil
 }
@@ -29,7 +29,7 @@ func (d *DatabaseSettingsStorage) Save(settings *domain.Settings) error {
 	defer d.mu.Unlock()
 	err := d.repo.Save(d.ctx, settings)
 	if err != nil {
-		return appErr.New("DB_STORAGE_ERROR", "failed to save settings to database", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_STORAGE_ERROR", "failed to save settings to database", err)
 	}
 	return nil
 }
@@ -39,7 +39,7 @@ func (d *DatabaseSettingsStorage) Delete() error {
 	defer d.mu.Unlock()
 	err := d.repo.Delete(d.ctx)
 	if err != nil {
-		return appErr.New("DB_STORAGE_ERROR", "failed to delete settings from database", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_STORAGE_ERROR", "failed to delete settings from database", err)
 	}
 	return nil
 }

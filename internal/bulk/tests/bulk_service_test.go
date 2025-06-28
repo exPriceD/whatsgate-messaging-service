@@ -175,7 +175,7 @@ func TestBulkService_HandleBulkSendMultipart_ValidationErrors(t *testing.T) {
 				MessagesPerHour: 10,
 				NumbersFile:     nil,
 			},
-			wantErr: "numbers_file must be *multipart.FileHeader",
+			wantErr: "BULK_FILE_PARSE_ERROR",
 		},
 		{
 			name: "invalid_messages_per_hour",
@@ -185,7 +185,7 @@ func TestBulkService_HandleBulkSendMultipart_ValidationErrors(t *testing.T) {
 				MessagesPerHour: 0,
 				NumbersFile:     createMultipartFileHeader("numbers.xlsx", "test", t),
 			},
-			wantErr: "messages_per_hour must be > 0",
+			wantErr: "BULK_RATE_LIMIT_EXCEEDED",
 		},
 		{
 			name: "negative_messages_per_hour",
@@ -195,7 +195,7 @@ func TestBulkService_HandleBulkSendMultipart_ValidationErrors(t *testing.T) {
 				MessagesPerHour: -5,
 				NumbersFile:     createMultipartFileHeader("numbers.xlsx", "test", t),
 			},
-			wantErr: "messages_per_hour must be > 0",
+			wantErr: "BULK_RATE_LIMIT_EXCEEDED",
 		},
 	}
 
@@ -245,7 +245,7 @@ func TestBulkService_HandleBulkSendMultipart_EmptyPhones(t *testing.T) {
 
 	_, err := service.HandleBulkSendMultipart(context.Background(), params)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no valid phone numbers found in file")
+	assert.Contains(t, err.Error(), "BULK_NO_VALID_NUMBERS")
 }
 
 func TestBulkService_HandleBulkSendMultipart_ClientError(t *testing.T) {
@@ -289,5 +289,5 @@ func TestBulkService_HandleBulkSendMultipart_InvalidFileType(t *testing.T) {
 
 	_, err := service.HandleBulkSendMultipart(context.Background(), params)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "numbers_file must be *multipart.FileHeader")
+	assert.Contains(t, err.Error(), "BULK_FILE_PARSE_ERROR")
 }

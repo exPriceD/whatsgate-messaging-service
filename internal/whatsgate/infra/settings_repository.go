@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	appErr "whatsapp-service/internal/errors"
+	appErrors "whatsapp-service/internal/errors"
 	"whatsapp-service/internal/logger"
 	domain "whatsapp-service/internal/whatsgate/domain"
 
@@ -45,7 +45,7 @@ func (r *SettingsRepository) InitTable(ctx context.Context) error {
 
 	_, err := r.pool.Exec(ctx, query)
 	if err != nil {
-		return appErr.New("DB_INIT_ERROR", "failed to create whatsgate_settings table", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_INIT_ERROR", "failed to create whatsgate_settings table", err)
 	}
 
 	return nil
@@ -73,7 +73,7 @@ func (r *SettingsRepository) Load(ctx context.Context) (*domain.Settings, error)
 			}, nil
 		}
 		r.Logger.Error("Failed to load settings from database", zap.Error(err))
-		return nil, appErr.New("DB_LOAD_ERROR", "failed to load settings from database", err)
+		return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_LOAD_ERROR", "failed to load settings from database", err)
 	}
 	r.Logger.Info("Settings loaded from database", zap.String("whatsapp_id", settings.WhatsappID))
 	return &settings, nil
@@ -86,7 +86,7 @@ func (r *SettingsRepository) Save(ctx context.Context, settings *domain.Settings
 	err := r.pool.QueryRow(ctx, "SELECT COUNT(*) FROM whatsgate_settings").Scan(&count)
 	if err != nil {
 		r.Logger.Error("Failed to check existing settings", zap.Error(err))
-		return appErr.New("DB_QUERY_ERROR", "failed to check existing settings", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_QUERY_ERROR", "failed to check existing settings", err)
 	}
 	if count == 0 {
 		query := `
@@ -104,7 +104,7 @@ func (r *SettingsRepository) Save(ctx context.Context, settings *domain.Settings
 	}
 	if err != nil {
 		r.Logger.Error("Failed to save settings", zap.Error(err))
-		return appErr.New("DB_SAVE_ERROR", "failed to save settings", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_SAVE_ERROR", "failed to save settings", err)
 	}
 	r.Logger.Info("Settings saved to database", zap.String("whatsapp_id", settings.WhatsappID))
 	return nil
@@ -117,7 +117,7 @@ func (r *SettingsRepository) Delete(ctx context.Context) error {
 	_, err := r.pool.Exec(ctx, query)
 	if err != nil {
 		r.Logger.Error("Failed to delete settings from database", zap.Error(err))
-		return appErr.New("DB_DELETE_ERROR", "failed to delete settings from database", err)
+		return appErrors.New(appErrors.ErrorTypeDatabase, "DB_DELETE_ERROR", "failed to delete settings from database", err)
 	}
 	r.Logger.Info("Settings deleted from database")
 	return nil
@@ -152,7 +152,7 @@ func (r *SettingsRepository) GetSettingsHistory(ctx context.Context) ([]domain.S
 	rows, err := r.pool.Query(ctx, query)
 	if err != nil {
 		r.Logger.Error("Failed to get settings history", zap.Error(err))
-		return nil, appErr.New("DB_HISTORY_ERROR", "failed to get settings history", err)
+		return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_HISTORY_ERROR", "failed to get settings history", err)
 	}
 	defer rows.Close()
 	var history []domain.Settings
@@ -167,13 +167,13 @@ func (r *SettingsRepository) GetSettingsHistory(ctx context.Context) ([]domain.S
 		)
 		if err != nil {
 			r.Logger.Error("Failed to scan settings history", zap.Error(err))
-			return nil, appErr.New("DB_SCAN_ERROR", "failed to scan settings history", err)
+			return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_SCAN_ERROR", "failed to scan settings history", err)
 		}
 		history = append(history, settings)
 	}
 	if err = rows.Err(); err != nil {
 		r.Logger.Error("Error iterating settings history", zap.Error(err))
-		return nil, appErr.New("DB_ROWS_ERROR", "error iterating settings history", err)
+		return nil, appErrors.New(appErrors.ErrorTypeDatabase, "DB_ROWS_ERROR", "error iterating settings history", err)
 	}
 	r.Logger.Info("Settings history loaded from database", zap.Int("count", len(history)))
 	return history, nil
