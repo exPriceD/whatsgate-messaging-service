@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS bulk_campaigns (
     media_mime TEXT,
     media_type TEXT,
     messages_per_hour INT NOT NULL,
+    error_count INT NOT NULL DEFAULT 0,
     initiator TEXT
 );
 
