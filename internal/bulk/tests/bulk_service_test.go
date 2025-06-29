@@ -428,3 +428,69 @@ func TestCancelCampaign_UpdatesPendingStatuses(t *testing.T) {
 	assert.Equal(t, 2, cancelledCount, "Should have 2 cancelled statuses")
 	assert.Equal(t, 1, sentCount, "Should have 1 sent status")
 }
+
+func TestBulkService_HandleBulkSendMultipart_WithAdditionalAndExcludeNumbers(t *testing.T) {
+	service, client, parser, campaignStorage, statusStorage := setupTestService()
+
+	// Настройка моков
+	parser.ParsePhonesFromExcelFunc = func(filePath string, columnName string) ([]string, error) {
+		return []string{"79991234567", "79998765432"}, nil
+	}
+
+	client.SendTextMessageFunc = func(ctx context.Context, phoneNumber, text string, async bool) (domain.SingleSendResult, error) {
+		return domain.SingleSendResult{
+			PhoneNumber: phoneNumber,
+			Success:     true,
+			Status:      "sent",
+		}, nil
+	}
+
+	// Тестовые параметры с дополнительными и исключаемыми номерами
+	params := domain.BulkSendParams{
+		Name:              "Test Campaign",
+		Message:           "Test message",
+		Async:             false,
+		MessagesPerHour:   10,
+		NumbersFile:       createMultipartFileHeader("numbers.xlsx", "test", t),
+		MediaFile:         nil,
+		AdditionalNumbers: []string{"79991111111", "79992222222"},
+		ExcludeNumbers:    []string{"79991234567"},
+	}
+
+	// Выполнение теста
+	result, err := service.HandleBulkSendMultipart(context.Background(), params)
+
+	// Проверки
+	require.NoError(t, err)
+	assert.True(t, result.Started)
+	assert.Equal(t, 3, result.Total) // 2 из файла + 2 дополнительных - 1 исключенный = 3
+
+	// Проверяем, что кампания создана с правильным количеством
+	campaigns := campaignStorage.Campaigns
+	assert.Len(t, campaigns, 1)
+	for _, campaign := range campaigns {
+		assert.Equal(t, "Test Campaign", campaign.Name)
+		assert.Equal(t, "Test message", campaign.Message)
+		assert.Equal(t, 3, campaign.Total) // Ожидаем 3 номера
+		assert.Equal(t, "started", campaign.Status)
+		assert.Equal(t, 10, campaign.MessagesPerHour)
+	}
+
+	// Проверяем, что статусы созданы для правильных номеров
+	statuses := statusStorage.Statuses
+	assert.Len(t, statuses, 3)
+
+	// Проверяем, что исключенный номер отсутствует
+	phoneNumbers := make([]string, 0, len(statuses))
+	for _, status := range statuses {
+		phoneNumbers = append(phoneNumbers, status.PhoneNumber)
+		assert.Equal(t, "pending", status.Status)
+	}
+
+	// Должны быть: 79998765432 (из файла), 79991111111, 79992222222 (дополнительные)
+	// 79991234567 исключен
+	assert.Contains(t, phoneNumbers, "79998765432")
+	assert.Contains(t, phoneNumbers, "79991111111")
+	assert.Contains(t, phoneNumbers, "79992222222")
+	assert.NotContains(t, phoneNumbers, "79991234567") // Исключенный номер
+}

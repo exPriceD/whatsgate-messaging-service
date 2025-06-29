@@ -55,3 +55,12 @@ func (a *FileParserAdapter) ParsePhonesFromExcel(filePath string, columnName str
 
 	return result.ValidPhones, nil
 }
+
+func (a *FileParserAdapter) CountRowsInExcel(filePath string) (int, error) {
+	result, err := parser.ParsePhonesFromExcel(filePath, "Телефон", a.Logger)
+	if err != nil {
+		return 0, err
+	}
+
+	return len(result.ValidPhones), nil
+}

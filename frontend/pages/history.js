@@ -351,7 +351,7 @@ export function initHistoryPage(showToast) {
           </div>
           
           ${campaign.media_filename ? `
-          <div class="detail-section" ${campaign.status === 'finished' ? 'style="padding-bottom: 25px;"':''}>
+          <div class="detail-section">
             <h4>📎 Медиа файл</h4>
             <div class="media-info">
               <div class="media-item">
@@ -365,6 +365,21 @@ export function initHistoryPage(showToast) {
           </div>
           ` : ''}
           
+          <div class="detail-section" ${campaign.status === 'finished' ? 'style="padding-bottom: 25px;"' : ''}>
+            <h4>📊 Уже отправлено (${campaign.processed_count})</h4>
+            <div class="sent-numbers-container">
+              <div class="sent-numbers-header">
+                <span class="sent-numbers-label">Номера, на которые уже отправлено сообщение:</span>
+                <button class="copy-numbers-btn" onclick="copySentNumbers('${campaign.id}')" title="Копировать все номера">
+                  📋 Копировать
+                </button>
+              </div>
+              <div class="sent-numbers-list" id="sent-numbers-${campaign.id}">
+                <div class="loading">Загрузка номеров...</div>
+              </div>
+            </div>
+          </div>
+          
           ${campaign.status === 'started' ? `
           <div class="detail-section" style="padding-bottom: 25px;">
             <h4>⚡ Действия</h4>
@@ -373,14 +388,16 @@ export function initHistoryPage(showToast) {
                 <span class="cancel-icon">🚫</span>
                 <span class="cancel-text">Отменить рассылку</span>
               </button>
-              <div class="cancel-warning">
-                ⚠️ Отмена остановит отправку всех неотправленных сообщений
-              </div>
             </div>
           </div>
           ` : ''}
         </div>
       `;
+      
+      // Загружаем номера при открытии деталей
+      setTimeout(() => {
+        loadSentNumbers(campaign.id);
+      }, 100);
     } catch (error) {
       console.error('Error loading campaign details:', error);
       modalTitle.textContent = 'Ошибка';
@@ -460,6 +477,45 @@ export function initHistoryPage(showToast) {
     } catch (error) {
       console.error('Error cancelling campaign:', error);
       // Ошибка уже обработана в apiPost
+    }
+  };
+  
+  // Функция для загрузки отправленных номеров
+  async function loadSentNumbers(campaignId) {
+    try {
+      const response = await apiGet(`/api/v1/messages/campaigns/${campaignId}/sent-numbers`, showToast);
+      const container = document.getElementById(`sent-numbers-${campaignId}`);
+      
+      if (response.sent_numbers && response.sent_numbers.length > 0) {
+        const numbersText = response.sent_numbers.join('\n');
+        container.innerHTML = `
+          <textarea class="sent-numbers-textarea" readonly>${numbersText}</textarea>
+        `;
+      } else {
+        container.innerHTML = '<div class="empty-numbers">Нет отправленных номеров</div>';
+      }
+    } catch (error) {
+      console.error('Error loading sent numbers:', error);
+      const container = document.getElementById(`sent-numbers-${campaignId}`);
+      container.innerHTML = '<div class="error">Ошибка загрузки номеров</div>';
+    }
+  }
+  
+  // Функция для копирования отправленных номеров
+  window.copySentNumbers = async function(campaignId) {
+    try {
+      const response = await apiGet(`/api/v1/messages/campaigns/${campaignId}/sent-numbers`, showToast);
+      
+      if (response.sent_numbers && response.sent_numbers.length > 0) {
+        const numbersText = response.sent_numbers.join('\n');
+        await navigator.clipboard.writeText(numbersText);
+        showToast('Номера скопированы в буфер обмена', 'success');
+      } else {
+        showToast('Нет номеров для копирования', 'info');
+      }
+    } catch (error) {
+      console.error('Error copying sent numbers:', error);
+      showToast('Ошибка копирования номеров', 'error');
     }
   };
 } 

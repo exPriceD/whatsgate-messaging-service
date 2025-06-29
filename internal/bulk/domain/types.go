@@ -3,12 +3,14 @@ package domain
 // BulkSendParams содержит параметры для bulk-рассылки
 // NumbersFile и MediaFile — абстракции для файлов (например, *multipart.FileHeader)
 type BulkSendParams struct {
-	Name            string
-	Message         string
-	Async           bool
-	MessagesPerHour int
-	NumbersFile     any
-	MediaFile       any
+	Name              string
+	Message           string
+	Async             bool
+	MessagesPerHour   int
+	NumbersFile       any
+	MediaFile         any
+	AdditionalNumbers []string // Дополнительные номера к файлу
+	ExcludeNumbers    []string // Номера для исключения из файла
 }
 
 // BulkMedia описывает медиа-файл для рассылки

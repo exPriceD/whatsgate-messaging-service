@@ -37,6 +37,17 @@ type BulkSendRequest struct {
 	Media        *BulkSendMedia `json:"media,omitempty"`
 }
 
+// BulkSendMultipartRequest представляет запрос на массовую рассылку через multipart/form-data
+type BulkSendMultipartRequest struct {
+	Name            string `form:"name" binding:"required" example:"Летняя акция"`
+	Message         string `form:"message" binding:"required" example:"Текст сообщения"`
+	MessagesPerHour int    `form:"messages_per_hour" binding:"required,min=1" example:"20"`
+	Async           bool   `form:"async" example:"false"`
+	// Новые поля для дополнительных и исключаемых номеров
+	AdditionalNumbers string `form:"additional_numbers" example:"+7(123)456-78-90\n+7(987)654-32-10"`
+	ExcludeNumbers    string `form:"exclude_numbers" example:"+7(555)123-45-67\n+7(777)888-99-00"`
+}
+
 // BulkSendMedia представляет медиа-файл для массовой рассылки.
 type BulkSendMedia struct {
 	MessageType string `json:"message_type" binding:"required" example:"image"`
@@ -84,4 +95,17 @@ type BulkCampaignResponse struct {
 	MediaType       *string `json:"media_type,omitempty" example:"image"`
 	MessagesPerHour int     `json:"messages_per_hour" example:"20"`
 	Initiator       *string `json:"initiator,omitempty" example:"user@example.com"`
+}
+
+// SentNumbersResponse — список отправленных номеров для рассылки
+type SentNumbersResponse struct {
+	CampaignID  string   `json:"campaign_id" example:"uuid"`
+	SentNumbers []string `json:"sent_numbers" example:"79991234567,79998765432"`
+	TotalSent   int      `json:"total_sent" example:"45"`
+}
+
+// CountFileRowsResponse представляет ответ на запрос подсчета строк в файле
+type CountFileRowsResponse struct {
+	Success bool `json:"success" example:"true"`
+	Rows    int  `json:"rows" example:"150"`
 }

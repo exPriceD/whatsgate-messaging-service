@@ -24,9 +24,9 @@ services:
       - DB_USER=postgres
       - DB_PASSWORD=postgres
       - DB_NAME=whatsapp_service
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
+    # depends_on:
+    #  migrate:
+    #    condition: service_completed_successfully
     restart: always
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]

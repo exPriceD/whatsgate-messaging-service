@@ -209,6 +209,8 @@ func SendMediaMessageHandler(ws *whatsgateService.SettingsUsecase) gin.HandlerFu
 // @Param messages_per_hour formData int true "Сколько сообщений в час (обязателен, > 0)"
 // @Param numbers_file formData file true "Файл с номерами (xlsx)"
 // @Param media_file formData file false "Медиа-файл (опционально, тип определяется по mime_type)"
+// @Param additional_numbers formData string false "Дополнительные номера (по одному на строку)"
+// @Param exclude_numbers formData string false "Исключаемые номера (по одному на строку)"
 // @Success 200 {object} BulkSendStartResponse "Запуск рассылки"
 // @Failure 400 {object} types.ClientErrorResponse "Ошибка валидации"
 // @Failure 500 {object} types.ClientErrorResponse "Внутренняя ошибка сервера"
@@ -256,13 +258,20 @@ func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage in
 			if mf, err := c.FormFile("media_file"); err == nil {
 				mediaFile = mf
 			}
+
+			// Обработка дополнительных и исключаемых номеров
+			additionalNumbers := parseNumbersFromText(c.PostForm("additional_numbers"))
+			excludeNumbers := parseNumbersFromText(c.PostForm("exclude_numbers"))
+
 			params := domain.BulkSendParams{
-				Name:            name,
-				Message:         message,
-				Async:           async,
-				MessagesPerHour: messagesPerHour,
-				NumbersFile:     numbersFile,
-				MediaFile:       mediaFile,
+				Name:              name,
+				Message:           message,
+				Async:             async,
+				MessagesPerHour:   messagesPerHour,
+				NumbersFile:       numbersFile,
+				MediaFile:         mediaFile,
+				AdditionalNumbers: additionalNumbers,
+				ExcludeNumbers:    excludeNumbers,
 			}
 
 			ctx := c.Request.Context()
@@ -285,6 +294,23 @@ func BulkSendHandler(wgService *whatsgateService.SettingsUsecase, bulkStorage in
 		}
 		c.Error(appErrors.NewValidationError("Only multipart supported"))
 	}
+}
+
+// parseNumbersFromText парсит номера из текстового поля (по одному на строку)
+func parseNumbersFromText(text string) []string {
+	if text == "" {
+		return nil
+	}
+
+	var numbers []string
+	lines := strings.Split(text, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			numbers = append(numbers, line)
+		}
+	}
+	return numbers
 }
 
 // TestSendHandler godoc
@@ -540,6 +566,108 @@ func CancelBulkCampaignHandler(wgService *whatsgateService.SettingsUsecase, bulk
 		c.JSON(http.StatusOK, types.SuccessResponse{
 			Success: true,
 			Message: "Campaign cancelled successfully",
+		})
+	}
+}
+
+// GetSentNumbersHandler godoc
+// @Summary Получить отправленные номера
+// @Description Возвращает список номеров, на которые уже была отправлена рассылка
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Param id path string true "ID рассылки"
+// @Success 200 {object} SentNumbersResponse "Список отправленных номеров"
+// @Failure 404 {object} types.ClientErrorResponse "Рассылка не найдена"
+// @Failure 500 {object} types.ClientErrorResponse "Внутренняя ошибка сервера"
+// @Router /messages/campaigns/{id}/sent-numbers [get]
+func GetSentNumbersHandler(statusStorage interfaces.BulkCampaignStatusStorage) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := c.MustGet("logger").(logger.Logger)
+		log.Debug("Incoming GetSentNumbers request")
+
+		campaignID := c.Param("id")
+		if campaignID == "" {
+			c.Error(appErrors.NewValidationError("Campaign ID is required"))
+			return
+		}
+
+		// Получаем все статусы для кампании
+		statuses, err := statusStorage.ListByCampaignID(campaignID)
+		if err != nil {
+			log.Error("Failed to get campaign statuses", zap.String("campaign_id", campaignID), zap.Error(err))
+			c.Error(err)
+			return
+		}
+
+		// Фильтруем только отправленные номера
+		var sentNumbers []string
+		for _, status := range statuses {
+			if status.Status == "sent" {
+				sentNumbers = append(sentNumbers, status.PhoneNumber)
+			}
+		}
+
+		response := SentNumbersResponse{
+			CampaignID:  campaignID,
+			SentNumbers: sentNumbers,
+			TotalSent:   len(sentNumbers),
+		}
+
+		c.JSON(http.StatusOK, response)
+	}
+}
+
+// CountFileRowsHandler godoc
+// @Summary Подсчитать количество строк в файле
+// @Description Возвращает количество строк в Excel файле используя существующий парсер
+// @Tags messages
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file true "Excel файл"
+// @Success 200 {object} CountFileRowsResponse "Количество строк"
+// @Failure 400 {object} types.ClientErrorResponse "Ошибка валидации"
+// @Failure 500 {object} types.ClientErrorResponse "Внутренняя ошибка сервера"
+// @Router /messages/count-file-rows [post]
+func CountFileRowsHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log := c.MustGet("logger").(logger.Logger)
+
+		file, err := c.FormFile("file")
+		if err != nil {
+			log.Error("file is required", zap.Error(err))
+			c.Error(appErrors.NewValidationError("file is required"))
+			return
+		}
+
+		// Проверяем расширение файла
+		if !strings.HasSuffix(strings.ToLower(file.Filename), ".xlsx") {
+			log.Error("file must be .xlsx", zap.String("filename", file.Filename))
+			c.Error(appErrors.NewValidationError("file must be .xlsx"))
+			return
+		}
+
+		// Создаем экземпляр BulkService для подсчета строк
+		bs := &bulkService.BulkService{
+			Logger:          log,
+			WhatsGateClient: &bulkInfra.WhatGateClientAdapter{Service: nil}, // Не используется для подсчета
+			FileParser:      &bulkInfra.FileParserAdapter{Logger: log},
+			CampaignStorage: nil, // Не используется для подсчета
+			StatusStorage:   nil, // Не используется для подсчета
+		}
+
+		count, err := bs.CountRowsInFile(file)
+		if err != nil {
+			log.Error("Failed to count rows in file", zap.String("filename", file.Filename), zap.Error(err))
+			c.Error(appErrors.NewValidationError("Failed to count rows in file: " + err.Error()))
+			return
+		}
+
+		log.Info("File rows counted", zap.String("filename", file.Filename), zap.Int("rows", count))
+
+		c.JSON(http.StatusOK, CountFileRowsResponse{
+			Success: true,
+			Rows:    count,
 		})
 	}
 }

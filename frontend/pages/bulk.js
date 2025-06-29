@@ -6,34 +6,83 @@ const fileIcon = `<svg fill="none" viewBox="0 0 20 20"><rect width="16" height="
 export function renderBulkPage() {
   return `
     <h2>Массовая рассылка</h2>
-    <form id="bulk-form" class="form" enctype="multipart/form-data">
-      <label>Название рассылки <input name="name" required autocomplete="off" placeholder="Например: Летняя акция"></label>
-      <label style="pointer-events: none;">
-        Файл номеров (xlsx)
-        <span class="file-input-wrapper">
-          <span class="file-input-label">${fileIcon} <span>Выбрать файл</span>
-            <input type="file" name="numbers_file" class="file-input" accept=".xlsx" required>
+    <div class="bulk-form-container">
+      <form id="bulk-form" class="form" enctype="multipart/form-data">
+        <label>Название рассылки <input name="name" required autocomplete="off" placeholder="Например: Летняя акция"></label>
+        <label class="file-label">
+          Файл номеров (xlsx)
+          <span class="file-input-wrapper">
+            <span class="file-input-label">${fileIcon} <span>Выбрать файл</span>
+              <input type="file" name="numbers_file" class="file-input" accept=".xlsx" required>
+            </span>
+            <span class="file-name" id="file-name-xlsx">Файл не выбран</span>
           </span>
-          <span class="file-name" id="file-name-xlsx">Файл не выбран</span>
-        </span>
-      </label>
-      <label>Сообщений в час <input type="number" name="messages_per_hour" min="1" value="20" required placeholder="Например: 25"></label>
-      <label>Сообщение <textarea style="height: 210px;" name="message" required placeholder="Введите текст сообщения..."></textarea></label>
-      <label style="pointer-events: none;">
-        Медиа файл
-        <span class="file-input-wrapper">
-          <span class="file-input-label">${fileIcon} <span>Выбрать медиа</span>
-            <input type="file" name="media_file" class="file-input" accept="image/*,video/*,audio/*">
+        </label>
+        <label>Сообщений в час <input type="number" name="messages_per_hour" min="1" value="20" required placeholder="Например: 25"></label>
+        <label>Сообщение <textarea name="message" required placeholder="Введите текст сообщения..."></textarea></label>
+        <label class="file-label">
+          Медиа файл
+          <span class="file-input-wrapper">
+            <span class="file-input-label">${fileIcon} <span>Выбрать медиа</span>
+              <input type="file" name="media_file" class="file-input" accept="image/*,video/*,audio/*">
+            </span>
+            <span class="file-name" id="file-name-media">Файл не выбран</span>
           </span>
-          <span class="file-name" id="file-name-media">Файл не выбран</span>
-        </span>
-      </label>
-      <div class="form-actions">
-        <input name="testPhone" placeholder="Номер для теста" style="flex:1;" autocomplete="off" disabled>
-        <button type="button" id="send-test" disabled>Отправить тест</button>
-        <button type="submit">Отправить</button>
+        </label>
+        <div class="form-actions">
+          <input name="testPhone" placeholder="Номер для теста" autocomplete="off" disabled>
+          <button type="button" id="send-test" disabled>Отправить тест</button>
+          <button type="submit">Отправить</button>
+        </div>
+      </form>
+      
+      <div class="bulk-form-sidebar">
+        <div class="additional-numbers-section">
+          <h4>➕ Добавить номера</h4>
+          <p class="section-description">Дополнительные номера к файлу (по одному на строку)</p>
+          <textarea 
+            name="additional_numbers" 
+            class="numbers-textarea" 
+            placeholder="71234567890&#10;79876543210&#10;75551234567"
+            rows="6"
+          ></textarea>
+        </div>
+        
+        <div class="exclude-numbers-section">
+          <h4>🚫 Исключить номера</h4>
+          <p class="section-description">Номера для исключения из файла (по одному на строку)</p>
+          <textarea 
+            name="exclude_numbers" 
+            class="numbers-textarea" 
+            placeholder="71234567890&#10;79876543210&#10;75551234567"
+            rows="6"
+          ></textarea>
+          <div class="exclude-hint">
+            💡 Скопируйте номера из деталей рассылки и вставьте сюда
+          </div>
+        </div>
+        
+        <div class="numbers-summary">
+          <h4>📊 Сводка номеров</h4>
+          <div class="summary-item">
+            <span class="summary-label">Из файла:</span>
+            <span class="summary-value" id="file-count">0</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Добавить:</span>
+            <span class="summary-value" id="add-count">0</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Исключить:</span>
+            <span class="summary-value" id="exclude-count">0</span>
+          </div>
+          <div class="summary-item total">
+            <span class="summary-label">Итого:</span>
+            <span class="summary-value" id="total-count">0</span>
+          </div>
+        </div>
       </div>
-    </form>
+    </div>
   `;
 }
 
@@ -43,11 +92,19 @@ export function initBulkForm(showToast) {
   // Кастомные file input'ы
   const fileInput = form.querySelector('input[name="numbers_file"]');
   const fileName = document.getElementById('file-name-xlsx');
-  fileInput.onchange = () => {
+  fileInput.onchange = async () => {
     fileName.textContent = fileInput.files[0]?.name || 'Файл не выбран';
-    if (fileInput.files[0]) fileName.style.color = '#2ecc40';
-    else fileName.style.color = '#b0b0b0';
+    if (fileInput.files[0]) {
+      fileName.style.color = '#2ecc40';
+      // Подсчитываем количество строк в файле
+      await countRowsInFile(fileInput.files[0]);
+    } else {
+      fileName.style.color = '#b0b0b0';
+      document.getElementById('file-count').textContent = '0';
+    }
+    updateNumbersSummary();
   };
+  
   const mediaInput = form.querySelector('input[name="media_file"]');
   const mediaName = document.getElementById('file-name-media');
   mediaInput.onchange = () => {
@@ -156,6 +213,20 @@ export function initBulkForm(showToast) {
     if (form.media_file.files[0]) fd.append('media_file', form.media_file.files[0]);
     fd.append('async', 'false');
     
+    // Добавляем дополнительные и исключаемые номера
+    const additionalTextarea = document.querySelector('textarea[name="additional_numbers"]');
+    const excludeTextarea = document.querySelector('textarea[name="exclude_numbers"]');
+    
+    const additionalNumbers = additionalTextarea ? additionalTextarea.value.trim() : '';
+    const excludeNumbers = excludeTextarea ? excludeTextarea.value.trim() : '';
+    
+    if (additionalNumbers) {
+      fd.append('additional_numbers', additionalNumbers);
+    }
+    if (excludeNumbers) {
+      fd.append('exclude_numbers', excludeNumbers);
+    }
+    
     try {
       await apiPost('/api/v1/messages/bulk-send', fd, showToast);
       showToast('Рассылка запущена', 'success');
@@ -166,4 +237,81 @@ export function initBulkForm(showToast) {
       setLoading(false, form.querySelector('button[type="submit"]'));
     }
   };
+
+  // Функция для подсчета строк в Excel файле
+  async function countRowsInFile(file) {
+    try {
+      // Показываем индикатор загрузки
+      const fileCountElement = document.getElementById('file-count');
+      fileCountElement.textContent = '...';
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/v1/messages/count-file-rows', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.rows > 0) {
+          fileCountElement.textContent = data.rows;
+          // Добавляем подсказку, что это приблизительное значение
+          fileCountElement.title = 'Приблизительное количество строк в файле';
+        } else {
+          fileCountElement.textContent = '~';
+          fileCountElement.title = 'Не удалось точно подсчитать строки';
+        }
+      } else {
+        fileCountElement.textContent = '~';
+        fileCountElement.title = 'Ошибка при подсчете строк';
+      }
+    } catch (error) {
+      console.error('Error counting rows in file:', error);
+      const fileCountElement = document.getElementById('file-count');
+      fileCountElement.textContent = '~';
+      fileCountElement.title = 'Ошибка при подсчете строк';
+    }
+  }
+
+  // Функция для подсчета номеров в текстовом поле
+  function countNumbers(text) {
+    if (!text.trim()) return 0;
+    return text.trim().split('\n').filter(line => line.trim()).length;
+  }
+
+  // Функция для обновления сводки номеров
+  function updateNumbersSummary() {
+    const additionalTextarea = document.querySelector('textarea[name="additional_numbers"]');
+    const excludeTextarea = document.querySelector('textarea[name="exclude_numbers"]');
+    
+    const additionalText = additionalTextarea ? additionalTextarea.value : '';
+    const excludeText = excludeTextarea ? excludeTextarea.value : '';
+    
+    const additionalCount = countNumbers(additionalText);
+    const excludeCount = countNumbers(excludeText);
+    
+    // Получаем количество из файла
+    const fileCountElement = document.getElementById('file-count');
+    const fileCountText = fileCountElement ? fileCountElement.textContent : '0';
+    const fileCount = fileCountText === '~' ? 0 : parseInt(fileCountText) || 0;
+    
+    const totalCount = Math.max(0, fileCount + additionalCount - excludeCount);
+    
+    document.getElementById('add-count').textContent = additionalCount;
+    document.getElementById('exclude-count').textContent = excludeCount;
+    document.getElementById('total-count').textContent = totalCount;
+  }
+
+  // Обработчики для текстовых полей
+  const additionalTextarea = document.querySelector('textarea[name="additional_numbers"]');
+  const excludeTextarea = document.querySelector('textarea[name="exclude_numbers"]');
+  
+  if (additionalTextarea) {
+    additionalTextarea.addEventListener('input', updateNumbersSummary);
+  }
+  if (excludeTextarea) {
+    excludeTextarea.addEventListener('input', updateNumbersSummary);
+  }
 } 

@@ -45,6 +45,19 @@ func (s *BulkService) HandleBulkSendMultipart(ctx context.Context, params domain
 	if err != nil {
 		return domain.BulkSendResult{}, err
 	}
+
+	// Добавляем дополнительные номера
+	if len(params.AdditionalNumbers) > 0 {
+		phones = append(phones, params.AdditionalNumbers...)
+		log.Info(fmt.Sprintf("Added %d additional numbers", len(params.AdditionalNumbers)))
+	}
+
+	// Исключаем номера
+	if len(params.ExcludeNumbers) > 0 {
+		phones = excludeNumbersFromList(phones, params.ExcludeNumbers)
+		log.Info(fmt.Sprintf("Excluded %d numbers", len(params.ExcludeNumbers)))
+	}
+
 	if len(phones) == 0 {
 		return domain.BulkSendResult{}, appErrors.NewBulkNoValidNumbersError()
 	}
@@ -290,6 +303,22 @@ func parseMediaFromFile(file *multipart.FileHeader) (*domain.BulkMedia, error) {
 	}, nil
 }
 
+// excludeNumbersFromList исключает номера из списка
+func excludeNumbersFromList(phones []string, excludeNumbers []string) []string {
+	excludeSet := make(map[string]bool)
+	for _, num := range excludeNumbers {
+		excludeSet[num] = true
+	}
+
+	var result []string
+	for _, phone := range phones {
+		if !excludeSet[phone] {
+			result = append(result, phone)
+		}
+	}
+	return result
+}
+
 // CancelCampaign отменяет рассылку
 func (s *BulkService) CancelCampaign(ctx context.Context, campaignID string) error {
 	log := s.Logger
@@ -330,4 +359,41 @@ func (s *BulkService) CancelCampaign(ctx context.Context, campaignID string) err
 
 	log.Info(fmt.Sprintf("Campaign cancelled successfully: campaign_id=%s, name=%s", campaignID, campaign.Name))
 	return nil
+}
+
+// CountRowsInFile — подсчитывает количество строк в Excel файле
+func (s *BulkService) CountRowsInFile(file *multipart.FileHeader) (int, error) {
+	if file == nil {
+		return 0, appErrors.NewBulkFileParseError("file", "is required")
+	}
+
+	numbersTmp, err := file.Open()
+	if err != nil {
+		return 0, err
+	}
+	defer func(numbersTmp multipart.File) {
+		_ = numbersTmp.Close()
+	}(numbersTmp)
+
+	tmpFile, err := os.CreateTemp("", "count-*.xlsx")
+	if err != nil {
+		return 0, err
+	}
+	defer func(name string) {
+		_ = os.Remove(name)
+	}(tmpFile.Name())
+
+	_, err = io.Copy(tmpFile, numbersTmp)
+	if err != nil {
+		_ = tmpFile.Close()
+		return 0, err
+	}
+	_ = tmpFile.Close()
+
+	count, err := s.FileParser.CountRowsInExcel(tmpFile.Name())
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }

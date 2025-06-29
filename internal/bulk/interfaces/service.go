@@ -14,4 +14,5 @@ type WhatsGateClient interface {
 // FileParser — интерфейс для парсинга номеров из файла
 type FileParser interface {
 	ParsePhonesFromExcel(filePath string, columnName string) ([]string, error)
+	CountRowsInExcel(filePath string) (int, error)
 }
