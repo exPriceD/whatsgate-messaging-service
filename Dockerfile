@@ -12,6 +12,6 @@ RUN apk add --no-cache tzdata && \
 
 WORKDIR /app
 COPY --from=builder /app/app .
-COPY config/config.yaml config/config.yaml
+COPY 1 config/config.yaml
 EXPOSE 8080
 CMD ["./app"] 

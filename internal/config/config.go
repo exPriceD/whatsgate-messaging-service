@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
-
-	appErrors "whatsapp-service/internal/errors"
 
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
@@ -40,47 +39,99 @@ type CORSConfig struct {
 }
 
 type DatabaseConfig struct {
-	Host            string        `yaml:"host" validate:"required,hostname|ip"`
-	Port            int           `yaml:"port" validate:"required,gt=0,lte=65535"`
-	Name            string        `yaml:"name" validate:"required"`
-	User            string        `yaml:"user" validate:"required"`
-	Password        string        `yaml:"password" validate:"required"`
-	SSLMode         string        `yaml:"ssl_mode" validate:"oneof=disable require verify-ca verify-full"`
-	MaxOpenConns    int           `yaml:"max_open_conns" validate:"gte=1"`
-	MaxIdleConns    int           `yaml:"max_idle_conns" validate:"gte=0"`
-	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime" validate:"required,gt=0"`
+	Host                 string        `yaml:"host" validate:"required,hostname|ip"`
+	Port                 int           `yaml:"port" validate:"required,gt=0,lte=65535"`
+	Name                 string        `yaml:"name" validate:"required"`
+	User                 string        `yaml:"user" validate:"required"`
+	Password             string        `yaml:"password" validate:"required"`
+	SSLMode              string        `yaml:"ssl_mode" validate:"oneof=disable require verify-ca verify-full"`
+	MaxOpenConns         int           `yaml:"max_open_conns" validate:"gte=1"`
+	MaxIdleConns         int           `yaml:"max_idle_conns" validate:"gte=0"`
+	ConnMaxLifetime      time.Duration `yaml:"conn_max_lifetime" validate:"required,gt=0"`
+	ConnMaxIdleTime      time.Duration `yaml:"conn_max_idle_time" validate:"gte=0"`
+	HealthCheckPeriod    time.Duration `yaml:"health_check_period" validate:"gte=0"`
+	Timezone             string        `yaml:"timezone" validate:"required"`
+	MaxAttemptConnection int           `yaml:"max_attempt_connection" validate:"required,gte=1"`
 }
 
 type LoggingConfig struct {
 	Level      string `yaml:"level" validate:"required,oneof=debug info warn error dpanic panic fatal"`
 	Format     string `yaml:"format" validate:"required,oneof=json console"`
 	OutputPath string `yaml:"output_path" validate:"required"`
+	Service    string `yaml:"service,omitempty"`
+	Env        string `yaml:"env,omitempty"`
 }
 
-// LoadConfig читает конфиг из yaml-файла, применяет дефолты, перекрывает env и валидирует.
+// LoadConfig читает файл YAML, применяет дефолтные значения, перекрывает часть
+// настроек переменными окружения и валидирует итоговую структуру.
+// Если path пустой, пытается взять CONFIG_PATH, иначе "config.yaml".
 func LoadConfig(path string) (*Config, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, appErrors.New(appErrors.ErrorTypeConfiguration, "CONFIG_FILE_OPEN_ERROR", "failed to open config file", err)
+	if path == "" {
+		if env := os.Getenv("CONFIG_PATH"); env != "" {
+			path = env
+		} else {
+			path = "config.yaml"
+		}
 	}
 
-	defer func(f *os.File) {
-		_ = f.Close()
-	}(f)
-
+	// Файл может отсутствовать – например, когда всё задаётся через окружение.
 	var cfg Config
-	decoder := yaml.NewDecoder(f)
-	if err := decoder.Decode(&cfg); err != nil {
-		return nil, appErrors.New(appErrors.ErrorTypeConfiguration, "CONFIG_DECODE_ERROR", "failed to decode yaml config", err)
+	if f, err := os.Open(path); err == nil {
+		defer f.Close()
+		if err := yaml.NewDecoder(f).Decode(&cfg); err != nil {
+			return nil, fmt.Errorf("decode yaml: %w", err)
+		}
+	} else if !os.IsNotExist(err) { // если ошибка отлична от "нет файла"
+		return nil, fmt.Errorf("open config file: %w", err)
 	}
+
+	// Переопределяем отдельные поля через переменные окружения.
+	overrideWithEnv(&cfg)
 
 	cfg.setDefaults()
 
 	if err := cfg.Validate(); err != nil {
-		return nil, appErrors.New(appErrors.ErrorTypeConfiguration, "CONFIG_VALIDATE_ERROR", "config validation failed", err)
+		return nil, err
 	}
 
 	return &cfg, nil
+}
+
+// Load – короткий алиас для LoadConfig.
+func Load(path string) (*Config, error) { return LoadConfig(path) }
+
+// overrideWithEnv переопределяет часть конфигурации переменными окружения.
+// Используем плоские переменные вида HTTP_HOST, DATABASE_PASSWORD и т.д.
+func overrideWithEnv(cfg *Config) {
+	if v := os.Getenv("HTTP_HOST"); v != "" {
+		cfg.HTTP.Host = v
+	}
+	if v := os.Getenv("HTTP_PORT"); v != "" {
+		if p, _ := strconv.Atoi(v); p > 0 {
+			cfg.HTTP.Port = p
+		}
+	}
+
+	if v := os.Getenv("DATABASE_HOST"); v != "" {
+		cfg.Database.Host = v
+	}
+	if v := os.Getenv("DATABASE_PORT"); v != "" {
+		if p, _ := strconv.Atoi(v); p > 0 {
+			cfg.Database.Port = p
+		}
+	}
+	if v := os.Getenv("DATABASE_NAME"); v != "" {
+		cfg.Database.Name = v
+	}
+	if v := os.Getenv("DATABASE_USER"); v != "" {
+		cfg.Database.User = v
+	}
+	if v := os.Getenv("DATABASE_PASSWORD"); v != "" {
+		cfg.Database.Password = v
+	}
+	if v := os.Getenv("LOG_LEVEL"); v != "" {
+		cfg.Logging.Level = strings.ToLower(v)
+	}
 }
 
 // Validate валидирует конфигурацию согласно тегам validate.
@@ -88,15 +139,20 @@ func (c *Config) Validate() error {
 	validate := validator.New()
 
 	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
-		return fld.Tag.Get("yaml")
+		tag := fld.Tag.Get("yaml")
+		if tag == "" {
+			tag = fld.Name
+		}
+		return tag
 	})
 
 	if err := validate.Struct(c); err != nil {
-		var errs []string
-		for _, err := range err.(validator.ValidationErrors) {
-			errs = append(errs, fmt.Sprintf("field '%s' failed validation: %s", err.Field(), err.Tag()))
+		var sb strings.Builder
+		sb.WriteString("config validation errors:")
+		for _, ve := range err.(validator.ValidationErrors) {
+			sb.WriteString(fmt.Sprintf(" %s[%s]", ve.Field(), ve.Tag()))
 		}
-		return fmt.Errorf("validation errors: %s", strings.Join(errs, "; "))
+		return fmt.Errorf(sb.String())
 	}
 
 	return nil
@@ -116,4 +172,18 @@ func (c *Config) setDefaults() {
 	if c.Logging.Format == "" {
 		c.Logging.Format = "json"
 	}
+	if c.Database.Timezone == "" {
+		c.Database.Timezone = "Europe/Moscow"
+	}
+	if c.Database.HealthCheckPeriod == 0 {
+		c.Database.HealthCheckPeriod = 30 * time.Second
+	}
+	if c.Logging.Service == "" {
+		c.Logging.Service = "whatsapp-service"
+	}
+}
+
+// HTTPListenAddress возвращает host:port строку.
+func (c *Config) HTTPListenAddress() string {
+	return fmt.Sprintf("%s:%d", c.HTTP.Host, c.HTTP.Port)
 }

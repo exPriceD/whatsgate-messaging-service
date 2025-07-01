@@ -9,5 +9,5 @@ export function showToast(msg, type = "") {
   toast.classList.add('show');
   if (type) toast.classList.add(type);
   toast.style.opacity = 1;
-  setTimeout(() => { toast.style.opacity = 0; toast.className = ''; }, 3000);
+  setTimeout(() => { toast.style.opacity = 0; toast.className = ''; }, 5000);
 } 

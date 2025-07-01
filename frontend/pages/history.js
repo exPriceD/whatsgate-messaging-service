@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '../ui/api.js';
+import { apiGet, apiPost, apiGetCampaignErrors } from '../ui/api.js';
 
 // Страница истории рассылок
 export function renderHistoryPage() {
@@ -67,6 +67,7 @@ export function renderHistoryPage() {
               <th>📊 Статус</th>
               <th>📈 Прогресс</th>
               <th>⏱️ Сообщ./час</th>
+              <th>❗ Ошибки</th>
               <th>📅 Дата</th>
               <th>🔧 Действия</th>
             </tr>
@@ -229,6 +230,9 @@ export function initHistoryPage(showToast) {
           <span class="speed-number">${campaign.messages_per_hour}</span>
           <span class="speed-label">/час</span>
         </td>
+        <td class="campaign-errors">
+          <span class="error-count">${campaign.error_count || 0}</span>
+        </td>
         <td class="campaign-date">
           <div class="date-content">
             <div class="date-main">${formatDate(campaign.created_at)}</div>
@@ -365,7 +369,7 @@ export function initHistoryPage(showToast) {
           </div>
           ` : ''}
           
-          <div class="detail-section" ${campaign.status === 'finished' ? 'style="padding-bottom: 25px;"' : ''}>
+          <div class="detail-section" ${campaign.status === 'finished' && campaign.error_count <= 0 ? 'style="padding-bottom: 25px;"' : ''}>
             <h4>📊 Уже отправлено (${campaign.processed_count})</h4>
             <div class="sent-numbers-container">
               <div class="sent-numbers-header">
@@ -381,13 +385,22 @@ export function initHistoryPage(showToast) {
           </div>
           
           ${campaign.status === 'started' ? `
-          <div class="detail-section" style="padding-bottom: 25px;">
+          <div class="detail-section" ${campaign.error_count <= 0 ? 'style="padding-bottom: 25px;"' : ''}">
             <h4>⚡ Действия</h4>
             <div class="actions-container">
               <button class="cancel-campaign-btn" onclick="cancelCampaign('${campaign.id}', '${campaign.name || 'Без названия'}')">
                 <span class="cancel-icon">🚫</span>
                 <span class="cancel-text">Отменить рассылку</span>
               </button>
+            </div>
+          </div>
+          ` : ''}
+          
+          ${campaign.error_count > 0 ? `
+          <div class="detail-section" style="padding-bottom: 25px;">
+            <h4>❗ Ошибки (${campaign.error_count})</h4>
+            <div class="errors-container" id="errors-${campaign.id}">
+              <div class="loading">Загрузка ошибок...</div>
             </div>
           </div>
           ` : ''}
@@ -398,6 +411,13 @@ export function initHistoryPage(showToast) {
       setTimeout(() => {
         loadSentNumbers(campaign.id);
       }, 100);
+      
+      // Загружаем ошибки при открытии деталей, если они есть
+      if (campaign.error_count > 0) {
+        setTimeout(() => {
+          showCampaignErrors(campaign.id);
+        }, 200);
+      }
     } catch (error) {
       console.error('Error loading campaign details:', error);
       modalTitle.textContent = 'Ошибка';
@@ -516,6 +536,36 @@ export function initHistoryPage(showToast) {
     } catch (error) {
       console.error('Error copying sent numbers:', error);
       showToast('Ошибка копирования номеров', 'error');
+    }
+  };
+
+  // Функция для показа ошибок
+  window.showCampaignErrors = async function(campaignId) {
+    try {
+      const response = await apiGetCampaignErrors(campaignId, showToast);
+      
+      if (response.errors && response.errors.length > 0) {
+        const errorMessages = response.errors.map(error => `
+          <div class="error-item">
+            <div class="error-phone">${error.phone_number}</div>
+            <div class="error-message">${error.error}</div>
+          </div>
+        `).join('');
+        
+        const errorsContainer = document.getElementById(`errors-${campaignId}`);
+        errorsContainer.innerHTML = `
+          <div class="errors-list">
+            ${errorMessages}
+          </div>
+        `;
+      } else {
+        const errorsContainer = document.getElementById(`errors-${campaignId}`);
+        errorsContainer.innerHTML = '<div class="no-errors">Нет ошибок для показа</div>';
+      }
+    } catch (error) {
+      console.error('Error showing campaign errors:', error);
+      const errorsContainer = document.getElementById(`errors-${campaignId}`);
+      errorsContainer.innerHTML = '<div class="error">Ошибка загрузки ошибок</div>';
     }
   };
 } 

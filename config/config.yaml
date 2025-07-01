@@ -4,10 +4,10 @@ http:
   read_timeout: "5s"
   write_timeout: "10s"
   idle_timeout: "60s"
-  shutdown_timeout: "5s"
+  shutdown_timeout: "1s"
   cors:
     enabled: true
-    allowed_origins: [ "https://example.com", "http://localhost:3000" ]
+    allowed_origins: [ "https://example.com", "http://localhost:3000", "http://127.0.0.1:8081" ]
     allowed_methods: [ "GET", "POST", "PUT", "DELETE", "OPTIONS" ]
     allowed_headers: [ "Content-Type", "Authorization" ]
     exposed_headers: [ "X-Custom-Header" ]
@@ -15,8 +15,8 @@ http:
     max_age: 86400
 
 database:
-  host: "localhost"
-  port: 5433
+  host: "db"
+  port: 5432
   name: "whatsapp_service"
   user: "postgres"
   password: "postgres"
@@ -24,8 +24,11 @@ database:
   max_open_conns: 25
   max_idle_conns: 25
   conn_max_lifetime: "5m"
+  max_attempt_connection: 3
 
 logging:
   level: "info"
   format: "console"
   output_path: "stdout"
+  service: "whatsapp_service"
+  env: "dev"

@@ -103,4 +103,8 @@ export async function apiPut(url, data, showToast = null) {
  */
 export async function apiDelete(url, showToast = null) {
   return apiRequest(url, { method: 'DELETE' }, showToast);
+}
+
+export async function apiGetCampaignErrors(campaignId, showToast = null) {
+  return apiGet(`/api/v1/messages/campaigns/${campaignId}/errors`, showToast);
 } 
