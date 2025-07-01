@@ -13,14 +13,16 @@ import (
 
 // HTTPServer представляет HTTP сервер
 type HTTPServer struct {
-	server     *http.Server
-	controller *controllers.CampaignController
+	server       *http.Server
+	campaignCtrl *controllers.CampaignController
+	settingsCtrl *controllers.SettingsController
 }
 
 // NewHTTPServer создает новый HTTP сервер
-func NewHTTPServer(port int, controller *controllers.CampaignController) *HTTPServer {
+func NewHTTPServer(port int, campaignCtrl *controllers.CampaignController, settingsCtrl *controllers.SettingsController) *HTTPServer {
 	return &HTTPServer{
-		controller: controller,
+		campaignCtrl: campaignCtrl,
+		settingsCtrl: settingsCtrl,
 		server: &http.Server{
 			Addr:         fmt.Sprintf(":%d", port),
 			ReadTimeout:  15 * time.Second,
@@ -58,6 +60,10 @@ func (s *HTTPServer) setupRoutes() {
 	mux.HandleFunc("/api/campaigns", s.campaignsHandler)
 	mux.HandleFunc("/api/campaigns/", s.campaignHandler)
 
+	// Settings endpoints
+	mux.HandleFunc("/api/settings", s.settingsHandler)            // GET, PUT
+	mux.HandleFunc("/api/settings/reset", s.settingsResetHandler) // DELETE
+
 	// Health check
 	mux.HandleFunc("/health", s.healthHandler)
 	mux.HandleFunc("/", s.notFoundHandler)
@@ -70,9 +76,9 @@ func (s *HTTPServer) setupRoutes() {
 func (s *HTTPServer) campaignsHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
-		s.controller.CreateCampaign(w, r)
+		s.campaignCtrl.CreateCampaign(w, r)
 	case http.MethodGet:
-		s.controller.ListCampaigns(w, r)
+		s.campaignCtrl.ListCampaigns(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -84,20 +90,20 @@ func (s *HTTPServer) campaignHandler(w http.ResponseWriter, r *http.Request) {
 
 	// /api/campaigns/{id}/start
 	if containsPath(path, "/start") {
-		s.controller.StartCampaign(w, r)
+		s.campaignCtrl.StartCampaign(w, r)
 		return
 	}
 
 	// /api/campaigns/{id}/cancel
 	if containsPath(path, "/cancel") {
-		s.controller.CancelCampaign(w, r)
+		s.campaignCtrl.CancelCampaign(w, r)
 		return
 	}
 
 	// /api/campaigns/{id}
 	switch r.Method {
 	case http.MethodGet:
-		s.controller.GetCampaign(w, r)
+		s.campaignCtrl.GetCampaign(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -178,4 +184,23 @@ func containsPath(path, substr string) bool {
 		}
 	}
 	return false
+}
+
+func (s *HTTPServer) settingsHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.settingsCtrl.GetSettings(w, r)
+	case http.MethodPut:
+		s.settingsCtrl.UpdateSettings(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *HTTPServer) settingsResetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.settingsCtrl.ResetSettings(w, r)
 }
