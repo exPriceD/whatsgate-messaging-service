@@ -11,6 +11,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Ensure implementation
+var _ interfaces.CampaignRepository = (*PostgresCampaignRepository)(nil)
+
 // PostgresCampaignRepository реализует CampaignRepository для PostgreSQL
 type PostgresCampaignRepository struct {
 	pool *pgxpool.Pool

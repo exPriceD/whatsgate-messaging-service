@@ -2,33 +2,40 @@ package types
 
 import "time"
 
-// --- Константы по умолчанию и ограничения
+// --- Константы по умолчанию и ограничения.
+// Эти значения используются шлюзом, если вызывающая сторона не передала свои.
+// Изменяйте с осторожностью — они влияют на все вызовы.
 const (
-	DefaultTimeout       = 30 * time.Second
+	// DefaultTimeout — тайм-аут HTTP-запросов к WhatsGate.
+	DefaultTimeout = 30 * time.Second
+	// DefaultRetryAttempts — сколько раз повторять запрос при ошибке «на стороне сети».
 	DefaultRetryAttempts = 2
-	DefaultRetryDelay    = 1 * time.Second
-	MaxFileSizeBytes     = 10 * 1024 * 1024 // 10MB
+	// DefaultRetryDelay — пауза между ретраями.
+	DefaultRetryDelay = 1 * time.Second
+	// MaxFileSizeBytes — ограничение размера отправляемого файла (10 МБ).
+	MaxFileSizeBytes = 10 * 1024 * 1024
 )
 
-// --- Константы типов сообщений для WhatsGate API
+// --- Константы типов сообщений WhatsGate.
+// Значения соответствуют полю Message.type в REST-схеме сервиса.
 const (
-	MessageTypeText    = "text"
-	MessageTypeImage   = "image"
-	MessageTypeDoc     = "doc"
-	MessageTypeVoice   = "voice"
-	MessageTypeSticker = "sticker"
+	MessageTypeText    = "text"    // обычное текстовое сообщение
+	MessageTypeImage   = "image"   // изображение
+	MessageTypeDoc     = "doc"     // документ (PDF, DOCX и т. д.)
+	MessageTypeVoice   = "voice"   // голосовое сообщение
+	MessageTypeSticker = "sticker" // стикер
 )
 
-// WhatsGateConfig описывает конфигурацию клиента WhatsGate API
-// Эта структура используется только слоем infrastructure.
+// WhatsGateConfig описывает конфигурацию HTTP-клиента WhatsGate.
+// Заполняется на уровне infrastructure (например, из БД).
 type WhatsGateConfig struct {
-	BaseURL       string        // Базовый URL API
-	APIKey        string        // Ключ авторизации
-	WhatsappID    string        // ID Whatsapp-аккаунта
-	Timeout       time.Duration // HTTP-таймаут
-	RetryAttempts int           // Количество повторных попыток
+	BaseURL       string        // Базовый URL API (https://whatsgate.ru/api/v1)
+	APIKey        string        // API-ключ, выдаваемый What​sGate
+	WhatsappID    string        // Идентификатор WhatsApp-аккаунта
+	Timeout       time.Duration // Тайм-аут HTTP-запроса
+	RetryAttempts int           // Кол-во повторов при сетевых ошибках
 	RetryDelay    time.Duration // Задержка между повторами
-	MaxFileSize   int64         // Максимальный размер медиа-файла
+	MaxFileSize   int64         // Максимальный размер медиа-файла в байтах
 }
 
 // --- Outbound DTO (запросы/ответы WhatsGate)

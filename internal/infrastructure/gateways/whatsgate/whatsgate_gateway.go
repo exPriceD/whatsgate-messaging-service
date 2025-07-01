@@ -20,13 +20,18 @@ import (
 // Регулярка для проверки номера (российский формат 7XXXXXXXXXX)
 var phoneRegex = regexp.MustCompile(`^7\d{10}$`)
 
-// WhatsGateGateway реализация MessageGateway для WhatsGate API
+// WhatsGateGateway — «голый» HTTP-клиент What​sGate.
+// Он не умеет сам добывать ключи: конфиг передаётся при создании.
+// Рекомендуется оборачивать его в SettingsAwareGateway для поддержки
+// «горячих» изменений настроек.
 type WhatsGateGateway struct {
 	config *types.WhatsGateConfig
 	client *http.Client
 }
 
-// NewWhatsGateGateway создает новый экземпляр WhatsGate gateway
+// NewWhatsGateGateway возвращает готовый к работе шлюз WhatsGate.
+// Функция автоматически подставляет значения по умолчанию, если они
+// не заданы в конфиге (таймауты, ретраи, лимит размера файла).
 func NewWhatsGateGateway(config *types.WhatsGateConfig) interfaces.MessageGateway {
 	if config.Timeout == 0 {
 		config.Timeout = types.DefaultTimeout

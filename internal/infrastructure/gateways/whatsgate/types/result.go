@@ -1,6 +1,8 @@
 package types
 
-// MessageResult представляет результат отправки сообщения через gateway
+// MessageResult представляет результат попытки отправки сообщения
+// через WhatsGate.  Структура не повторяет точный ответ API, а содержит
+// усреднённый набор полей, достаточный для бизнес-логики.
 type MessageResult struct {
 	PhoneNumber string // Номер телефона получателя
 	Success     bool   // Успешно ли отправлено сообщение
@@ -9,7 +11,8 @@ type MessageResult struct {
 	Timestamp   string // Время отправки
 }
 
-// TestConnectionResult представляет результат проверки соединения с gateway
+// TestConnectionResult возвращается методом TestConnection и позволяет
+// убедиться, что переданные учётные данные валидны, а WhatsGate доступен.
 type TestConnectionResult struct {
 	Success   bool   // Статус проверки
 	Error     string // Сообщение об ошибке (если неуспешно)
