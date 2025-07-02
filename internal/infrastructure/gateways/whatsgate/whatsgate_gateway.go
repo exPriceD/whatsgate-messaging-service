@@ -11,10 +11,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"whatsapp-service/internal/infrastructure/gateways/whatsgate/types"
-
 	"whatsapp-service/internal/entities"
-	"whatsapp-service/internal/usecases/interfaces"
+	"whatsapp-service/internal/infrastructure/gateways/whatsgate/types"
+	"whatsapp-service/internal/usecases/dto"
 )
 
 // Регулярка для проверки номера (российский формат 7XXXXXXXXXX)
@@ -32,7 +31,7 @@ type WhatsGateGateway struct {
 // NewWhatsGateGateway возвращает готовый к работе шлюз WhatsGate.
 // Функция автоматически подставляет значения по умолчанию, если они
 // не заданы в конфиге (таймауты, ретраи, лимит размера файла).
-func NewWhatsGateGateway(config *types.WhatsGateConfig) interfaces.MessageGateway {
+func NewWhatsGateGateway(config *types.WhatsGateConfig) *WhatsGateGateway {
 	if config.Timeout == 0 {
 		config.Timeout = types.DefaultTimeout
 	}
@@ -53,22 +52,22 @@ func NewWhatsGateGateway(config *types.WhatsGateConfig) interfaces.MessageGatewa
 }
 
 // SendTextMessage отправляет текстовое сообщение
-func (g *WhatsGateGateway) SendTextMessage(ctx context.Context, phoneNumber, message string, async bool) (types.MessageResult, error) {
+func (g *WhatsGateGateway) SendTextMessage(ctx context.Context, phoneNumber, message string, async bool) (*dto.MessageSendResult, error) {
 	if err := g.validatePhoneNumber(phoneNumber); err != nil {
-		return types.MessageResult{
+		return &dto.MessageSendResult{
 			PhoneNumber: phoneNumber,
 			Success:     false,
 			Error:       fmt.Sprintf("invalid phone number: %v", err),
-			Timestamp:   time.Now().Format(time.RFC3339),
+			Timestamp:   time.Now(),
 		}, nil
 	}
 
 	if strings.TrimSpace(message) == "" {
-		return types.MessageResult{
+		return &dto.MessageSendResult{
 			PhoneNumber: phoneNumber,
 			Success:     false,
 			Error:       "message cannot be empty",
-			Timestamp:   time.Now().Format(time.RFC3339),
+			Timestamp:   time.Now(),
 		}, nil
 	}
 
@@ -87,7 +86,7 @@ func (g *WhatsGateGateway) SendTextMessage(ctx context.Context, phoneNumber, mes
 	return g.sendMessageWithRetry(ctx, request, phoneNumber)
 }
 
-func (g *WhatsGateGateway) TestConnection(ctx context.Context) (types.TestConnectionResult, error) {
+func (g *WhatsGateGateway) TestConnection(ctx context.Context) (*dto.ConnectionTestResult, error) {
 	request := types.TestConnectionRequest{
 		WhatsappID: g.config.WhatsappID,
 		Number:     "79317019910",
@@ -97,41 +96,41 @@ func (g *WhatsGateGateway) TestConnection(ctx context.Context) (types.TestConnec
 }
 
 // SendMediaMessage отправляет медиа-сообщение
-func (g *WhatsGateGateway) SendMediaMessage(ctx context.Context, phoneNumber string, messageType entities.MessageType, message string, filename string, mediaData io.Reader, mimeType string, async bool) (types.MessageResult, error) {
+func (g *WhatsGateGateway) SendMediaMessage(ctx context.Context, phoneNumber string, messageType entities.MessageType, message string, filename string, mediaData io.Reader, mimeType string, async bool) (*dto.MessageSendResult, error) {
 	if err := g.validatePhoneNumber(phoneNumber); err != nil {
-		return types.MessageResult{
+		return &dto.MessageSendResult{
 			PhoneNumber: phoneNumber,
 			Success:     false,
 			Error:       fmt.Sprintf("invalid phone number: %v", err),
-			Timestamp:   time.Now().Format(time.RFC3339),
+			Timestamp:   time.Now(),
 		}, nil
 	}
 
 	if err := g.validateMessageType(string(messageType)); err != nil {
-		return types.MessageResult{
+		return &dto.MessageSendResult{
 			PhoneNumber: phoneNumber,
 			Success:     false,
 			Error:       fmt.Sprintf("invalid message type: %v", err),
-			Timestamp:   time.Now().Format(time.RFC3339),
+			Timestamp:   time.Now(),
 		}, nil
 	}
 
 	fileData, err := io.ReadAll(mediaData)
 	if err != nil {
-		return types.MessageResult{
+		return &dto.MessageSendResult{
 			PhoneNumber: phoneNumber,
 			Success:     false,
 			Error:       fmt.Sprintf("failed to read media data: %v", err),
-			Timestamp:   time.Now().Format(time.RFC3339),
+			Timestamp:   time.Now(),
 		}, nil
 	}
 
 	if int64(len(fileData)) > g.config.MaxFileSize {
-		return types.MessageResult{
+		return &dto.MessageSendResult{
 			PhoneNumber: phoneNumber,
 			Success:     false,
 			Error:       fmt.Sprintf("file size exceeds limit: %d bytes", g.config.MaxFileSize),
-			Timestamp:   time.Now().Format(time.RFC3339),
+			Timestamp:   time.Now(),
 		}, nil
 	}
 
@@ -158,7 +157,7 @@ func (g *WhatsGateGateway) SendMediaMessage(ctx context.Context, phoneNumber str
 }
 
 // sendMessageWithRetry отправляет сообщение с повторными попытками
-func (g *WhatsGateGateway) sendMessageWithRetry(ctx context.Context, request types.SendMessageRequest, phoneNumber string) (types.MessageResult, error) {
+func (g *WhatsGateGateway) sendMessageWithRetry(ctx context.Context, request types.SendMessageRequest, phoneNumber string) (*dto.MessageSendResult, error) {
 	var lastResult types.MessageResult
 
 	for attempt := 1; attempt <= g.config.RetryAttempts; attempt++ {
@@ -175,60 +174,88 @@ func (g *WhatsGateGateway) sendMessageWithRetry(ctx context.Context, request typ
 		}
 
 		if lastResult.Success || !g.isRetryableError(lastResult.Error) {
-			return lastResult, nil
+			break
 		}
 
 		if attempt < g.config.RetryAttempts {
 			select {
 			case <-ctx.Done():
-				return types.MessageResult{
+				lastResult = types.MessageResult{
 					PhoneNumber: phoneNumber,
 					Success:     false,
 					Error:       "context cancelled during retry",
 					Timestamp:   time.Now().Format(time.RFC3339),
-				}, nil
+				}
+				goto endRetry
 			case <-time.After(g.config.RetryDelay):
 			}
 		}
 	}
 
-	return lastResult, nil
+endRetry:
+	ts, _ := time.Parse(time.RFC3339, lastResult.Timestamp)
+	return &dto.MessageSendResult{
+		PhoneNumber: lastResult.PhoneNumber,
+		Success:     lastResult.Success,
+		MessageID:   lastResult.Status,
+		Error:       lastResult.Error,
+		Timestamp:   ts,
+	}, nil
 }
 
 // testConnectionWithRetry проверяет соединение с повторными попытками
-func (g *WhatsGateGateway) testConnectionWithRetry(ctx context.Context, request types.TestConnectionRequest) (types.TestConnectionResult, error) {
-	var lastResult types.TestConnectionResult
+func (g *WhatsGateGateway) testConnectionWithRetry(ctx context.Context, request types.TestConnectionRequest) (*dto.ConnectionTestResult, error) {
+	var lastInfraResult types.TestConnectionResult
+	var lastError error
 
 	for attempt := 1; attempt <= g.config.RetryAttempts; attempt++ {
 		result, err := g.testConnection(ctx, request)
 		if err != nil {
-			lastResult = types.TestConnectionResult{
+			lastInfraResult = types.TestConnectionResult{
 				Success:   false,
 				Error:     fmt.Sprintf("attempt %d failed: %v", attempt, err),
 				Timestamp: time.Now().Format(time.RFC3339),
 			}
+			lastError = err
 		} else {
-			lastResult = result
+			lastInfraResult = result
+			lastError = nil // Сбрасываем ошибку при успехе
 		}
 
-		if lastResult.Success || !g.isRetryableError(lastResult.Error) {
-			return lastResult, nil
+		if lastInfraResult.Success || !g.isRetryableError(lastInfraResult.Error) {
+			break
 		}
 
 		if attempt < g.config.RetryAttempts {
 			select {
 			case <-ctx.Done():
-				return types.TestConnectionResult{
+				lastInfraResult = types.TestConnectionResult{
 					Success:   false,
 					Error:     "context cancelled during retry",
 					Timestamp: time.Now().Format(time.RFC3339),
-				}, nil
+				}
+				lastError = ctx.Err()
+				goto endRetry
 			case <-time.After(g.config.RetryDelay):
 			}
 		}
 	}
 
-	return lastResult, nil
+endRetry:
+	// Если была системная ошибка, а не ошибка API, пробрасываем ее
+	if lastError != nil && !lastInfraResult.Success {
+		// Но сначала конвертируем то, что есть
+		return &dto.ConnectionTestResult{
+			Success: false,
+			Error:   lastInfraResult.Error,
+		}, lastError
+	}
+
+	// Конвертируем финальный результат в DTO
+	return &dto.ConnectionTestResult{
+		Success: lastInfraResult.Success,
+		Error:   lastInfraResult.Error,
+	}, nil
 }
 
 // isRetryableError определяет, стоит ли повторять запрос при данной ошибке
@@ -328,49 +355,42 @@ func (g *WhatsGateGateway) sendMessage(ctx context.Context, request types.SendMe
 		}, nil
 	}
 
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var response types.SendMessageResponse
-		if err := json.Unmarshal(body, &response); err != nil {
-			return types.MessageResult{
-				PhoneNumber: phoneNumber,
-				Success:     true,
-				Status:      "sent",
-				Timestamp:   time.Now().Format(time.RFC3339),
-			}, nil
+	// Обработка ответа
+	if resp.StatusCode != http.StatusOK {
+		var errorMsg string
+		if resp.StatusCode >= 500 {
+			errorMsg = fmt.Sprintf("server error: API returned HTTP %d - %s", resp.StatusCode, string(body))
+		} else {
+			var errResp types.SendMessageResponse
+			_ = json.Unmarshal(body, &errResp) // Игнорируем ошибку, если тело пустое
+			errorMsg = fmt.Sprintf("API client error: HTTP %d. Status: %s. Message: %s", resp.StatusCode, errResp.Status, errResp.Message)
 		}
 
+		return types.MessageResult{
+			PhoneNumber: phoneNumber,
+			Success:     false,
+			Status:      "failed",
+			Error:       errorMsg,
+			Timestamp:   time.Now().Format(time.RFC3339),
+		}, nil
+	}
+
+	var response types.SendMessageResponse
+	if err := json.Unmarshal(body, &response); err != nil {
 		return types.MessageResult{
 			PhoneNumber: phoneNumber,
 			Success:     true,
 			Status:      "sent",
 			Timestamp:   time.Now().Format(time.RFC3339),
 		}, nil
-
-	case http.StatusUnauthorized:
-		return types.MessageResult{
-			PhoneNumber: phoneNumber,
-			Success:     false,
-			Error:       "unauthorized: invalid credentials",
-			Timestamp:   time.Now().Format(time.RFC3339),
-		}, nil
-
-	case http.StatusInternalServerError:
-		return types.MessageResult{
-			PhoneNumber: phoneNumber,
-			Success:     false,
-			Error:       fmt.Sprintf("server error: %s", string(body)),
-			Timestamp:   time.Now().Format(time.RFC3339),
-		}, nil
-
-	default:
-		return types.MessageResult{
-			PhoneNumber: phoneNumber,
-			Success:     false,
-			Error:       fmt.Sprintf("API error: HTTP %d - %s", resp.StatusCode, string(body)),
-			Timestamp:   time.Now().Format(time.RFC3339),
-		}, nil
 	}
+
+	return types.MessageResult{
+		PhoneNumber: phoneNumber,
+		Success:     true,
+		Status:      "sent",
+		Timestamp:   time.Now().Format(time.RFC3339),
+	}, nil
 }
 
 // TestConnection проверяет соединение с API
@@ -408,47 +428,35 @@ func (g *WhatsGateGateway) testConnection(ctx context.Context, request types.Tes
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return types.TestConnectionResult{
-			Success:   false,
-			Error:     fmt.Sprintf("failed to read response: %v", err),
-			Timestamp: time.Now().Format(time.RFC3339),
-		}, nil
+		return types.TestConnectionResult{Success: false, Error: "failed to read response body"}, fmt.Errorf("read response: %w", err)
 	}
 
-	switch resp.StatusCode {
-	case http.StatusOK:
-		var response types.TestConnectionResponse
-		if err := json.Unmarshal(body, &response); err != nil {
-			return types.TestConnectionResult{
-				Success:   true,
-				Timestamp: time.Now().Format(time.RFC3339),
-			}, nil
+	// Сначала проверяем статус HTTP
+	if resp.StatusCode != http.StatusOK {
+		var errorMsg string
+		if resp.StatusCode >= 500 {
+			errorMsg = fmt.Sprintf("server error: API returned HTTP %d - %s", resp.StatusCode, string(body))
+		} else {
+			errorMsg = fmt.Sprintf("API client error: HTTP %d - %s", resp.StatusCode, string(body))
 		}
-
-		return types.TestConnectionResult{
-			Success:   true,
-			Timestamp: time.Now().Format(time.RFC3339),
-		}, nil
-
-	case http.StatusUnauthorized:
-		return types.TestConnectionResult{
-			Success:   false,
-			Error:     "unauthorized: invalid credentials",
-			Timestamp: time.Now().Format(time.RFC3339),
-		}, nil
-
-	case http.StatusInternalServerError:
-		return types.TestConnectionResult{
-			Success:   false,
-			Error:     fmt.Sprintf("server error: %s", string(body)),
-			Timestamp: time.Now().Format(time.RFC3339),
-		}, nil
-
-	default:
-		return types.TestConnectionResult{
-			Success:   false,
-			Error:     fmt.Sprintf("API error: HTTP %d - %s", resp.StatusCode, string(body)),
-			Timestamp: time.Now().Format(time.RFC3339),
-		}, nil
+		return types.TestConnectionResult{Success: false, Error: errorMsg, Timestamp: time.Now().Format(time.RFC3339)}, nil
 	}
+
+	var response types.TestConnectionResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return types.TestConnectionResult{Success: false, Error: "failed to decode response", Timestamp: time.Now().Format(time.RFC3339)}, fmt.Errorf("decode response: %w", err)
+	}
+
+	// Теперь проверяем содержимое ответа
+	isSuccess := response.Result == "success" && response.Data == true
+	errorMessage := ""
+	if !isSuccess {
+		errorMessage = fmt.Sprintf("Connection test failed: %s", response.Result)
+	}
+
+	return types.TestConnectionResult{
+		Success:   isSuccess,
+		Error:     errorMessage,
+		Timestamp: time.Now().Format(time.RFC3339),
+	}, nil
 }

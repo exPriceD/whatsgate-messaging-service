@@ -30,7 +30,7 @@ const (
 // Заполняется на уровне infrastructure (например, из БД).
 type WhatsGateConfig struct {
 	BaseURL       string        // Базовый URL API (https://whatsgate.ru/api/v1)
-	APIKey        string        // API-ключ, выдаваемый What​sGate
+	APIKey        string        // API-ключ, выдаваемый WhatsGate
 	WhatsappID    string        // Идентификатор WhatsApp-аккаунта
 	Timeout       time.Duration // Тайм-аут HTTP-запроса
 	RetryAttempts int           // Кол-во повторов при сетевых ошибках

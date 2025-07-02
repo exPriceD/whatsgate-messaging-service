@@ -3,26 +3,55 @@ package whatsgate
 import (
 	"context"
 	"io"
+	"sync"
+	"time"
 
 	"whatsapp-service/internal/entities"
 	"whatsapp-service/internal/infrastructure/gateways/whatsgate/types"
+	"whatsapp-service/internal/usecases/dto"
 	"whatsapp-service/internal/usecases/interfaces"
 )
 
-// SettingsAwareGateway получает актуальные креды из репозитория в рантайме.
+const (
+	// defaultCacheTTL — время жизни кэша для настроек шлюза.
+	// В течение этого времени шлюз не будет обращаться в БД за настройками.
+	defaultCacheTTL = 1 * time.Minute
+)
+
+// SettingsAwareGateway получает актуальные креды из репозитория в рантайме
+// и кэширует их для повышения производительности.
 type SettingsAwareGateway struct {
-	repo interfaces.WhatsGateSettingsRepository
+	repo           interfaces.WhatsGateSettingsRepository
+	cachedGateway  interfaces.MessageGateway
+	cacheTimestamp time.Time
+	cacheTTL       time.Duration
+	mu             sync.RWMutex
 }
 
-// NewSettingsAwareGateway создаёт ленивый шлюз, «знающий» о репозитории
-// настроек.  Каждый вызов сначала забирает запись whatsgate_settings из
-// БД (можно кешировать/добавить TTL, если понадобится), затем формирует
-// внутренний WhatsGateGateway и делегирует ему отправку.
-func NewSettingsAwareGateway(repo interfaces.WhatsGateSettingsRepository) interfaces.MessageGateway {
-	return &SettingsAwareGateway{repo: repo}
+// NewSettingsAwareGateway создаёт ленивый кэширующий шлюз.
+func NewSettingsAwareGateway(repo interfaces.WhatsGateSettingsRepository) *SettingsAwareGateway {
+	return &SettingsAwareGateway{
+		repo:     repo,
+		cacheTTL: defaultCacheTTL,
+	}
 }
 
-func (d *SettingsAwareGateway) buildGateway(ctx context.Context) (interfaces.MessageGateway, error) {
+// buildOrGetFromCache получает шлюз из кэша или создает новый, если кэш устарел.
+func (d *SettingsAwareGateway) buildOrGetFromCache(ctx context.Context) (interfaces.MessageGateway, error) {
+	d.mu.RLock()
+	if d.cachedGateway != nil && time.Since(d.cacheTimestamp) < d.cacheTTL {
+		defer d.mu.RUnlock()
+		return d.cachedGateway, nil
+	}
+	d.mu.RUnlock()
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.cachedGateway != nil && time.Since(d.cacheTimestamp) < d.cacheTTL {
+		return d.cachedGateway, nil
+	}
+
 	settings, err := d.repo.Get(ctx)
 	if err != nil || settings == nil {
 		return nil, err
@@ -36,38 +65,38 @@ func (d *SettingsAwareGateway) buildGateway(ctx context.Context) (interfaces.Mes
 		RetryDelay:    types.DefaultRetryDelay,
 		MaxFileSize:   types.MaxFileSizeBytes,
 	}
-	return NewWhatsGateGateway(cfg), nil
+
+	newGateway := NewWhatsGateGateway(cfg)
+
+	d.cachedGateway = newGateway
+	d.cacheTimestamp = time.Now()
+
+	return newGateway, nil
 }
 
 // SendTextMessage реализует interfaces.MessageGateway.
-// Перед реальной отправкой формируется внутренний клиент с текущими
-// параметрами What​sGate.  Если настройка ещё не сохранена — возвращаем
-// ошибку в поле Error и Success=false.
-func (d *SettingsAwareGateway) SendTextMessage(ctx context.Context, phone, message string, async bool) (types.MessageResult, error) {
-	gw, err := d.buildGateway(ctx)
+func (d *SettingsAwareGateway) SendTextMessage(ctx context.Context, phone, message string, async bool) (*dto.MessageSendResult, error) {
+	gw, err := d.buildOrGetFromCache(ctx)
 	if err != nil {
-		return types.MessageResult{PhoneNumber: phone, Success: false, Error: "settings not configured"}, nil
+		return &dto.MessageSendResult{PhoneNumber: phone, Success: false, Error: "settings not configured", Timestamp: time.Now()}, nil
 	}
 	return gw.SendTextMessage(ctx, phone, message, async)
 }
 
-// SendMediaMessage аналогичен SendTextMessage, но отправляет медиа-файл.
-// Все ограничения (размер файла, MIME) проверяются внутри базового
-// WhatsGateGateway.
-func (d *SettingsAwareGateway) SendMediaMessage(ctx context.Context, phone string, mt entities.MessageType, message, filename string, media io.Reader, mime string, async bool) (types.MessageResult, error) {
-	gw, err := d.buildGateway(ctx)
+// SendMediaMessage аналогичен SendTextMessage.
+func (d *SettingsAwareGateway) SendMediaMessage(ctx context.Context, phone string, mt entities.MessageType, message, filename string, media io.Reader, mime string, async bool) (*dto.MessageSendResult, error) {
+	gw, err := d.buildOrGetFromCache(ctx)
 	if err != nil {
-		return types.MessageResult{PhoneNumber: phone, Success: false, Error: "settings not configured"}, nil
+		return &dto.MessageSendResult{PhoneNumber: phone, Success: false, Error: "settings not configured", Timestamp: time.Now()}, nil
 	}
 	return gw.SendMediaMessage(ctx, phone, mt, message, filename, media, mime, async)
 }
 
-// TestConnection вызывает эндпоинт What​sGate «ping» с текущими
-// реквизитами и возвращает результат.
-func (d *SettingsAwareGateway) TestConnection(ctx context.Context) (types.TestConnectionResult, error) {
-	gw, err := d.buildGateway(ctx)
+// TestConnection вызывает эндпоинт WhatsGate «ping» с текущими реквизитами.
+func (d *SettingsAwareGateway) TestConnection(ctx context.Context) (*dto.ConnectionTestResult, error) {
+	gw, err := d.buildOrGetFromCache(ctx)
 	if err != nil {
-		return types.TestConnectionResult{Success: false, Error: "settings not configured"}, nil
+		return &dto.ConnectionTestResult{Success: false, Error: "settings not configured"}, nil
 	}
 	return gw.TestConnection(ctx)
 }

@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
-	"whatsapp-service/internal/infrastructure/gateways/whatsgate/types"
+
+	"github.com/stretchr/testify/require"
 
 	"whatsapp-service/internal/entities"
+	"whatsapp-service/internal/infrastructure/gateways/whatsgate/types"
 )
 
 // stubServer возвращает httptest сервер, который обрабатывает /send и /status
@@ -31,85 +32,151 @@ func newGateway(baseURL string) *WhatsGateGateway {
 		RetryDelay:    10 * time.Millisecond,
 		MaxFileSize:   types.MaxFileSizeBytes,
 	}
-	return NewWhatsGateGateway(cfg).(*WhatsGateGateway)
+	return NewWhatsGateGateway(cfg)
 }
 
-func TestSendTextMessage_Success(t *testing.T) {
-	server := stubServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/send" {
-			t.Errorf("unexpected path %s", r.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "id": "123"})
-	})
-
-	gw := newGateway(server.URL)
-
-	res, _ := gw.SendTextMessage(context.Background(), "79161234567", "hello", false)
-
-	if !res.Success {
-		t.Fatalf("expected success, got %+v", res)
+func TestSendTextMessage(t *testing.T) {
+	testCases := []struct {
+		name          string
+		phoneNumber   string
+		message       string
+		mockHandler   func(t *testing.T, w http.ResponseWriter, r *http.Request)
+		expectSuccess bool
+		expectErrorIn string
+	}{
+		{
+			name:        "success_text_message",
+			phoneNumber: "79161234567",
+			message:     "hello",
+			mockHandler: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				require.Equal(t, "/send", r.URL.Path)
+				w.Header().Set("Content-Type", "application/json")
+				err := json.NewEncoder(w).Encode(map[string]string{"status": "sent", "id": "msg123"})
+				require.NoError(t, err)
+			},
+			expectSuccess: true,
+		},
+		{
+			name:          "invalid_phone_number",
+			phoneNumber:   "123",
+			message:       "hi",
+			mockHandler:   nil, // Валидация происходит до вызова сервера
+			expectSuccess: false,
+			expectErrorIn: "invalid phone number",
+		},
+		{
+			name:        "unauthorized_error_from_server",
+			phoneNumber: "79161234567",
+			message:     "msg",
+			mockHandler: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				// Имитируем более реалистичный ответ API при ошибке
+				err := json.NewEncoder(w).Encode(types.SendMessageResponse{
+					Status:  "error",
+					Message: "Invalid API key",
+				})
+				require.NoError(t, err)
+			},
+			expectSuccess: false,
+			expectErrorIn: "Invalid API key", // Теперь ожидаем осмысленное сообщение
+		},
 	}
-}
 
-func TestSendTextMessage_InvalidPhone(t *testing.T) {
-	gw := newGateway("http://localhost")
-	res, _ := gw.SendTextMessage(context.Background(), "123", "hi", false)
-	if res.Success {
-		t.Error("expected failure for invalid phone")
-	}
-	if !strings.Contains(res.Error, "invalid") {
-		t.Errorf("unexpected error: %s", res.Error)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var serverURL string
+			if tc.mockHandler != nil {
+				server := stubServer(t, func(w http.ResponseWriter, r *http.Request) {
+					tc.mockHandler(t, w, r)
+				})
+				serverURL = server.URL
+			}
+
+			gw := newGateway(serverURL)
+			res, err := gw.SendTextMessage(context.Background(), tc.phoneNumber, tc.message, false)
+
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			require.Equal(t, tc.expectSuccess, res.Success)
+			if tc.expectErrorIn != "" {
+				require.Contains(t, res.Error, tc.expectErrorIn)
+			}
+		})
 	}
 }
 
 func TestSendMediaMessage_TooLarge(t *testing.T) {
 	gw := newGateway("http://localhost")
 	big := bytes.Repeat([]byte("a"), int(types.MaxFileSizeBytes)+1)
-	res, _ := gw.SendMediaMessage(context.Background(), "79161234567", entities.MessageTypeImage, "photo", "big.jpg", bytes.NewReader(big), "image/jpeg", false)
-	if res.Success {
-		t.Error("expected failure for big file")
-	}
-	if !strings.Contains(res.Error, "file size") {
-		t.Errorf("unexpected error: %s", res.Error)
-	}
+	res, err := gw.SendMediaMessage(context.Background(), "79161234567", entities.MessageTypeImage, "photo", "big.jpg", bytes.NewReader(big), "image/jpeg", false)
+
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	require.False(t, res.Success, "expected failure for big file")
+	require.Contains(t, res.Error, "file size")
 }
 
-func TestTestConnection_RetrySuccess(t *testing.T) {
-	calls := 0
-	server := stubServer(t, func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		if calls == 1 {
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte("oops"))
-			return
-		}
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	})
-
-	gw := newGateway(server.URL)
-	gw.config.RetryAttempts = 2
-	gw.config.RetryDelay = 1 * time.Millisecond
-
-	res, _ := gw.TestConnection(context.Background())
-	if !res.Success {
-		t.Errorf("expected success after retry, got %+v", res)
+func TestTestConnection(t *testing.T) {
+	testCases := []struct {
+		name          string
+		retryAttempts int
+		mockHandler   func(t *testing.T, w http.ResponseWriter, r *http.Request)
+		expectSuccess bool
+		expectErrorIn string
+	}{
+		{
+			name:          "success_on_first_try",
+			retryAttempts: 1,
+			mockHandler: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				err := json.NewEncoder(w).Encode(types.TestConnectionResponse{Result: "success", Data: true})
+				require.NoError(t, err)
+			},
+			expectSuccess: true,
+		},
+		{
+			name:          "success_on_second_try_after_500",
+			retryAttempts: 2,
+			mockHandler: func() func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				calls := 0
+				return func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					calls++
+					if calls == 1 {
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					w.Header().Set("Content-Type", "application/json")
+					err := json.NewEncoder(w).Encode(types.TestConnectionResponse{Result: "success", Data: true})
+					require.NoError(t, err)
+				}
+			}(),
+			expectSuccess: true,
+		},
 	}
-}
 
-func TestSendTextMessage_Unauthorized(t *testing.T) {
-	server := stubServer(t, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte("unauthorized"))
-	})
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var serverURL string
+			if tc.mockHandler != nil {
+				server := stubServer(t, func(w http.ResponseWriter, r *http.Request) {
+					tc.mockHandler(t, w, r)
+				})
+				serverURL = server.URL
+			}
 
-	gw := newGateway(server.URL)
+			gw := newGateway(serverURL)
+			gw.config.RetryAttempts = tc.retryAttempts
+			gw.config.RetryDelay = 1 * time.Millisecond
 
-	res, _ := gw.SendTextMessage(context.Background(), "79161234567", "msg", false)
-	if res.Success {
-		t.Error("should fail with unauthorized")
-	}
-	if !strings.Contains(res.Error, "unauthorized") {
-		t.Errorf("unexpected error: %s", res.Error)
+			res, err := gw.TestConnection(context.Background())
+
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			require.Equal(t, tc.expectSuccess, res.Success)
+			if tc.expectErrorIn != "" {
+				require.Contains(t, res.Error, tc.expectErrorIn)
+			}
+		})
 	}
 }

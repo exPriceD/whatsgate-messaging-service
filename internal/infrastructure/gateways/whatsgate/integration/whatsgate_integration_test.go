@@ -1,12 +1,10 @@
-//go:build integration
-// +build integration
+//go:build integration_test
 
 package integration
 
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -14,6 +12,7 @@ import (
 	"whatsapp-service/internal/infrastructure/gateways/whatsgate/types"
 
 	"github.com/joho/godotenv"
+	"github.com/stretchr/testify/require"
 
 	"whatsapp-service/internal/entities"
 )
@@ -51,27 +50,22 @@ func TestWhatsGate_SendTextMessage_Live(t *testing.T) {
 	gw := whatsgate.NewWhatsGateGateway(cfg)
 
 	res, err := gw.SendTextMessage(context.Background(), phoneNumber, "Ping from integration test", false)
-	fmt.Println(res)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !res.Success {
-		t.Fatalf("gateway returned failure: %+v", res)
-	}
+
+	require.NoError(t, err, "SendTextMessage returned an unexpected error")
+	require.NotNil(t, res)
+	require.True(t, res.Success, "gateway returned failure: %+v", res)
 }
 
-// TestWhatsGate_TestConnection_Live проверяет эндпоинт /status реального API.
+// TestWhatsGate_TestConnection_Live проверяет эндпоинт /check реального API.
 func TestWhatsGate_TestConnection_Live(t *testing.T) {
 	cfg, _ := cfgFromEnv(t)
 	gw := whatsgate.NewWhatsGateGateway(cfg)
 
 	res, err := gw.TestConnection(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !res.Success {
-		t.Fatalf("connection failed: %+v", res)
-	}
+
+	require.NoError(t, err, "TestConnection returned an unexpected error")
+	require.NotNil(t, res)
+	require.True(t, res.Success, "connection failed: %+v", res)
 }
 
 func TestWhatsGate_SendMediaMessage_Live(t *testing.T) {
@@ -79,16 +73,14 @@ func TestWhatsGate_SendMediaMessage_Live(t *testing.T) {
 	gw := whatsgate.NewWhatsGateGateway(cfg)
 
 	data, err := os.ReadFile("../testdata/test.jpg")
-	if err != nil {
+	if os.IsNotExist(err) {
 		t.Skip("testdata/test.jpg not found, skipping media test")
 	}
+	require.NoError(t, err, "failed to read test image")
 
 	res, err := gw.SendMediaMessage(context.Background(), phoneNumber, entities.MessageTypeImage, "Integration photo", "test.jpg", bytes.NewReader(data), "image/jpeg", false)
-	fmt.Println(res)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !res.Success {
-		t.Fatalf("media send failed: %+v", res)
-	}
+
+	require.NoError(t, err, "SendMediaMessage returned an unexpected error")
+	require.NotNil(t, res)
+	require.True(t, res.Success, "media send failed: %+v", res)
 }
