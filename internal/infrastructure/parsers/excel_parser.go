@@ -8,8 +8,7 @@ import (
 	"strings"
 
 	"whatsapp-service/internal/entities"
-	"whatsapp-service/internal/infrastructure/parsers/types"
-	"whatsapp-service/internal/usecases/interfaces"
+	"whatsapp-service/internal/usecases/dto"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -18,7 +17,7 @@ import (
 type ExcelParser struct{}
 
 // NewExcelParser создает новый Excel парсер
-func NewExcelParser() interfaces.FileParser {
+func NewExcelParser() *ExcelParser {
 	return &ExcelParser{}
 }
 
@@ -60,7 +59,7 @@ func (p *ExcelParser) ParsePhoneNumbers(fileData io.Reader) ([]entities.PhoneNum
 }
 
 // ParsePhoneNumbersDetailed парсит номера с подробной статистикой
-func (p *ExcelParser) ParsePhoneNumbersDetailed(fileData io.Reader, columnName string) (*types.ParseResult, error) {
+func (p *ExcelParser) ParsePhoneNumbersDetailed(fileData io.Reader, columnName string) (*dto.ParseResult, error) {
 	file, err := excelize.OpenReader(fileData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open Excel file: %w", err)
@@ -81,12 +80,12 @@ func (p *ExcelParser) ParsePhoneNumbersDetailed(fileData io.Reader, columnName s
 		return nil, errors.New("excel file is empty")
 	}
 
-	result := &types.ParseResult{
+	result := &dto.ParseResult{
 		ValidPhones:     make([]entities.PhoneNumber, 0),
-		InvalidPhones:   make([]types.InvalidPhone, 0),
-		DuplicatePhones: make([]types.DuplicatePhone, 0),
+		InvalidPhones:   make([]dto.InvalidPhone, 0),
+		DuplicatePhones: make([]dto.DuplicatePhone, 0),
 		Warnings:        make([]string, 0),
-		Statistics: types.ParseStatistics{
+		Statistics: dto.ParseStatistics{
 			TotalRows: len(rows),
 			DataRows:  len(rows) - 1,
 		},
@@ -106,7 +105,6 @@ func (p *ExcelParser) ParsePhoneNumbersDetailed(fileData io.Reader, columnName s
 	}
 
 	seenPhones := make(map[string]int)
-	duplicateCount := 0
 
 	for rowIdx, row := range rows[1:] {
 		actualRowNum := rowIdx + 2
@@ -126,7 +124,7 @@ func (p *ExcelParser) ParsePhoneNumbersDetailed(fileData io.Reader, columnName s
 
 		phone, err := entities.NewPhoneNumber(rawValue)
 		if err != nil {
-			result.InvalidPhones = append(result.InvalidPhones, types.InvalidPhone{
+			result.InvalidPhones = append(result.InvalidPhones, dto.InvalidPhone{
 				RawValue: rawValue,
 				Row:      actualRowNum,
 				Reason:   err.Error(),
@@ -137,13 +135,12 @@ func (p *ExcelParser) ParsePhoneNumbersDetailed(fileData io.Reader, columnName s
 
 		phoneValue := phone.Value()
 		if firstSeenRow, exists := seenPhones[phoneValue]; exists {
-			result.DuplicatePhones = append(result.DuplicatePhones, types.DuplicatePhone{
+			result.DuplicatePhones = append(result.DuplicatePhones, dto.DuplicatePhone{
 				PhoneNumber: *phone,
 				RawValue:    rawValue,
 				Row:         actualRowNum,
 				FirstSeenAt: firstSeenRow,
 			})
-			duplicateCount++
 			result.Statistics.DuplicateCount++
 			continue
 		}
