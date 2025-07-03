@@ -58,6 +58,11 @@ func (m *Media) MessageType() MessageType {
 	return m.messageType
 }
 
+// SetMessageType вручную задаёт тип сообщения
+func (m *Media) SetMessageType(mt MessageType) {
+	m.messageType = mt
+}
+
 // Data возвращает данные файла
 func (m *Media) Data() []byte {
 	return m.data
@@ -102,44 +107,44 @@ func detectMessageType(mimeType string) MessageType {
 	}
 }
 
+var allowedMimeTypes = map[string]struct{}{
+	// Документы
+	"application/ogg":               {},
+	"application/pdf":               {},
+	"application/zip":               {},
+	"application/gzip":              {},
+	"application/msword":            {},
+	"application/vnd.ms-excel":      {},
+	"application/vnd.ms-powerpoint": {},
+
+	// Аудио
+	"audio/mp4":  {},
+	"audio/aac":  {},
+	"audio/mpeg": {},
+	"audio/ogg":  {},
+	"audio/webm": {},
+
+	// Изображения
+	"image/gif":     {},
+	"image/jpeg":    {},
+	"image/pjpeg":   {},
+	"image/png":     {},
+	"image/svg+xml": {},
+	"image/tiff":    {},
+	"image/webp":    {},
+
+	// Видео
+	"video/mpeg":      {},
+	"video/mp4":       {},
+	"video/ogg":       {},
+	"video/quicktime": {},
+	"video/webm":      {},
+	"video/x-ms-wmv":  {},
+	"video/x-flv":     {},
+}
+
 // isAllowedMimeType проверяет, поддерживается ли MIME-тип
 func isAllowedMimeType(mimeType string) bool {
-	allowedMimeTypes := map[string]struct{}{
-		// Документы
-		"application/ogg":               {},
-		"application/pdf":               {},
-		"application/zip":               {},
-		"application/gzip":              {},
-		"application/msword":            {},
-		"application/vnd.ms-excel":      {},
-		"application/vnd.ms-powerpoint": {},
-
-		// Аудио
-		"audio/mp4":  {},
-		"audio/aac":  {},
-		"audio/mpeg": {},
-		"audio/ogg":  {},
-		"audio/webm": {},
-
-		// Изображения
-		"image/gif":     {},
-		"image/jpeg":    {},
-		"image/pjpeg":   {},
-		"image/png":     {},
-		"image/svg+xml": {},
-		"image/tiff":    {},
-		"image/webp":    {},
-
-		// Видео
-		"video/mpeg":      {},
-		"video/mp4":       {},
-		"video/ogg":       {},
-		"video/quicktime": {},
-		"video/webm":      {},
-		"video/x-ms-wmv":  {},
-		"video/x-flv":     {},
-	}
-
 	_, ok := allowedMimeTypes[mimeType]
 	return ok
 }

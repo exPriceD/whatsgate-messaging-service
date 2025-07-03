@@ -1,14 +1,12 @@
 package errors
 
-import "errors"
+import (
+	"errors"
+)
 
-// Бизнес-ошибки кампаний
 var (
 	ErrCannotStartCampaign         = errors.New("campaign cannot be started")
 	ErrCannotCancelCampaign        = errors.New("campaign cannot be cancelled")
-	ErrCannotFinishCampaign        = errors.New("campaign cannot be finished")
-	ErrCannotFailCampaign          = errors.New("campaign cannot be failed")
-	ErrCannotCompleteCampaign      = errors.New("campaign cannot be completed")
 	ErrCannotModifyRunningCampaign = errors.New("cannot modify running campaign")
 	ErrCampaignNotPending          = errors.New("campaign is not in pending status")
 	ErrNoPhoneNumbers              = errors.New("no phone numbers provided")
@@ -17,7 +15,8 @@ var (
 	ErrInvalidMessagesPerHour      = errors.New("invalid messages per hour rate")
 	ErrCampaignNotFound            = errors.New("campaign not found")
 	ErrRepositoryError             = errors.New("repository error")
-	ErrCampaignAlreadyRunning      = errors.New("уже есть запущенная кампания")
-	ErrCampaignNameRequired        = errors.New("название кампании обязательно")
-	ErrCampaignMessageRequired     = errors.New("сообщение кампании обязательно")
+	ErrCampaignAlreadyRunning      = errors.New("campaign is already running")
+	ErrCampaignNameRequired        = errors.New("campaign name is required")
+	ErrCampaignMessageRequired     = errors.New("campaign message is required")
+	ErrCampaignCannotBeStarted     = errors.New("campaign cannot be started in its current state")
 )

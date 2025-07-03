@@ -20,7 +20,10 @@ func NewPhoneNumber(phone string) (*PhoneNumber, error) {
 }
 
 // Equal проверяет равенство двух номеров телефонов
-func (p *PhoneNumber) Equal(other PhoneNumber) bool {
+func (p *PhoneNumber) Equal(other *PhoneNumber) bool {
+	if other == nil {
+		return false
+	}
 	return p.value == other.value
 }
 
@@ -40,18 +43,9 @@ func normalizePhone(s string) string {
 	return re.ReplaceAllString(s, "")
 }
 
+var phoneRegexp = regexp.MustCompile(`^7\d{10}$`)
+
 // isValidPhone проверяет, что строка — валидный российский номер (11 цифр, начинается с 7)
 func isValidPhone(s string) bool {
-	if len(s) != 11 {
-		return false
-	}
-	if s[0] != '7' {
-		return false
-	}
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
+	return phoneRegexp.MatchString(s)
 }
