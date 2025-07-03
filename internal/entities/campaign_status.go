@@ -15,6 +15,7 @@ const (
 )
 
 // CampaignPhoneStatus представляет статус отправки сообщения на конкретный номер
+// Value Object — не изменяется извне, а пересоздается
 type CampaignPhoneStatus struct {
 	id          string
 	campaignID  string
@@ -33,6 +34,19 @@ func NewCampaignStatus(campaignID, phoneNumber string) *CampaignPhoneStatus {
 		phoneNumber: phoneNumber,
 		status:      CampaignStatusTypePending,
 		createdAt:   time.Now(),
+	}
+}
+
+// RestoreCampaignStatus восстанавливает статус из БД
+func RestoreCampaignStatus(id, campaignID, phoneNumber string, status CampaignStatusType, errorMsg string, sentAt *time.Time, createdAt time.Time) *CampaignPhoneStatus {
+	return &CampaignPhoneStatus{
+		id:          id,
+		campaignID:  campaignID,
+		phoneNumber: phoneNumber,
+		status:      status,
+		error:       errorMsg,
+		sentAt:      sentAt,
+		createdAt:   createdAt,
 	}
 }
 
@@ -76,19 +90,29 @@ func (cs *CampaignPhoneStatus) MarkAsSent() {
 	cs.status = CampaignStatusTypeSent
 	now := time.Now()
 	cs.sentAt = &now
-	cs.error = "" // Очищаем ошибку при успешной отправке
+	cs.error = ""
 }
 
 // MarkAsFailed помечает сообщение как неудачное
 func (cs *CampaignPhoneStatus) MarkAsFailed(errorMsg string) {
 	cs.status = CampaignStatusTypeFailed
 	cs.error = errorMsg
+	cs.sentAt = nil
 }
 
 // Cancel отменяет отправку сообщения
 func (cs *CampaignPhoneStatus) Cancel() {
 	if cs.status == CampaignStatusTypePending {
 		cs.status = CampaignStatusTypeCancelled
+	}
+}
+
+// Retry сбрасывает статус для повторной попытки отправки
+func (cs *CampaignPhoneStatus) Retry() {
+	if cs.CanBeRetried() {
+		cs.status = CampaignStatusTypePending
+		cs.error = ""
+		cs.sentAt = nil
 	}
 }
 
@@ -115,39 +139,4 @@ func (cs *CampaignPhoneStatus) IsCancelled() bool {
 // CanBeRetried проверяет, можно ли повторить отправку
 func (cs *CampaignPhoneStatus) CanBeRetried() bool {
 	return cs.status == CampaignStatusTypeFailed
-}
-
-// Retry сбрасывает статус для повторной попытки отправки
-func (cs *CampaignPhoneStatus) Retry() {
-	if cs.CanBeRetried() {
-		cs.status = CampaignStatusTypePending
-		cs.error = ""
-		cs.sentAt = nil
-	}
-}
-
-// SetID устанавливает идентификатор (для восстановления из БД)
-func (cs *CampaignPhoneStatus) SetID(id string) {
-	cs.id = id
-}
-
-// SetSentAt устанавливает время отправки (для восстановления из БД)
-func (cs *CampaignPhoneStatus) SetSentAt(sentAt *time.Time) {
-	cs.sentAt = sentAt
-}
-
-// SetCreatedAt устанавливает время создания (для восстановления из БД)
-func (cs *CampaignPhoneStatus) SetCreatedAt(createdAt time.Time) {
-	cs.createdAt = createdAt
-}
-
-// RestoreFromDB восстанавливает статус из данных БД
-func (cs *CampaignPhoneStatus) RestoreFromDB(id, campaignID, phoneNumber string, status CampaignStatusType, errorMsg string, sentAt *time.Time, createdAt time.Time) {
-	cs.id = id
-	cs.campaignID = campaignID
-	cs.phoneNumber = phoneNumber
-	cs.status = status
-	cs.error = errorMsg
-	cs.sentAt = sentAt
-	cs.createdAt = createdAt
 }

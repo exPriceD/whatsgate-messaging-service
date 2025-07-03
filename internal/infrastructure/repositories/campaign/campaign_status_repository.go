@@ -1,8 +1,11 @@
-package repositories
+package campaignRepository
 
 import (
 	"context"
+	"fmt"
 	"time"
+	"whatsapp-service/internal/infrastructure/repositories/campaign/converter"
+	"whatsapp-service/internal/infrastructure/repositories/campaign/models"
 
 	"whatsapp-service/internal/entities"
 	"whatsapp-service/internal/usecases/interfaces"
@@ -19,30 +22,20 @@ type PostgresCampaignStatusRepository struct {
 }
 
 // NewPostgresCampaignStatusRepository создает новый экземпляр PostgreSQL status repository
-func NewPostgresCampaignStatusRepository(pool *pgxpool.Pool) interfaces.CampaignStatusRepository {
+func NewPostgresCampaignStatusRepository(pool *pgxpool.Pool) *PostgresCampaignStatusRepository {
 	return &PostgresCampaignStatusRepository{pool: pool}
 }
 
 // Save сохраняет статус кампании в базе данных
 func (r *PostgresCampaignStatusRepository) Save(ctx context.Context, status *entities.CampaignPhoneStatus) error {
-	var sentAt *time.Time
-	if status.SentAt() != nil {
-		sentAt = status.SentAt()
-	}
-
+	model := converter.ToCampaignStatusModel(status)
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO bulk_campaign_statuses (
 			id, campaign_id, phone_number, status, error, sent_at
 		) VALUES ($1, $2, $3, $4, $5, $6)
 	`,
-		status.ID(),
-		status.CampaignID(),
-		status.PhoneNumber(),
-		string(status.Status()),
-		status.Error(),
-		sentAt,
+		model.ID, model.CampaignID, model.PhoneNumber, model.Status, model.Error, model.SentAt,
 	)
-
 	return err
 }
 
@@ -53,53 +46,38 @@ func (r *PostgresCampaignStatusRepository) GetByID(ctx context.Context, id strin
 		FROM bulk_campaign_statuses WHERE id = $1
 	`, id)
 
-	var dbID, campaignID, phoneNumber, statusStr, errorMsg string
-	var sentAt *time.Time
-
-	err := row.Scan(&dbID, &campaignID, &phoneNumber, &statusStr, &errorMsg, &sentAt)
+	var model models.CampaignStatusModel
+	err := row.Scan(&model.ID, &model.CampaignID, &model.PhoneNumber, &model.Status, &model.Error, &model.SentAt)
 	if err != nil {
 		return nil, err
 	}
-
-	status := entities.NewCampaignStatus(campaignID, phoneNumber)
-	status.SetID(dbID)
-
-	if sentAt != nil {
-		status.SetSentAt(sentAt)
-	}
-
-	// Восстанавливаем статус
-	switch entities.CampaignStatusType(statusStr) {
-	case entities.CampaignStatusTypeSent:
-		status.MarkAsSent()
-	case entities.CampaignStatusTypeFailed:
-		status.MarkAsFailed(errorMsg)
-	case entities.CampaignStatusTypeCancelled:
-		status.Cancel()
-	}
-
-	return status, nil
+	return converter.ToCampaignStatusEntity(&model), nil
 }
 
 // Update обновляет статус в базе данных
 func (r *PostgresCampaignStatusRepository) Update(ctx context.Context, status *entities.CampaignPhoneStatus) error {
-	var sentAt *time.Time
-	if status.SentAt() != nil {
-		sentAt = status.SentAt()
-	}
-
+	model := converter.ToCampaignStatusModel(status)
 	_, err := r.pool.Exec(ctx, `
 		UPDATE bulk_campaign_statuses SET
 			status = $2, error = $3, sent_at = $4
 		WHERE id = $1
 	`,
-		status.ID(),
-		string(status.Status()),
-		status.Error(),
-		sentAt,
+		model.ID, model.Status, model.Error, model.SentAt,
 	)
-
 	return err
+}
+
+// UpdateByPhoneNumber UpdateStatusByPhoneNumber обновляет статус для конкретного номера в рамках кампании.
+func (r *PostgresCampaignStatusRepository) UpdateByPhoneNumber(ctx context.Context, campaignID, phoneNumber string, newStatus entities.CampaignStatusType, errorMessage string) error {
+	query := `UPDATE bulk_campaign_statuses SET status = $1, error = $2, updated_at = NOW() WHERE campaign_id = $3 AND phone_number = $4`
+	ct, err := r.pool.Exec(ctx, query, newStatus, errorMessage, campaignID, phoneNumber)
+	if err != nil {
+		return fmt.Errorf("failed to execute update for campaign %s, phone %s: %w", campaignID, phoneNumber, err)
+	}
+	if ct.RowsAffected() == 0 {
+		return fmt.Errorf("no campaign_status found with campaign_id %s and phone %s to update", campaignID, phoneNumber)
+	}
+	return nil
 }
 
 // Delete удаляет статус по идентификатору
@@ -116,7 +94,6 @@ func (r *PostgresCampaignStatusRepository) ListByCampaignID(ctx context.Context,
 		WHERE campaign_id = $1
 		ORDER BY sent_at DESC NULLS LAST
 	`, campaignID)
-
 	if err != nil {
 		return nil, err
 	}
@@ -124,34 +101,13 @@ func (r *PostgresCampaignStatusRepository) ListByCampaignID(ctx context.Context,
 
 	var statuses []*entities.CampaignPhoneStatus
 	for rows.Next() {
-		var dbID, campaignID, phoneNumber, statusStr, errorMsg string
-		var sentAt *time.Time
-
-		err := rows.Scan(&dbID, &campaignID, &phoneNumber, &statusStr, &errorMsg, &sentAt)
+		var model models.CampaignStatusModel
+		err := rows.Scan(&model.ID, &model.CampaignID, &model.PhoneNumber, &model.Status, &model.Error, &model.SentAt)
 		if err != nil {
 			continue
 		}
-
-		status := entities.NewCampaignStatus(campaignID, phoneNumber)
-		status.SetID(dbID)
-
-		if sentAt != nil {
-			status.SetSentAt(sentAt)
-		}
-
-		// Восстанавливаем статус
-		switch entities.CampaignStatusType(statusStr) {
-		case entities.CampaignStatusTypeSent:
-			status.MarkAsSent()
-		case entities.CampaignStatusTypeFailed:
-			status.MarkAsFailed(errorMsg)
-		case entities.CampaignStatusTypeCancelled:
-			status.Cancel()
-		}
-
-		statuses = append(statuses, status)
+		statuses = append(statuses, converter.ToCampaignStatusEntity(&model))
 	}
-
 	return statuses, nil
 }
 
@@ -208,7 +164,6 @@ func (r *PostgresCampaignStatusRepository) GetSentNumbersByCampaignID(ctx contex
 		WHERE campaign_id = $1 AND status = $2
 		ORDER BY sent_at DESC
 	`, campaignID, string(entities.CampaignStatusTypeSent))
-
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +177,6 @@ func (r *PostgresCampaignStatusRepository) GetSentNumbersByCampaignID(ctx contex
 		}
 		phoneNumbers = append(phoneNumbers, phoneNumber)
 	}
-
 	return phoneNumbers, nil
 }
 
@@ -234,7 +188,6 @@ func (r *PostgresCampaignStatusRepository) GetFailedStatusesByCampaignID(ctx con
 		WHERE campaign_id = $1 AND status = $2
 		ORDER BY sent_at DESC NULLS LAST
 	`, campaignID, string(entities.CampaignStatusTypeFailed))
-
 	if err != nil {
 		return nil, err
 	}
@@ -242,25 +195,13 @@ func (r *PostgresCampaignStatusRepository) GetFailedStatusesByCampaignID(ctx con
 
 	var statuses []*entities.CampaignPhoneStatus
 	for rows.Next() {
-		var dbID, campaignID, phoneNumber, statusStr, errorMsg string
-		var sentAt *time.Time
-
-		err := rows.Scan(&dbID, &campaignID, &phoneNumber, &statusStr, &errorMsg, &sentAt)
+		var model models.CampaignStatusModel
+		err := rows.Scan(&model.ID, &model.CampaignID, &model.PhoneNumber, &model.Status, &model.Error, &model.SentAt)
 		if err != nil {
 			continue
 		}
-
-		status := entities.NewCampaignStatus(campaignID, phoneNumber)
-		status.SetID(dbID)
-		status.MarkAsFailed(errorMsg)
-
-		if sentAt != nil {
-			status.SetSentAt(sentAt)
-		}
-
-		statuses = append(statuses, status)
+		statuses = append(statuses, converter.ToCampaignStatusEntity(&model))
 	}
-
 	return statuses, nil
 }
 
@@ -275,10 +216,4 @@ func (r *PostgresCampaignStatusRepository) CountStatusesByCampaignID(ctx context
 	var count int
 	err := row.Scan(&count)
 	return count, err
-}
-
-// InitTable создает таблицы если они не существуют
-func (r *PostgresCampaignStatusRepository) InitTable(ctx context.Context) error {
-	// Таблицы уже созданы через миграции
-	return nil
 }
