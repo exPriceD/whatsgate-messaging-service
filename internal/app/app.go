@@ -3,11 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
-	"go.uber.org/zap"
 
 	"whatsapp-service/internal/adapters/converter"
 	"whatsapp-service/internal/adapters/presenters"
@@ -16,8 +12,8 @@ import (
 	"whatsapp-service/internal/delivery/http/handlers"
 	"whatsapp-service/internal/infrastructure/database/postgres"
 	"whatsapp-service/internal/infrastructure/dispatcher/messaging"
+	messagingPorts "whatsapp-service/internal/infrastructure/dispatcher/messaging/ports"
 	"whatsapp-service/internal/infrastructure/gateways/whatsapp/dynamic/whatsgate"
-	gtypes "whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate/types"
 	zaplogger "whatsapp-service/internal/infrastructure/logger/zap"
 	"whatsapp-service/internal/infrastructure/parsers/excel"
 	"whatsapp-service/internal/infrastructure/registry"
@@ -26,34 +22,66 @@ import (
 	"whatsapp-service/internal/infrastructure/services/ratelimiter"
 	"whatsapp-service/internal/shared/logger"
 	campaignInteractor "whatsapp-service/internal/usecases/campaigns/interactor"
+	campaignInterfaces "whatsapp-service/internal/usecases/campaigns/interfaces"
 	"whatsapp-service/internal/usecases/campaigns/ports"
 	settingsInteractor "whatsapp-service/internal/usecases/settings/interactor"
+	settingsInterfaces "whatsapp-service/internal/usecases/settings/interfaces"
+	settingsPorts "whatsapp-service/internal/usecases/settings/ports"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// Infrastructure содержит все инфраструктурные зависимости
+type Infrastructure struct {
+	Database           *pgxpool.Pool
+	Logger             logger.Logger
+	CampaignRepo       ports.CampaignRepository
+	CampaignStatusRepo ports.CampaignStatusRepository
+	SettingsRepo       settingsPorts.WhatsGateSettingsRepository
+	FileParser         ports.FileParser
+	MessageGateway     messagingPorts.MessageGateway
+	GlobalRateLimiter  messagingPorts.GlobalRateLimiter
+	Dispatcher         ports.Dispatcher
+	CampaignRegistry   ports.CampaignRegistry
+}
+
+// UseCases содержит все use case зависимости
+type UseCases struct {
+	Campaign campaignInterfaces.CampaignUseCase
+	Settings settingsInterfaces.SettingsUseCase
+}
+
+// Adapters содержит все адаптеры (конвертеры и презентеры)
+type Adapters struct {
+	CampaignConverter converter.CampaignConverter
+	SettingsConverter converter.SettingsConverter
+	CampaignPresenter presenters.CampaignPresenterInterface
+	SettingsPresenter presenters.SettingsPresenterInterface
+}
+
+// Handlers содержит все HTTP обработчики
+type Handlers struct {
+	Campaign *handlers.CampaignsHandler
+	Settings *handlers.SettingsHandler
+	Health   *handlers.HealthHandler
+}
 
 // App инкапсулирует все зависимости и умеет запускаться/останавливаться.
 type App struct {
-	cfg        *config.Config
-	logger     logger.Logger
-	db         *pgxpool.Pool
-	server     *http.HTTPServer
-	dispatcher ports.Dispatcher
+	cfg            *config.Config
+	infrastructure *Infrastructure
+	server         *http.HTTPServer
 }
 
-// New собирает приложение из конфигурации.
-func New(cfg *config.Config) (*App, error) {
-	// 1. Логгер
+// NewInfrastructure создает все инфраструктурные зависимости
+func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
+	// Логгер
 	sharedLogger, err := zaplogger.New(cfg.Logging)
 	if err != nil {
 		return nil, fmt.Errorf("init logger: %w", err)
 	}
 
-	// 2. Создаем отдельный zap.Logger для компонентов, которые требуют именно zap
-	zapLogger, err := zap.NewProduction()
-	if err != nil {
-		return nil, fmt.Errorf("init zap logger: %w", err)
-	}
-
-	// 3. БД
+	// БД
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	pool, err := postgres.NewPostgresPool(ctx, cfg.Database)
@@ -61,70 +89,123 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("init db: %w", err)
 	}
 
-	// 4. Репозитории
-	campaignRepo := campaignRepository.NewPostgresCampaignRepository(pool)
-	campaignStatusRepo := campaignRepository.NewPostgresCampaignStatusRepository(pool)
-	settingsRepo := settingsRepository.NewPostgresWhatsGateSettingsRepository(pool)
+	// Репозитории
+	var campaignRepo ports.CampaignRepository = campaignRepository.NewPostgresCampaignRepository(pool)
+	var campaignStatusRepo ports.CampaignStatusRepository = campaignRepository.NewPostgresCampaignStatusRepository(pool)
+	var settingsRepo settingsPorts.WhatsGateSettingsRepository = settingsRepository.NewPostgresWhatsGateSettingsRepository(pool)
 
-	// 5. Утилитарные сервисы
-	globalRateLimiter := ratelimiter.NewGlobalMemoryRateLimiter()
-	fileParser := excel.NewExcelParser()
-	messageGateway := whatsgate.NewSettingsAwareGateway(settingsRepo)
-	dispatcherSvc := messaging.NewDispatcher(messageGateway, globalRateLimiter, zapLogger)
-	campaignRegistry := registry.NewInMemoryCampaignRegistry()
+	// Утилитарные сервисы
+	var globalRateLimiter messagingPorts.GlobalRateLimiter = ratelimiter.NewGlobalMemoryRateLimiter()
+	var fileParser ports.FileParser = excel.NewExcelParser()
+	var messageGateway messagingPorts.MessageGateway = whatsgate.NewSettingsAwareGateway(settingsRepo)
+	var dispatcherSvc ports.Dispatcher = messaging.NewDispatcher(messageGateway, globalRateLimiter, sharedLogger)
+	var campaignRegistry ports.CampaignRegistry = registry.NewInMemoryCampaignRegistry()
 
-	// 6. Настройка WhatsGate
-	_ = initWhatsGateConfig(ctx, settingsRepo) // используем для инициализации
+	return &Infrastructure{
+		Database:           pool,
+		Logger:             sharedLogger,
+		CampaignRepo:       campaignRepo,
+		CampaignStatusRepo: campaignStatusRepo,
+		SettingsRepo:       settingsRepo,
+		FileParser:         fileParser,
+		MessageGateway:     messageGateway,
+		GlobalRateLimiter:  globalRateLimiter,
+		Dispatcher:         dispatcherSvc,
+		CampaignRegistry:   campaignRegistry,
+	}, nil
+}
 
-	// 7. Use Cases
-	campaignUseCase := campaignInteractor.NewCampaignInteractor(
-		campaignRepo,
-		campaignStatusRepo,
-		dispatcherSvc,
-		campaignRegistry,
-		fileParser,
-		sharedLogger,
+// NewUseCases создает все use case зависимости
+func NewUseCases(infra *Infrastructure) *UseCases {
+	// Use Cases
+	var campaignUseCase campaignInterfaces.CampaignUseCase = campaignInteractor.NewCampaignInteractor(
+		infra.CampaignRepo,
+		infra.CampaignStatusRepo,
+		infra.Dispatcher,
+		infra.CampaignRegistry,
+		infra.FileParser,
+		infra.Logger,
 	)
 
-	settingsUseCase := settingsInteractor.NewService(settingsRepo)
+	var settingsUseCase settingsInterfaces.SettingsUseCase = settingsInteractor.NewService(infra.SettingsRepo)
 
-	// 8. Конвертеры
-	campaignConverter := converter.NewCampaignConverter()
-	settingsConverter := converter.NewSettingsConverter()
+	return &UseCases{
+		Campaign: campaignUseCase,
+		Settings: settingsUseCase,
+	}
+}
 
-	// 9. Presenters
-	campaignPresenter := presenters.NewCampaignPresenter(campaignConverter)
-	settingsPresenter := presenters.NewSettingsPresenter(settingsConverter)
+// NewAdapters создает все адаптеры (конвертеры и презентеры)
+func NewAdapters() *Adapters {
+	// Конвертеры
+	var campaignConverter converter.CampaignConverter = converter.NewCampaignConverter()
+	var settingsConverter converter.SettingsConverter = converter.NewSettingsConverter()
 
-	// 10. Handlers
+	// Presenters
+	var campaignPresenter presenters.CampaignPresenterInterface = presenters.NewCampaignPresenter(campaignConverter)
+	var settingsPresenter presenters.SettingsPresenterInterface = presenters.NewSettingsPresenter(settingsConverter)
+
+	return &Adapters{
+		CampaignConverter: campaignConverter,
+		SettingsConverter: settingsConverter,
+		CampaignPresenter: campaignPresenter,
+		SettingsPresenter: settingsPresenter,
+	}
+}
+
+// NewHandlers создает все HTTP обработчики
+func NewHandlers(useCases *UseCases, adapters *Adapters, infra *Infrastructure) *Handlers {
+	// Handlers
 	campaignHandler := handlers.NewCampaignsHandler(
-		campaignUseCase,
-		campaignPresenter,
-		campaignConverter,
+		useCases.Campaign,
+		adapters.CampaignPresenter,
+		adapters.CampaignConverter,
 	)
 
 	settingsHandler := handlers.NewSettingsHandler(
-		settingsUseCase,
-		settingsPresenter,
-		settingsConverter,
+		useCases.Settings,
+		adapters.SettingsPresenter,
+		adapters.SettingsConverter,
 	)
 
-	// 11. Health Handler
+	// Health Handler
 	healthHandler := handlers.NewHealthHandler(
-		sharedLogger,
-		campaignRepo,
-		dispatcherSvc,
+		infra.Logger,
+		infra.CampaignRepo,
+		infra.Dispatcher,
 	)
 
-	// 12. HTTP Server
-	httpSrv := createHTTPServer(cfg.HTTP.Port, campaignHandler, settingsHandler, healthHandler, sharedLogger)
+	return &Handlers{
+		Campaign: campaignHandler,
+		Settings: settingsHandler,
+		Health:   healthHandler,
+	}
+}
+
+// New собирает приложение из конфигурации.
+func New(cfg *config.Config) (*App, error) {
+	// Инфраструктура
+	infra, err := NewInfrastructure(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize infrastructure: %w", err)
+	}
+
+	// Use cases
+	useCases := NewUseCases(infra)
+
+	// Адаптеры
+	adapters := NewAdapters()
+
+	// Handlers
+	handlerSet := NewHandlers(useCases, adapters, infra)
+
+	// HTTP Server
+	httpSrv := createHTTPServer(cfg.HTTP.Port, handlerSet.Campaign, handlerSet.Settings, handlerSet.Health, infra.Logger)
 
 	return &App{
-		cfg:        cfg,
-		logger:     sharedLogger,
-		db:         pool,
-		server:     httpSrv,
-		dispatcher: dispatcherSvc,
+		cfg:            cfg,
+		infrastructure: infra,
+		server:         httpSrv,
 	}, nil
 }
 
@@ -147,65 +228,30 @@ func createHTTPServer(
 
 // Start запускает HTTP сервер и фоновые процессы.
 func (a *App) Start(ctx context.Context) error {
-	a.dispatcher.Start(ctx)
-	a.logger.Info("Dispatcher started")
+	a.infrastructure.Dispatcher.Start(ctx)
+	a.infrastructure.Logger.Info("Dispatcher started")
 
-	a.logger.Info("HTTP server starting", "port", a.cfg.HTTP.Port)
+	a.infrastructure.Logger.Info("HTTP server starting", "port", a.cfg.HTTP.Port)
 	return a.server.Start()
 }
 
 // Stop останавливает HTTP сервер и закрывает ресурсы.
 func (a *App) Stop(ctx context.Context) error {
-	a.logger.Info("Stopping application...")
+	a.infrastructure.Logger.Info("Stopping application...")
 
-	if err := a.dispatcher.Stop(ctx); err != nil {
-		a.logger.Error("failed to stop dispatcher gracefully", "error", err)
-		// Не возвращаем ошибку, чтобы продолжить остановку
+	if err := a.infrastructure.Dispatcher.Stop(ctx); err != nil {
+		a.infrastructure.Logger.Error("failed to stop dispatcher gracefully", "error", err)
 	} else {
-		a.logger.Info("Dispatcher stopped")
+		a.infrastructure.Logger.Info("Dispatcher stopped")
 	}
 
 	if err := a.server.Stop(ctx); err != nil {
 		return err
 	}
-	a.logger.Info("HTTP server stopped")
+	a.infrastructure.Logger.Info("HTTP server stopped")
 
-	postgres.Close(a.db)
-	a.logger.Info("Database pool closed")
+	postgres.Close(a.infrastructure.Database)
+	a.infrastructure.Logger.Info("Database pool closed")
 
 	return nil
-}
-
-// initWhatsGateConfig инициализирует конфигурацию WhatsGate
-func initWhatsGateConfig(ctx context.Context, settingsRepo *settingsRepository.PostgresWhatsGateSettingsRepository) *gtypes.WhatsGateConfig {
-	// Получаем сохраненные настройки, если есть
-	stored, _ := settingsRepo.Get(ctx) // игнорируем ошибку -> считаем как отсутствующие
-
-	config := &gtypes.WhatsGateConfig{
-		Timeout:       30 * time.Second,
-		RetryAttempts: 2,
-		RetryDelay:    1 * time.Second,
-		MaxFileSize:   gtypes.MaxFileSizeBytes,
-	}
-
-	if stored != nil {
-		config.BaseURL = stored.BaseURL()
-		config.APIKey = stored.APIKey()
-		config.WhatsappID = stored.WhatsappID()
-	} else {
-		// Fallback к переменным окружения
-		config.BaseURL = getenv("WHATSGATE_URL", "http://localhost:3000")
-		config.APIKey = getenv("WHATSGATE_API_KEY", "demo-key")
-		config.WhatsappID = getenv("WHATSAPP_ID", "demo-whatsapp")
-	}
-
-	return config
-}
-
-// getenv возвращает значение переменной окружения или значение по умолчанию
-func getenv(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
 }
