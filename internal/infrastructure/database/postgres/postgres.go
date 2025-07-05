@@ -1,17 +1,16 @@
-package database
+package postgres
 
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"time"
-
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/tracelog"
+	"go.uber.org/zap"
+	"net/url"
+	"time"
 
 	"whatsapp-service/internal/config"
-	"whatsapp-service/internal/infrastructure/logger"
 )
 
 // NewPostgresPool создает пул соединений pgxpool.Pool согласно настройкам из конфигурации.
@@ -43,7 +42,7 @@ func NewPostgresPool(ctx context.Context, cfg config.DatabaseConfig) (*pgxpool.P
 	}
 
 	poolCfg.ConnConfig.Tracer = &tracelog.TraceLog{
-		Logger:   newZapPGXLogger(logger.L(), 500*time.Millisecond),
+		Logger:   newZapPGXLogger(zap.L(), 500*time.Millisecond),
 		LogLevel: tracelog.LogLevelInfo,
 	}
 
