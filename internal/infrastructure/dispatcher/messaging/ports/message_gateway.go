@@ -1,9 +1,9 @@
-package interfaces
+package ports
 
 import (
 	"context"
 	"io"
-	"whatsapp-service/internal/entities"
+	"whatsapp-service/internal/entities/campaign"
 	"whatsapp-service/internal/usecases/dto"
 )
 
@@ -13,7 +13,7 @@ type MessageGateway interface {
 	SendTextMessage(ctx context.Context, phoneNumber, message string, async bool) (*dto.MessageSendResult, error)
 
 	// SendMediaMessage отправляет медиа-сообщение
-	SendMediaMessage(ctx context.Context, phoneNumber string, messageType entities.MessageType, message string, filename string, mediaData io.Reader, mimeType string, async bool) (*dto.MessageSendResult, error)
+	SendMediaMessage(ctx context.Context, phoneNumber string, messageType campaign.MessageType, message string, filename string, mediaData io.Reader, mimeType string, async bool) (*dto.MessageSendResult, error)
 
 	// TestConnection проверка соединения
 	TestConnection(ctx context.Context) (*dto.ConnectionTestResult, error)
