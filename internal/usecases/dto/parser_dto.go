@@ -1,10 +1,12 @@
 package dto
 
-import "whatsapp-service/internal/entities"
+import (
+	"whatsapp-service/internal/entities/campaign"
+)
 
 // ParseResult детальный результат парсинга файла
 type ParseResult struct {
-	ValidPhones     []entities.PhoneNumber // Валидные уникальные номера
+	ValidPhones     []campaign.PhoneNumber // Валидные уникальные номера
 	InvalidPhones   []InvalidPhone         // Невалидные номера с деталями
 	DuplicatePhones []DuplicatePhone       // Дубликаты с информацией
 	Statistics      ParseStatistics        // Статистика парсинга
@@ -20,7 +22,7 @@ type InvalidPhone struct {
 
 // DuplicatePhone информация о дубликате
 type DuplicatePhone struct {
-	PhoneNumber entities.PhoneNumber // Номер телефона
+	PhoneNumber campaign.PhoneNumber // Номер телефона
 	RawValue    string               // Исходное значение
 	Row         int                  // Номер строки в файле
 	FirstSeenAt int                  // Строка где впервые встречен
