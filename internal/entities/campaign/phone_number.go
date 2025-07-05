@@ -1,8 +1,7 @@
-package entities
+package campaign
 
 import (
 	"regexp"
-	entityErrors "whatsapp-service/internal/entities/errors"
 )
 
 // PhoneNumber представляет номер телефона как value object
@@ -14,7 +13,7 @@ type PhoneNumber struct {
 func NewPhoneNumber(phone string) (*PhoneNumber, error) {
 	normalized := normalizePhone(phone)
 	if !isValidPhone(normalized) {
-		return nil, entityErrors.ErrInvalidPhoneNumber
+		return nil, ErrInvalidPhoneNumber
 	}
 	return &PhoneNumber{value: normalized}, nil
 }

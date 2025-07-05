@@ -1,9 +1,9 @@
-package entities
+package campaign
 
 import (
-	"github.com/google/uuid"
 	"time"
-	"whatsapp-service/internal/entities/errors"
+
+	"github.com/google/uuid"
 )
 
 // generateID создает новый UUID для сущности
@@ -134,15 +134,15 @@ type Campaign struct {
 	delivery        *DeliveryStatus
 }
 
-func NewCampaign(name, message, initiator string) *Campaign {
+func NewCampaign(name, message string, messagesPerHour int) *Campaign {
 	return &Campaign{
 		id:              generateID(),
 		name:            name,
 		message:         message,
 		status:          CampaignStatusPending,
-		messagesPerHour: 20,
+		messagesPerHour: messagesPerHour,
 		createdAt:       time.Now(),
-		initiator:       initiator,
+		initiator:       "",
 		audience:        &TargetAudience{},
 		metrics:         &CampaignMetrics{},
 		delivery:        &DeliveryStatus{},
@@ -189,7 +189,7 @@ func (c *Campaign) Delivery() *DeliveryStatus { return c.delivery }
 
 func (c *Campaign) AddPhoneNumbers(numbers []*PhoneNumber) error {
 	if len(numbers) == 0 {
-		return errors.ErrNoPhoneNumbers
+		return ErrNoPhoneNumbers
 	}
 	c.audience.Primary = append(c.audience.Primary, numbers...)
 	return nil
@@ -201,6 +201,16 @@ func (c *Campaign) AddAdditionalNumbers(numbers []*PhoneNumber) {
 
 func (c *Campaign) AddExcludedNumbers(numbers []*PhoneNumber) {
 	c.audience.Excluded = append(c.audience.Excluded, numbers...)
+}
+
+// SetInitiator устанавливает инициатора кампании
+func (c *Campaign) SetInitiator(initiator string) {
+	c.initiator = initiator
+}
+
+// SetMedia устанавливает медиа-файл кампании
+func (c *Campaign) SetMedia(media *Media) {
+	c.media = media
 }
 
 func (c *Campaign) CanBeCancelled() bool {
@@ -217,7 +227,7 @@ func (c *Campaign) CanBeModified() bool {
 
 func (c *Campaign) Start() error {
 	if !c.CanBeStarted() {
-		return errors.ErrCampaignNotPending
+		return ErrCampaignNotPending
 	}
 	c.status = CampaignStatusStarted
 	for _, phone := range c.audience.AllTargets() {
@@ -228,7 +238,7 @@ func (c *Campaign) Start() error {
 
 func (c *Campaign) Cancel() error {
 	if !c.CanBeCancelled() {
-		return errors.ErrCannotCancelCampaign
+		return ErrCannotCancelCampaign
 	}
 	c.status = CampaignStatusCancelled
 	c.delivery.CancelPending()
