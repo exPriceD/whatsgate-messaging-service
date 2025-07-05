@@ -79,10 +79,8 @@ func (h *HealthHandler) Check(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	// Проверяем компоненты
 	components := h.checkComponents(ctx)
 
-	// Определяем общий статус
 	overallStatus := h.calculateOverallStatus(components)
 
 	// Формируем ответ
@@ -95,7 +93,6 @@ func (h *HealthHandler) Check(w http.ResponseWriter, r *http.Request) {
 		Components: components,
 	}
 
-	// Возвращаем соответствующий HTTP статус
 	statusCode := http.StatusOK
 	if overallStatus == StatusUnhealthy {
 		statusCode = http.StatusServiceUnavailable
@@ -124,7 +121,6 @@ func (h *HealthHandler) checkComponents(ctx context.Context) map[string]Componen
 func (h *HealthHandler) checkDatabase(ctx context.Context) ComponentHealth {
 	checkTime := time.Now()
 
-	// Простая проверка - пытаемся выполнить легкий запрос
 	if h.campaignRepo == nil {
 		return ComponentHealth{
 			Status:    StatusUnhealthy,
@@ -155,7 +151,6 @@ func (h *HealthHandler) checkDispatcher(ctx context.Context) ComponentHealth {
 		}
 	}
 
-	// Dispatcher всегда считается здоровым если инициализирован
 	return ComponentHealth{
 		Status:    StatusHealthy,
 		Message:   "Dispatcher is running",
@@ -167,7 +162,6 @@ func (h *HealthHandler) checkDispatcher(ctx context.Context) ComponentHealth {
 func (h *HealthHandler) checkSystem(ctx context.Context) ComponentHealth {
 	checkTime := time.Now()
 
-	// Простая проверка - если мы дошли до этого момента, система работает
 	uptime := time.Since(h.startTime)
 
 	return ComponentHealth{
@@ -233,11 +227,9 @@ func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
-	// Проверяем критически важные компоненты
 	components := make(map[string]ComponentHealth)
 	components["database"] = h.checkDatabase(ctx)
 
-	// Для readiness проверяем только критические компоненты
 	overallStatus := h.calculateOverallStatus(components)
 
 	if overallStatus == StatusUnhealthy {
@@ -257,7 +249,6 @@ func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 func (h *HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debug("Liveness check requested", "remote_addr", r.RemoteAddr)
 
-	// Liveness - простая проверка что сервис отвечает
 	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"status":    "alive",
 		"timestamp": time.Now(),

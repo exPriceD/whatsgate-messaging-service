@@ -11,6 +11,7 @@ import (
 	"whatsapp-service/internal/adapters/converter"
 	httpDTO "whatsapp-service/internal/adapters/dto/campaign"
 	"whatsapp-service/internal/adapters/presenters"
+	"whatsapp-service/internal/shared/logger"
 	"whatsapp-service/internal/usecases/campaigns/interfaces"
 
 	"github.com/go-chi/chi/v5"
@@ -21,6 +22,7 @@ type CampaignsHandler struct {
 	campaignUseCase interfaces.CampaignUseCase
 	presenter       presenters.CampaignPresenterInterface
 	converter       converter.CampaignConverter
+	logger          logger.Logger
 }
 
 // NewCampaignsHandler создает новый обработчик кампаний
@@ -28,11 +30,13 @@ func NewCampaignsHandler(
 	campaignUseCase interfaces.CampaignUseCase,
 	presenter presenters.CampaignPresenterInterface,
 	converter converter.CampaignConverter,
+	logger logger.Logger,
 ) *CampaignsHandler {
 	return &CampaignsHandler{
 		campaignUseCase: campaignUseCase,
 		presenter:       presenter,
 		converter:       converter,
+		logger:          logger,
 	}
 }
 
@@ -118,7 +122,20 @@ func (h *CampaignsHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 // GetByID получает кампанию по ID
 func (h *CampaignsHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	campaignID := chi.URLParam(r, "id")
+
+	h.logger.Info("get campaign by ID request started",
+		"campaign_id", campaignID,
+		"method", r.Method,
+		"path", r.URL.Path,
+		"user_agent", r.UserAgent(),
+		"remote_addr", r.RemoteAddr,
+	)
+
 	if err := h.validateCampaignID(campaignID); err != nil {
+		h.logger.Warn("get campaign by ID validation failed",
+			"campaign_id", campaignID,
+			"error", err.Error(),
+		)
 		h.presenter.PresentValidationError(w, err)
 		return
 	}
@@ -127,28 +144,73 @@ func (h *CampaignsHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	ucResp, err := h.campaignUseCase.GetByID(r.Context(), ucReq)
 	if err != nil {
+		h.logger.Error("get campaign by ID usecase failed",
+			"campaign_id", campaignID,
+			"error", err.Error(),
+		)
 		h.presenter.PresentUseCaseError(w, err)
 		return
 	}
+
+	h.logger.Info("get campaign by ID request completed successfully",
+		"campaign_id", campaignID,
+		"campaign_name", ucResp.Name,
+		"campaign_status", ucResp.Status,
+		"total_count", ucResp.TotalCount,
+		"processed_count", ucResp.ProcessedCount,
+		"error_count", ucResp.ErrorCount,
+	)
 
 	h.presenter.PresentGetCampaignByIDSuccess(w, ucResp)
 }
 
 // List получает список кампаний с пагинацией и фильтрацией
 func (h *CampaignsHandler) List(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("list campaigns request started",
+		"method", r.Method,
+		"path", r.URL.Path,
+		"query_params", r.URL.RawQuery,
+		"user_agent", r.UserAgent(),
+		"remote_addr", r.RemoteAddr,
+	)
+
 	limit, offset, status, err := h.parseListParams(r)
 	if err != nil {
+		h.logger.Warn("list campaigns validation failed",
+			"error", err.Error(),
+			"query_params", r.URL.RawQuery,
+		)
 		h.presenter.PresentValidationError(w, err)
 		return
 	}
+
+	h.logger.Debug("list campaigns parsed parameters",
+		"limit", limit,
+		"offset", offset,
+		"status", status,
+	)
 
 	ucReq := h.converter.ToListCampaignsRequest(limit, offset, status)
 
 	ucResp, err := h.campaignUseCase.List(r.Context(), ucReq)
 	if err != nil {
+		h.logger.Error("list campaigns usecase failed",
+			"limit", limit,
+			"offset", offset,
+			"status", status,
+			"error", err.Error(),
+		)
 		h.presenter.PresentUseCaseError(w, err)
 		return
 	}
+
+	h.logger.Info("list campaigns request completed successfully",
+		"limit", limit,
+		"offset", offset,
+		"status", status,
+		"total_campaigns", ucResp.Total,
+		"returned_campaigns", len(ucResp.Campaigns),
+	)
 
 	h.presenter.PresentListCampaignsSuccess(w, ucResp)
 }

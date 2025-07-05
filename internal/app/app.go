@@ -127,7 +127,10 @@ func NewUseCases(infra *Infrastructure) *UseCases {
 		infra.Logger,
 	)
 
-	var settingsUseCase settingsInterfaces.SettingsUseCase = settingsInteractor.NewService(infra.SettingsRepo)
+	var settingsUseCase settingsInterfaces.SettingsUseCase = settingsInteractor.NewService(
+		infra.SettingsRepo,
+		infra.Logger,
+	)
 
 	return &UseCases{
 		Campaign: campaignUseCase,
@@ -160,12 +163,14 @@ func NewHandlers(useCases *UseCases, adapters *Adapters, infra *Infrastructure) 
 		useCases.Campaign,
 		adapters.CampaignPresenter,
 		adapters.CampaignConverter,
+		infra.Logger,
 	)
 
 	settingsHandler := handlers.NewSettingsHandler(
 		useCases.Settings,
 		adapters.SettingsPresenter,
 		adapters.SettingsConverter,
+		infra.Logger,
 	)
 
 	// Health Handler

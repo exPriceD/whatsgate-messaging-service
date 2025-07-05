@@ -7,6 +7,7 @@ import (
 	"whatsapp-service/internal/adapters/converter"
 	httpDTO "whatsapp-service/internal/adapters/dto/settings"
 	"whatsapp-service/internal/adapters/presenters"
+	"whatsapp-service/internal/shared/logger"
 	"whatsapp-service/internal/usecases/settings/interfaces"
 )
 
@@ -15,6 +16,7 @@ type SettingsHandler struct {
 	settingsUseCase interfaces.SettingsUseCase
 	presenter       presenters.SettingsPresenterInterface
 	converter       converter.SettingsConverter
+	logger          logger.Logger
 }
 
 // NewSettingsHandler создает новый обработчик настроек
@@ -22,22 +24,40 @@ func NewSettingsHandler(
 	settingsUseCase interfaces.SettingsUseCase,
 	presenter presenters.SettingsPresenterInterface,
 	converter converter.SettingsConverter,
+	logger logger.Logger,
 ) *SettingsHandler {
 	return &SettingsHandler{
 		settingsUseCase: settingsUseCase,
 		presenter:       presenter,
 		converter:       converter,
+		logger:          logger,
 	}
 }
 
 // Get получает текущие настройки
 func (h *SettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("get settings request started",
+		"method", r.Method,
+		"path", r.URL.Path,
+		"user_agent", r.UserAgent(),
+		"remote_addr", r.RemoteAddr,
+	)
+
 	// 1. Вызов UseCase
 	ucResponse, err := h.settingsUseCase.Get(r.Context())
 	if err != nil {
+		h.logger.Error("get settings usecase failed",
+			"error", err.Error(),
+		)
 		h.presenter.PresentError(w, http.StatusInternalServerError, "Failed to fetch settings")
 		return
 	}
+
+	h.logger.Info("get settings request completed successfully",
+		"whatsapp_id", ucResponse.WhatsappID,
+		"base_url", ucResponse.BaseURL,
+		"has_api_key", ucResponse.APIKey != "",
+	)
 
 	// 2. Представление ответа
 	h.presenter.PresentSettings(w, ucResponse)
@@ -45,43 +65,78 @@ func (h *SettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // Update обновляет настройки
 func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
-	// 1. Парсинг HTTP запроса
+	h.logger.Info("update settings request started",
+		"method", r.Method,
+		"path", r.URL.Path,
+		"user_agent", r.UserAgent(),
+		"remote_addr", r.RemoteAddr,
+	)
+
 	httpReq, err := h.parseUpdateRequest(r)
 	if err != nil {
+		h.logger.Warn("update settings parsing failed",
+			"error", err.Error(),
+		)
 		h.presenter.PresentValidationError(w, err)
 		return
 	}
 
-	// 2. Валидация HTTP запроса
+	h.logger.Debug("update settings request parsed",
+		"whatsapp_id", httpReq.WhatsappID,
+		"base_url", httpReq.BaseURL,
+		"has_api_key", httpReq.APIKey != "",
+	)
+
 	if err := h.validateUpdateRequest(httpReq); err != nil {
+		h.logger.Warn("update settings validation failed",
+			"whatsapp_id", httpReq.WhatsappID,
+			"error", err.Error(),
+		)
 		h.presenter.PresentValidationError(w, err)
 		return
 	}
 
-	// 3. Конвертация HTTP -> UseCase
 	ucReq := h.converter.HTTPRequestToUseCaseDTO(httpReq)
 
-	// 4. Вызов UseCase
 	ucResponse, err := h.settingsUseCase.Update(r.Context(), ucReq)
 	if err != nil {
+		h.logger.Error("update settings usecase failed",
+			"whatsapp_id", httpReq.WhatsappID,
+			"error", err.Error(),
+		)
 		h.presenter.PresentError(w, http.StatusInternalServerError, "Failed to update settings")
 		return
 	}
 
-	// 5. Представление ответа
+	h.logger.Info("update settings request completed successfully",
+		"whatsapp_id", ucResponse.WhatsappID,
+		"base_url", ucResponse.BaseURL,
+		"updated_at", ucResponse.UpdatedAt,
+	)
+
 	h.presenter.PresentUpdateSuccess(w, ucResponse)
 }
 
 // Reset сбрасывает настройки к значениям по умолчанию
 func (h *SettingsHandler) Reset(w http.ResponseWriter, r *http.Request) {
-	// 1. Вызов UseCase
+	h.logger.Info("reset settings request started",
+		"method", r.Method,
+		"path", r.URL.Path,
+		"user_agent", r.UserAgent(),
+		"remote_addr", r.RemoteAddr,
+	)
+
 	err := h.settingsUseCase.Reset(r.Context())
 	if err != nil {
+		h.logger.Error("reset settings usecase failed",
+			"error", err.Error(),
+		)
 		h.presenter.PresentError(w, http.StatusInternalServerError, "Failed to reset settings")
 		return
 	}
 
-	// 2. Представление ответа
+	h.logger.Info("reset settings request completed successfully")
+
 	h.presenter.PresentResetSuccess(w)
 }
 
@@ -96,7 +151,6 @@ func (h *SettingsHandler) parseUpdateRequest(r *http.Request) (httpDTO.UpdateSet
 
 // validateUpdateRequest валидирует запрос на обновление настроек
 func (h *SettingsHandler) validateUpdateRequest(req httpDTO.UpdateSettingsRequest) error {
-	// Валидация WhatsApp ID
 	if strings.TrimSpace(req.WhatsappID) == "" {
 		return NewSettingsValidationError("whatsapp_id", "WhatsApp ID is required")
 	}
@@ -105,7 +159,6 @@ func (h *SettingsHandler) validateUpdateRequest(req httpDTO.UpdateSettingsReques
 		return NewSettingsValidationError("whatsapp_id", "WhatsApp ID must be less than 50 characters")
 	}
 
-	// Валидация API Key
 	if strings.TrimSpace(req.APIKey) == "" {
 		return NewSettingsValidationError("api_key", "API key is required")
 	}
@@ -114,7 +167,6 @@ func (h *SettingsHandler) validateUpdateRequest(req httpDTO.UpdateSettingsReques
 		return NewSettingsValidationError("api_key", "API key must be less than 200 characters")
 	}
 
-	// Валидация Base URL
 	if strings.TrimSpace(req.BaseURL) == "" {
 		return NewSettingsValidationError("base_url", "Base URL is required")
 	}
