@@ -2,18 +2,16 @@ package campaignRepository
 
 import (
 	"context"
+	"whatsapp-service/internal/entities/campaign"
 	"whatsapp-service/internal/infrastructure/repositories/campaign/converter"
 	"whatsapp-service/internal/infrastructure/repositories/campaign/models"
-
-	"whatsapp-service/internal/entities"
-	"whatsapp-service/internal/entities/errors"
-	"whatsapp-service/internal/usecases/interfaces"
+	"whatsapp-service/internal/usecases/campaigns/ports"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Ensure implementation
-var _ interfaces.CampaignRepository = (*PostgresCampaignRepository)(nil)
+var _ ports.CampaignRepository = (*PostgresCampaignRepository)(nil)
 
 // PostgresCampaignRepository реализует CampaignRepository для PostgreSQL
 type PostgresCampaignRepository struct {
@@ -26,8 +24,8 @@ func NewPostgresCampaignRepository(pool *pgxpool.Pool) *PostgresCampaignReposito
 }
 
 // Save сохраняет кампанию в базе данных
-func (r *PostgresCampaignRepository) Save(ctx context.Context, campaign *entities.Campaign) error {
-	model := converter.ToCampaignModel(campaign)
+func (r *PostgresCampaignRepository) Save(ctx context.Context, campaign *campaign.Campaign) error {
+	model := converter.MapCampaignEntityToModel(campaign)
 
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO bulk_campaigns (
@@ -45,7 +43,7 @@ func (r *PostgresCampaignRepository) Save(ctx context.Context, campaign *entitie
 }
 
 // GetByID получает кампанию по идентификатору
-func (r *PostgresCampaignRepository) GetByID(ctx context.Context, id string) (*entities.Campaign, error) {
+func (r *PostgresCampaignRepository) GetByID(ctx context.Context, id string) (*campaign.Campaign, error) {
 	row := r.pool.QueryRow(ctx, `
 		SELECT id, name, message, total, status, media_filename, 
 		       media_mime, media_type, messages_per_hour, error_count, 
@@ -61,15 +59,15 @@ func (r *PostgresCampaignRepository) GetByID(ctx context.Context, id string) (*e
 		&model.MessagesPerHour, &model.ErrorCount, &model.Initiator, &model.CreatedAt,
 	)
 	if err != nil {
-		return nil, errors.ErrCampaignNotFound
+		return nil, campaign.ErrCampaignNotFound
 	}
 
-	return converter.ToCampaignEntity(model), nil
+	return converter.MapCampaignModelToEntity(model), nil
 }
 
 // Update обновляет кампанию в базе данных
-func (r *PostgresCampaignRepository) Update(ctx context.Context, campaign *entities.Campaign) error {
-	model := converter.ToCampaignModel(campaign)
+func (r *PostgresCampaignRepository) Update(ctx context.Context, campaign *campaign.Campaign) error {
+	model := converter.MapCampaignEntityToModel(campaign)
 
 	_, err := r.pool.Exec(ctx, `
 		UPDATE bulk_campaigns SET
@@ -93,7 +91,7 @@ func (r *PostgresCampaignRepository) Delete(ctx context.Context, id string) erro
 }
 
 // List возвращает список кампаний с пагинацией
-func (r *PostgresCampaignRepository) List(ctx context.Context, limit, offset int) ([]*entities.Campaign, error) {
+func (r *PostgresCampaignRepository) List(ctx context.Context, limit, offset int) ([]*campaign.Campaign, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, name, message, total, status, media_filename, 
 		       media_mime, media_type, messages_per_hour, error_count, 
@@ -108,7 +106,7 @@ func (r *PostgresCampaignRepository) List(ctx context.Context, limit, offset int
 	}
 	defer rows.Close()
 
-	var campaigns []*entities.Campaign
+	var campaigns []*campaign.Campaign
 	for rows.Next() {
 		var model models.CampaignModel
 		err := rows.Scan(
@@ -119,14 +117,14 @@ func (r *PostgresCampaignRepository) List(ctx context.Context, limit, offset int
 		if err != nil {
 			continue
 		}
-		campaigns = append(campaigns, converter.ToCampaignEntity(model))
+		campaigns = append(campaigns, converter.MapCampaignModelToEntity(model))
 	}
 
 	return campaigns, nil
 }
 
 // UpdateStatus обновляет статус кампании
-func (r *PostgresCampaignRepository) UpdateStatus(ctx context.Context, id string, status entities.CampaignStatus) error {
+func (r *PostgresCampaignRepository) UpdateStatus(ctx context.Context, id string, status campaign.CampaignStatus) error {
 	_, err := r.pool.Exec(ctx,
 		"UPDATE bulk_campaigns SET status = $2 WHERE id = $1", id, string(status))
 	return err
@@ -147,13 +145,13 @@ func (r *PostgresCampaignRepository) IncrementErrorCount(ctx context.Context, id
 }
 
 // GetActiveCampaigns возвращает активные кампании
-func (r *PostgresCampaignRepository) GetActiveCampaigns(ctx context.Context) ([]*entities.Campaign, error) {
+func (r *PostgresCampaignRepository) GetActiveCampaigns(ctx context.Context) ([]*campaign.Campaign, error) {
 	return r.getCampaignsByStatus(ctx, []string{"pending", "started"})
 }
 
 // Helper methods
 
-func (r *PostgresCampaignRepository) getCampaignsByStatus(ctx context.Context, statuses []string) ([]*entities.Campaign, error) {
+func (r *PostgresCampaignRepository) getCampaignsByStatus(ctx context.Context, statuses []string) ([]*campaign.Campaign, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, name, message, total, status, media_filename, 
 		       media_mime, media_type, messages_per_hour, error_count, 
@@ -168,7 +166,7 @@ func (r *PostgresCampaignRepository) getCampaignsByStatus(ctx context.Context, s
 	}
 	defer rows.Close()
 
-	var campaigns []*entities.Campaign
+	var campaigns []*campaign.Campaign
 	for rows.Next() {
 		var model models.CampaignModel
 		err := rows.Scan(
@@ -179,8 +177,56 @@ func (r *PostgresCampaignRepository) getCampaignsByStatus(ctx context.Context, s
 		if err != nil {
 			continue
 		}
-		campaigns = append(campaigns, converter.ToCampaignEntity(model))
+		campaigns = append(campaigns, converter.MapCampaignModelToEntity(model))
 	}
 
 	return campaigns, nil
+}
+
+// ListByStatus возвращает список кампаний с определенным статусом и пагинацией
+func (r *PostgresCampaignRepository) ListByStatus(ctx context.Context, status string, limit, offset int) ([]*campaign.Campaign, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, name, message, total, status, media_filename, 
+		       media_mime, media_type, messages_per_hour, error_count, 
+		       initiator, created_at
+		FROM bulk_campaigns 
+		WHERE status = $1
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3
+	`, status, limit, offset)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var campaigns []*campaign.Campaign
+	for rows.Next() {
+		var model models.CampaignModel
+		err := rows.Scan(
+			&model.ID, &model.Name, &model.Message, &model.TotalCount, &model.Status,
+			&model.MediaFilename, &model.MediaMime, &model.MediaType,
+			&model.MessagesPerHour, &model.ErrorCount, &model.Initiator, &model.CreatedAt,
+		)
+		if err != nil {
+			continue
+		}
+		campaigns = append(campaigns, converter.MapCampaignModelToEntity(model))
+	}
+
+	return campaigns, nil
+}
+
+// Count возвращает общее количество кампаний
+func (r *PostgresCampaignRepository) Count(ctx context.Context) (int, error) {
+	var count int
+	err := r.pool.QueryRow(ctx, "SELECT COUNT(*) FROM bulk_campaigns").Scan(&count)
+	return count, err
+}
+
+// CountByStatus возвращает количество кампаний с определенным статусом
+func (r *PostgresCampaignRepository) CountByStatus(ctx context.Context, status string) (int, error) {
+	var count int
+	err := r.pool.QueryRow(ctx, "SELECT COUNT(*) FROM bulk_campaigns WHERE status = $1", status).Scan(&count)
+	return count, err
 }

@@ -4,17 +4,16 @@ import (
 	"context"
 	"fmt"
 	"time"
+	"whatsapp-service/internal/entities/campaign"
 	"whatsapp-service/internal/infrastructure/repositories/campaign/converter"
 	"whatsapp-service/internal/infrastructure/repositories/campaign/models"
-
-	"whatsapp-service/internal/entities"
-	"whatsapp-service/internal/usecases/interfaces"
+	"whatsapp-service/internal/usecases/campaigns/ports"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Ensure implementation
-var _ interfaces.CampaignStatusRepository = (*PostgresCampaignStatusRepository)(nil)
+var _ ports.CampaignStatusRepository = (*PostgresCampaignStatusRepository)(nil)
 
 // PostgresCampaignStatusRepository реализует CampaignStatusRepository для PostgreSQL
 type PostgresCampaignStatusRepository struct {
@@ -27,7 +26,7 @@ func NewPostgresCampaignStatusRepository(pool *pgxpool.Pool) *PostgresCampaignSt
 }
 
 // Save сохраняет статус кампании в базе данных
-func (r *PostgresCampaignStatusRepository) Save(ctx context.Context, status *entities.CampaignPhoneStatus) error {
+func (r *PostgresCampaignStatusRepository) Save(ctx context.Context, status *campaign.CampaignPhoneStatus) error {
 	model := converter.ToCampaignStatusModel(status)
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO bulk_campaign_statuses (
@@ -40,7 +39,7 @@ func (r *PostgresCampaignStatusRepository) Save(ctx context.Context, status *ent
 }
 
 // GetByID получает статус по идентификатору
-func (r *PostgresCampaignStatusRepository) GetByID(ctx context.Context, id string) (*entities.CampaignPhoneStatus, error) {
+func (r *PostgresCampaignStatusRepository) GetByID(ctx context.Context, id string) (*campaign.CampaignPhoneStatus, error) {
 	row := r.pool.QueryRow(ctx, `
 		SELECT id, campaign_id, phone_number, status, error, sent_at
 		FROM bulk_campaign_statuses WHERE id = $1
@@ -55,7 +54,7 @@ func (r *PostgresCampaignStatusRepository) GetByID(ctx context.Context, id strin
 }
 
 // Update обновляет статус в базе данных
-func (r *PostgresCampaignStatusRepository) Update(ctx context.Context, status *entities.CampaignPhoneStatus) error {
+func (r *PostgresCampaignStatusRepository) Update(ctx context.Context, status *campaign.CampaignPhoneStatus) error {
 	model := converter.ToCampaignStatusModel(status)
 	_, err := r.pool.Exec(ctx, `
 		UPDATE bulk_campaign_statuses SET
@@ -68,7 +67,7 @@ func (r *PostgresCampaignStatusRepository) Update(ctx context.Context, status *e
 }
 
 // UpdateByPhoneNumber UpdateStatusByPhoneNumber обновляет статус для конкретного номера в рамках кампании.
-func (r *PostgresCampaignStatusRepository) UpdateByPhoneNumber(ctx context.Context, campaignID, phoneNumber string, newStatus entities.CampaignStatusType, errorMessage string) error {
+func (r *PostgresCampaignStatusRepository) UpdateByPhoneNumber(ctx context.Context, campaignID, phoneNumber string, newStatus campaign.CampaignStatusType, errorMessage string) error {
 	query := `UPDATE bulk_campaign_statuses SET status = $1, error = $2, updated_at = NOW() WHERE campaign_id = $3 AND phone_number = $4`
 	ct, err := r.pool.Exec(ctx, query, newStatus, errorMessage, campaignID, phoneNumber)
 	if err != nil {
@@ -87,7 +86,7 @@ func (r *PostgresCampaignStatusRepository) Delete(ctx context.Context, id string
 }
 
 // ListByCampaignID возвращает все статусы для кампании
-func (r *PostgresCampaignStatusRepository) ListByCampaignID(ctx context.Context, campaignID string) ([]*entities.CampaignPhoneStatus, error) {
+func (r *PostgresCampaignStatusRepository) ListByCampaignID(ctx context.Context, campaignID string) ([]*campaign.CampaignPhoneStatus, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, campaign_id, phone_number, status, error, sent_at
 		FROM bulk_campaign_statuses 
@@ -99,7 +98,7 @@ func (r *PostgresCampaignStatusRepository) ListByCampaignID(ctx context.Context,
 	}
 	defer rows.Close()
 
-	var statuses []*entities.CampaignPhoneStatus
+	var statuses []*campaign.CampaignPhoneStatus
 	for rows.Next() {
 		var model models.CampaignStatusModel
 		err := rows.Scan(&model.ID, &model.CampaignID, &model.PhoneNumber, &model.Status, &model.Error, &model.SentAt)
@@ -112,7 +111,7 @@ func (r *PostgresCampaignStatusRepository) ListByCampaignID(ctx context.Context,
 }
 
 // UpdateStatusesByCampaignID массово обновляет статусы по кампании
-func (r *PostgresCampaignStatusRepository) UpdateStatusesByCampaignID(ctx context.Context, campaignID string, oldStatus, newStatus entities.CampaignStatusType) error {
+func (r *PostgresCampaignStatusRepository) UpdateStatusesByCampaignID(ctx context.Context, campaignID string, oldStatus, newStatus campaign.CampaignStatusType) error {
 	_, err := r.pool.Exec(ctx, `
 		UPDATE bulk_campaign_statuses 
 		SET status = $3 
@@ -129,7 +128,7 @@ func (r *PostgresCampaignStatusRepository) MarkAsSent(ctx context.Context, id st
 		UPDATE bulk_campaign_statuses 
 		SET status = $2, sent_at = $3, error = ''
 		WHERE id = $1
-	`, id, string(entities.CampaignStatusTypeSent), now)
+	`, id, string(campaign.CampaignStatusTypeSent), now)
 
 	return err
 }
@@ -140,7 +139,7 @@ func (r *PostgresCampaignStatusRepository) MarkAsFailed(ctx context.Context, id 
 		UPDATE bulk_campaign_statuses 
 		SET status = $2, error = $3
 		WHERE id = $1
-	`, id, string(entities.CampaignStatusTypeFailed), errorMsg)
+	`, id, string(campaign.CampaignStatusTypeFailed), errorMsg)
 
 	return err
 }
@@ -151,7 +150,7 @@ func (r *PostgresCampaignStatusRepository) MarkAsCancelled(ctx context.Context, 
 		UPDATE bulk_campaign_statuses 
 		SET status = $2
 		WHERE id = $1
-	`, id, string(entities.CampaignStatusTypeCancelled))
+	`, id, string(campaign.CampaignStatusTypeCancelled))
 
 	return err
 }
@@ -163,7 +162,7 @@ func (r *PostgresCampaignStatusRepository) GetSentNumbersByCampaignID(ctx contex
 		FROM bulk_campaign_statuses 
 		WHERE campaign_id = $1 AND status = $2
 		ORDER BY sent_at DESC
-	`, campaignID, string(entities.CampaignStatusTypeSent))
+	`, campaignID, string(campaign.CampaignStatusTypeSent))
 	if err != nil {
 		return nil, err
 	}
@@ -181,19 +180,19 @@ func (r *PostgresCampaignStatusRepository) GetSentNumbersByCampaignID(ctx contex
 }
 
 // GetFailedStatusesByCampaignID возвращает неудачные статусы для кампании
-func (r *PostgresCampaignStatusRepository) GetFailedStatusesByCampaignID(ctx context.Context, campaignID string) ([]*entities.CampaignPhoneStatus, error) {
+func (r *PostgresCampaignStatusRepository) GetFailedStatusesByCampaignID(ctx context.Context, campaignID string) ([]*campaign.CampaignPhoneStatus, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, campaign_id, phone_number, status, error, sent_at
 		FROM bulk_campaign_statuses 
 		WHERE campaign_id = $1 AND status = $2
 		ORDER BY sent_at DESC NULLS LAST
-	`, campaignID, string(entities.CampaignStatusTypeFailed))
+	`, campaignID, string(campaign.CampaignStatusTypeFailed))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var statuses []*entities.CampaignPhoneStatus
+	var statuses []*campaign.CampaignPhoneStatus
 	for rows.Next() {
 		var model models.CampaignStatusModel
 		err := rows.Scan(&model.ID, &model.CampaignID, &model.PhoneNumber, &model.Status, &model.Error, &model.SentAt)
@@ -206,7 +205,7 @@ func (r *PostgresCampaignStatusRepository) GetFailedStatusesByCampaignID(ctx con
 }
 
 // CountStatusesByCampaignID подсчитывает статусы определенного типа для кампании
-func (r *PostgresCampaignStatusRepository) CountStatusesByCampaignID(ctx context.Context, campaignID string, status entities.CampaignStatusType) (int, error) {
+func (r *PostgresCampaignStatusRepository) CountStatusesByCampaignID(ctx context.Context, campaignID string, status campaign.CampaignStatusType) (int, error) {
 	row := r.pool.QueryRow(ctx, `
 		SELECT COUNT(*) 
 		FROM bulk_campaign_statuses 

@@ -1,12 +1,12 @@
 package converter
 
 import (
-	"whatsapp-service/internal/entities"
+	"whatsapp-service/internal/entities/settings"
 	"whatsapp-service/internal/infrastructure/repositories/settings/models"
 )
 
-// ToWhatsGateSettingsModel преобразует сущность WhatsGateSettings в модель для БД
-func ToWhatsGateSettingsModel(settings *entities.WhatsGateSettings) *models.WhatsGateSettingsModel {
+// MapSettingsEntityToModel преобразует сущность WhatsGateSettings в модель для БД
+func MapSettingsEntityToModel(settings *settings.WhatsGateSettings) *models.WhatsGateSettingsModel {
 	return &models.WhatsGateSettingsModel{
 		ID:         settings.ID(),
 		WhatsappID: settings.WhatsappID(),
@@ -17,9 +17,9 @@ func ToWhatsGateSettingsModel(settings *entities.WhatsGateSettings) *models.What
 	}
 }
 
-// ToWhatsGateSettingsEntity преобразует модель БД в сущность WhatsGateSettings
-func ToWhatsGateSettingsEntity(model *models.WhatsGateSettingsModel) *entities.WhatsGateSettings {
-	return entities.RestoreWhatsGateSettings(
+// MapSettingsModelToEntity преобразует модель БД в сущность WhatsGateSettings
+func MapSettingsModelToEntity(model *models.WhatsGateSettingsModel) *settings.WhatsGateSettings {
+	return settings.RestoreWhatsGateSettings(
 		model.ID,
 		model.WhatsappID,
 		model.APIKey,
