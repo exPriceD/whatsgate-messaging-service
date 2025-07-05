@@ -2,141 +2,142 @@ package presenters
 
 import (
 	"net/http"
-
-	"whatsapp-service/internal/adapters/dto"
-	"whatsapp-service/internal/entities"
-	"whatsapp-service/internal/entities/errors"
-	"whatsapp-service/internal/usecases/campaigns"
-
-	"github.com/gin-gonic/gin"
+	"whatsapp-service/internal/adapters/converter"
+	"whatsapp-service/internal/delivery/http/response"
+	"whatsapp-service/internal/entities/campaign"
+	"whatsapp-service/internal/usecases/campaigns/dto"
 )
 
+// CampaignPresenterInterface определяет интерфейс для presenter кампаний
+type CampaignPresenterInterface interface {
+	// UseCase responses
+	PresentCreateCampaignSuccess(w http.ResponseWriter, ucResponse *dto.CreateCampaignResponse)
+	PresentStartCampaignSuccess(w http.ResponseWriter, ucResponse *dto.StartCampaignResponse)
+	PresentCancelCampaignSuccess(w http.ResponseWriter, ucResponse *dto.CancelCampaignResponse)
+	PresentGetCampaignByIDSuccess(w http.ResponseWriter, ucResponse *dto.GetCampaignByIDResponse)
+	PresentListCampaignsSuccess(w http.ResponseWriter, ucResponse *dto.ListCampaignsResponse)
+
+	// Entity responses
+	PresentCampaign(w http.ResponseWriter, campaign *campaign.Campaign)
+	PresentCampaignsList(w http.ResponseWriter, campaigns []*campaign.Campaign)
+	PresentBriefCampaignsList(w http.ResponseWriter, campaigns []*campaign.Campaign)
+
+	// Error responses
+	PresentValidationError(w http.ResponseWriter, err error)
+	PresentError(w http.ResponseWriter, statusCode int, message string)
+	PresentUseCaseError(w http.ResponseWriter, err error)
+}
+
 // CampaignPresenter обрабатывает представление данных кампаний
-type CampaignPresenter struct{}
+type CampaignPresenter struct {
+	converter converter.CampaignConverter
+}
 
 // NewCampaignPresenter создает новый экземпляр presenter
-func NewCampaignPresenter() *CampaignPresenter {
-	return &CampaignPresenter{}
+func NewCampaignPresenter(converter converter.CampaignConverter) *CampaignPresenter {
+	return &CampaignPresenter{
+		converter: converter,
+	}
 }
 
 // PresentCreateCampaignSuccess представляет успешный ответ на создание кампании
-func (p *CampaignPresenter) PresentCreateCampaignSuccess(c *gin.Context, response *campaigns.CreateCampaignResponse) {
-	responseDTO := dto.CreateCampaignResponse{
-		Campaign:      p.mapCampaignToDTO(response.Campaign),
-		TotalPhones:   response.TotalNumbers,
-		ValidPhones:   response.ValidPhones,
-		InvalidPhones: response.InvalidPhones,
-	}
-
-	c.JSON(http.StatusCreated, responseDTO)
+func (p *CampaignPresenter) PresentCreateCampaignSuccess(w http.ResponseWriter, ucResponse *dto.CreateCampaignResponse) {
+	responseDTO := p.converter.ToCreateCampaignResponse(ucResponse)
+	response.WriteJSON(w, http.StatusCreated, responseDTO)
 }
 
 // PresentStartCampaignSuccess представляет успешный ответ на запуск кампании
-func (p *CampaignPresenter) PresentStartCampaignSuccess(c *gin.Context, response *campaigns.StartCampaignResponse) {
-	responseDTO := gin.H{
-		"campaign_id":     response.CampaignID,
-		"status":          string(response.Status),
-		"total_numbers":   response.TotalNumbers,
-		"estimated_time":  response.EstimatedTime,
-		"async_started":   response.AsyncStarted,
-		"initial_results": response.InitialResults,
-	}
-	c.JSON(http.StatusOK, responseDTO)
+func (p *CampaignPresenter) PresentStartCampaignSuccess(w http.ResponseWriter, ucResponse *dto.StartCampaignResponse) {
+	responseDTO := p.converter.ToStartCampaignResponse(ucResponse)
+	response.WriteJSON(w, http.StatusOK, responseDTO)
 }
 
 // PresentCancelCampaignSuccess представляет успешный ответ на отмену кампании
-func (p *CampaignPresenter) PresentCancelCampaignSuccess(c *gin.Context, response *campaigns.CancelCampaignResponse) {
-	responseDTO := gin.H{
-		"campaign_id":          response.CampaignID,
-		"status":               string(response.Status),
-		"cancelled_numbers":    response.CancelledNumbers,
-		"already_sent_numbers": response.AlreadySentNumbers,
-		"total_numbers":        response.TotalNumbers,
-		"worker_stopped":       response.WorkerStopped,
-	}
-	c.JSON(http.StatusOK, responseDTO)
+func (p *CampaignPresenter) PresentCancelCampaignSuccess(w http.ResponseWriter, ucResponse *dto.CancelCampaignResponse) {
+	responseDTO := p.converter.ToCancelCampaignResponse(ucResponse)
+	response.WriteJSON(w, http.StatusOK, responseDTO)
+}
+
+// PresentGetCampaignByIDSuccess представляет успешный ответ на получение кампании по ID
+func (p *CampaignPresenter) PresentGetCampaignByIDSuccess(w http.ResponseWriter, ucResponse *dto.GetCampaignByIDResponse) {
+	responseDTO := p.converter.ToGetCampaignByIDResponse(ucResponse)
+	response.WriteJSON(w, http.StatusOK, responseDTO)
+}
+
+// PresentListCampaignsSuccess представляет успешный ответ на получение списка кампаний
+func (p *CampaignPresenter) PresentListCampaignsSuccess(w http.ResponseWriter, ucResponse *dto.ListCampaignsResponse) {
+	responseDTO := p.converter.ToListCampaignsResponse(ucResponse)
+	response.WriteJSON(w, http.StatusOK, responseDTO)
+}
+
+// PresentCampaign представляет одну кампанию
+func (p *CampaignPresenter) PresentCampaign(w http.ResponseWriter, campaign *campaign.Campaign) {
+	responseDTO := p.converter.ToCampaignResponse(campaign)
+	response.WriteJSON(w, http.StatusOK, responseDTO)
+}
+
+// PresentCampaignsList представляет список кампаний
+func (p *CampaignPresenter) PresentCampaignsList(w http.ResponseWriter, campaigns []*campaign.Campaign) {
+	responseDTO := p.converter.ToCampaignResponseList(campaigns)
+	response.WriteJSON(w, http.StatusOK, responseDTO)
+}
+
+// PresentBriefCampaignsList представляет краткий список кампаний
+func (p *CampaignPresenter) PresentBriefCampaignsList(w http.ResponseWriter, campaigns []*campaign.Campaign) {
+	responseDTO := p.converter.ToBriefCampaignResponseList(campaigns)
+	response.WriteJSON(w, http.StatusOK, responseDTO)
 }
 
 // PresentValidationError представляет ошибку валидации
-func (p *CampaignPresenter) PresentValidationError(c *gin.Context, err error) {
-	responseDTO := gin.H{
-		"error":   "validation_error",
-		"code":    http.StatusBadRequest,
-		"message": err.Error(),
-	}
-
-	c.JSON(http.StatusBadRequest, responseDTO)
+func (p *CampaignPresenter) PresentValidationError(w http.ResponseWriter, err error) {
+	response.WriteError(w, http.StatusBadRequest, err.Error())
 }
 
 // PresentError представляет общую ошибку
-func (p *CampaignPresenter) PresentError(c *gin.Context, statusCode int, message string) {
-	responseDTO := gin.H{
-		"error":   "error",
-		"code":    statusCode,
-		"message": message,
-	}
-
-	c.JSON(statusCode, responseDTO)
+func (p *CampaignPresenter) PresentError(w http.ResponseWriter, statusCode int, message string) {
+	response.WriteError(w, statusCode, message)
 }
 
 // PresentUseCaseError представляет ошибку use case
-func (p *CampaignPresenter) PresentUseCaseError(c *gin.Context, err error) {
-	var statusCode int
-	var errorType string
-
-	switch err {
-	case errors.ErrCannotStartCampaign:
-		statusCode = http.StatusConflict
-		errorType = "cannot_start_campaign"
-	case errors.ErrCannotCancelCampaign:
-		statusCode = http.StatusConflict
-		errorType = "cannot_cancel_campaign"
-	case errors.ErrCampaignNotPending:
-		statusCode = http.StatusConflict
-		errorType = "campaign_not_pending"
-	case errors.ErrInvalidPhoneNumber:
-		statusCode = http.StatusBadRequest
-		errorType = "invalid_phone_number"
-	case errors.ErrInvalidMessagesPerHour:
-		statusCode = http.StatusBadRequest
-		errorType = "invalid_messages_per_hour"
-	case errors.ErrCampaignNotFound:
-		statusCode = http.StatusNotFound
-		errorType = "campaign_not_found"
-	case errors.ErrRepositoryError:
-		statusCode = http.StatusInternalServerError
-		errorType = "internal_error"
-	default:
-		statusCode = http.StatusInternalServerError
-		errorType = "internal_error"
-	}
-
-	responseDTO := gin.H{
-		"error":   errorType,
-		"code":    statusCode,
-		"message": err.Error(),
-	}
-
-	c.JSON(statusCode, responseDTO)
+func (p *CampaignPresenter) PresentUseCaseError(w http.ResponseWriter, err error) {
+	statusCode := p.mapErrorToStatusCode(err)
+	response.WriteError(w, statusCode, err.Error())
 }
 
-// mapCampaignToDTO преобразует Campaign entity в DTO
-func (p *CampaignPresenter) mapCampaignToDTO(campaign *entities.Campaign) dto.CampaignResponse {
-	var initiator *string
-	if initiatorValue := campaign.Initiator(); initiatorValue != "" {
-		initiator = &initiatorValue
-	}
+// mapErrorToStatusCode преобразует ошибку UseCase в HTTP статус код
+func (p *CampaignPresenter) mapErrorToStatusCode(err error) int {
+	switch err {
+	// Конфликты состояния (409)
+	case campaign.ErrCannotStartCampaign:
+		return http.StatusConflict
+	case campaign.ErrCannotCancelCampaign:
+		return http.StatusConflict
+	case campaign.ErrCampaignNotPending:
+		return http.StatusConflict
+	case campaign.ErrCampaignAlreadyRunning:
+		return http.StatusConflict
 
-	return dto.CampaignResponse{
-		ID:              campaign.ID(),
-		Name:            campaign.Name(),
-		Message:         campaign.Message(),
-		Status:          string(campaign.Status()),
-		TotalCount:      campaign.TotalCount(),
-		ProcessedCount:  campaign.ProcessedCount(),
-		ErrorCount:      campaign.ErrorCount(),
-		MessagesPerHour: campaign.MessagesPerHour(),
-		CreatedAt:       campaign.CreatedAt().Format("2006-01-02T15:04:05Z07:00"),
-		Initiator:       initiator,
+	// Ошибки валидации (400)
+	case campaign.ErrInvalidPhoneNumber:
+		return http.StatusBadRequest
+	case campaign.ErrInvalidMessagesPerHour:
+		return http.StatusBadRequest
+	case campaign.ErrCampaignNameRequired:
+		return http.StatusBadRequest
+	case campaign.ErrCampaignMessageRequired:
+		return http.StatusBadRequest
+	case campaign.ErrNoPhoneNumbers:
+		return http.StatusBadRequest
+
+	// Ошибки не найдено (404)
+	case campaign.ErrCampaignNotFound:
+		return http.StatusNotFound
+
+	// Внутренние ошибки (500)
+	case campaign.ErrRepositoryError:
+		return http.StatusInternalServerError
+
+	default:
+		return http.StatusInternalServerError
 	}
 }
