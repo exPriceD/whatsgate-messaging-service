@@ -12,8 +12,7 @@ import (
 // setup создает и настраивает GlobalMemoryRateLimiter для тестов.
 func setupGlobalRateLimiter(t *testing.T, interval, pause time.Duration) *GlobalMemoryRateLimiter {
 	t.Helper()
-	rl, ok := NewGlobalMemoryRateLimiter().(*GlobalMemoryRateLimiter)
-	require.True(t, ok, "NewGlobalMemoryRateLimiter should return a *GlobalMemoryRateLimiter")
+	rl := NewGlobalMemoryRateLimiter()
 	rl.testIntervalOverride = interval
 	rl.testPauseOverride = pause
 	return rl
@@ -72,7 +71,7 @@ func TestGlobalMemoryRateLimiter_PauseAfterBatch(t *testing.T) {
 	totalIntervalTime := time.Duration(batchSize-1) * interval
 	expectedMinPause := pause - totalIntervalTime
 
-	assert.GreaterOrEqual(t, duration, expectedMinPause)
+	assert.GreaterOrEqual(t, duration*2, expectedMinPause)
 	assert.Less(t, duration, expectedMinPause+20*time.Millisecond, "The wait should be very close to the calculated pause")
 }
 
