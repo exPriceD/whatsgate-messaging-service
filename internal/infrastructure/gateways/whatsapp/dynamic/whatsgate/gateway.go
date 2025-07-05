@@ -5,11 +5,13 @@ import (
 	"io"
 	"sync"
 	"time"
+	"whatsapp-service/internal/entities/campaign"
+	"whatsapp-service/internal/infrastructure/dispatcher/messaging/ports"
+	"whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate"
+	"whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate/types"
+	ports2 "whatsapp-service/internal/usecases/settings/ports"
 
-	"whatsapp-service/internal/entities"
-	"whatsapp-service/internal/infrastructure/gateways/whatsgate/types"
 	"whatsapp-service/internal/usecases/dto"
-	"whatsapp-service/internal/usecases/interfaces"
 )
 
 const (
@@ -21,15 +23,15 @@ const (
 // SettingsAwareGateway получает актуальные креды из репозитория в рантайме
 // и кэширует их для повышения производительности.
 type SettingsAwareGateway struct {
-	repo           interfaces.WhatsGateSettingsRepository
-	cachedGateway  interfaces.MessageGateway
+	repo           ports2.WhatsGateSettingsRepository
+	cachedGateway  ports.MessageGateway
 	cacheTimestamp time.Time
 	cacheTTL       time.Duration
 	mu             sync.RWMutex
 }
 
 // NewSettingsAwareGateway создаёт ленивый кэширующий шлюз.
-func NewSettingsAwareGateway(repo interfaces.WhatsGateSettingsRepository) *SettingsAwareGateway {
+func NewSettingsAwareGateway(repo ports2.WhatsGateSettingsRepository) *SettingsAwareGateway {
 	return &SettingsAwareGateway{
 		repo:     repo,
 		cacheTTL: defaultCacheTTL,
@@ -37,7 +39,7 @@ func NewSettingsAwareGateway(repo interfaces.WhatsGateSettingsRepository) *Setti
 }
 
 // buildOrGetFromCache получает шлюз из кэша или создает новый, если кэш устарел.
-func (d *SettingsAwareGateway) buildOrGetFromCache(ctx context.Context) (interfaces.MessageGateway, error) {
+func (d *SettingsAwareGateway) buildOrGetFromCache(ctx context.Context) (ports.MessageGateway, error) {
 	d.mu.RLock()
 	if d.cachedGateway != nil && time.Since(d.cacheTimestamp) < d.cacheTTL {
 		defer d.mu.RUnlock()
@@ -52,21 +54,21 @@ func (d *SettingsAwareGateway) buildOrGetFromCache(ctx context.Context) (interfa
 		return d.cachedGateway, nil
 	}
 
-	settings, err := d.repo.Get(ctx)
-	if err != nil || settings == nil {
+	s, err := d.repo.Get(ctx)
+	if err != nil || s == nil {
 		return nil, err
 	}
 	cfg := &types.WhatsGateConfig{
-		BaseURL:       settings.BaseURL,
-		APIKey:        settings.APIKey,
-		WhatsappID:    settings.WhatsappID,
+		BaseURL:       s.BaseURL(),
+		APIKey:        s.APIKey(),
+		WhatsappID:    s.WhatsappID(),
 		Timeout:       types.DefaultTimeout,
 		RetryAttempts: types.DefaultRetryAttempts,
 		RetryDelay:    types.DefaultRetryDelay,
 		MaxFileSize:   types.MaxFileSizeBytes,
 	}
 
-	newGateway := NewWhatsGateGateway(cfg)
+	newGateway := whatsgate.NewWhatsGateGateway(cfg)
 
 	d.cachedGateway = newGateway
 	d.cacheTimestamp = time.Now()
@@ -84,7 +86,7 @@ func (d *SettingsAwareGateway) SendTextMessage(ctx context.Context, phone, messa
 }
 
 // SendMediaMessage аналогичен SendTextMessage.
-func (d *SettingsAwareGateway) SendMediaMessage(ctx context.Context, phone string, mt entities.MessageType, message, filename string, media io.Reader, mime string, async bool) (*dto.MessageSendResult, error) {
+func (d *SettingsAwareGateway) SendMediaMessage(ctx context.Context, phone string, mt campaign.MessageType, message, filename string, media io.Reader, mime string, async bool) (*dto.MessageSendResult, error) {
 	gw, err := d.buildOrGetFromCache(ctx)
 	if err != nil {
 		return &dto.MessageSendResult{PhoneNumber: phone, Success: false, Error: "settings not configured", Timestamp: time.Now()}, nil

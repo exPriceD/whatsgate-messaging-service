@@ -8,11 +8,10 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+	"whatsapp-service/internal/entities/campaign"
+	"whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate/types"
 
 	"github.com/stretchr/testify/require"
-
-	"whatsapp-service/internal/entities"
-	"whatsapp-service/internal/infrastructure/gateways/whatsgate/types"
 )
 
 // stubServer возвращает httptest сервер, который обрабатывает /send и /status
@@ -109,7 +108,7 @@ func TestSendTextMessage(t *testing.T) {
 func TestSendMediaMessage_TooLarge(t *testing.T) {
 	gw := newGateway("http://localhost")
 	big := bytes.Repeat([]byte("a"), int(types.MaxFileSizeBytes)+1)
-	res, err := gw.SendMediaMessage(context.Background(), "79161234567", entities.MessageTypeImage, "photo", "big.jpg", bytes.NewReader(big), "image/jpeg", false)
+	res, err := gw.SendMediaMessage(context.Background(), "79161234567", campaign.MessageTypeImage, "photo", "big.jpg", bytes.NewReader(big), "image/jpeg", false)
 
 	require.NoError(t, err)
 	require.NotNil(t, res)

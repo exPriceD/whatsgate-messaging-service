@@ -5,16 +5,14 @@ package integration
 import (
 	"bytes"
 	"context"
+	"github.com/joho/godotenv"
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 	"time"
-	"whatsapp-service/internal/infrastructure/gateways/whatsgate"
-	"whatsapp-service/internal/infrastructure/gateways/whatsgate/types"
-
-	"github.com/joho/godotenv"
-	"github.com/stretchr/testify/require"
-
-	"whatsapp-service/internal/entities"
+	"whatsapp-service/internal/entities/campaign"
+	"whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate"
+	"whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate/types"
 )
 
 // cfgFromEnv собирает конфиг WhatsGate из переменных окружения.
@@ -78,7 +76,7 @@ func TestWhatsGate_SendMediaMessage_Live(t *testing.T) {
 	}
 	require.NoError(t, err, "failed to read test image")
 
-	res, err := gw.SendMediaMessage(context.Background(), phoneNumber, entities.MessageTypeImage, "Integration photo", "test.jpg", bytes.NewReader(data), "image/jpeg", false)
+	res, err := gw.SendMediaMessage(context.Background(), phoneNumber, campaign.MessageTypeImage, "Integration photo", "test.jpg", bytes.NewReader(data), "image/jpeg", false)
 
 	require.NoError(t, err, "SendMediaMessage returned an unexpected error")
 	require.NotNil(t, res)

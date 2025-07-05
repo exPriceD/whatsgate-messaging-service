@@ -11,8 +11,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"whatsapp-service/internal/entities"
-	"whatsapp-service/internal/infrastructure/gateways/whatsgate/types"
+	"whatsapp-service/internal/entities/campaign"
+	types2 "whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate/types"
 	"whatsapp-service/internal/usecases/dto"
 )
 
@@ -24,25 +24,25 @@ var phoneRegex = regexp.MustCompile(`^7\d{10}$`)
 // Рекомендуется оборачивать его в SettingsAwareGateway для поддержки
 // «горячих» изменений настроек.
 type WhatsGateGateway struct {
-	config *types.WhatsGateConfig
+	config *types2.WhatsGateConfig
 	client *http.Client
 }
 
 // NewWhatsGateGateway возвращает готовый к работе шлюз WhatsGate.
 // Функция автоматически подставляет значения по умолчанию, если они
 // не заданы в конфиге (таймауты, ретраи, лимит размера файла).
-func NewWhatsGateGateway(config *types.WhatsGateConfig) *WhatsGateGateway {
+func NewWhatsGateGateway(config *types2.WhatsGateConfig) *WhatsGateGateway {
 	if config.Timeout == 0 {
-		config.Timeout = types.DefaultTimeout
+		config.Timeout = types2.DefaultTimeout
 	}
 	if config.RetryAttempts == 0 {
-		config.RetryAttempts = types.DefaultRetryAttempts
+		config.RetryAttempts = types2.DefaultRetryAttempts
 	}
 	if config.RetryDelay == 0 {
-		config.RetryDelay = types.DefaultRetryDelay
+		config.RetryDelay = types2.DefaultRetryDelay
 	}
 	if config.MaxFileSize == 0 {
-		config.MaxFileSize = types.MaxFileSizeBytes
+		config.MaxFileSize = types2.MaxFileSizeBytes
 	}
 
 	return &WhatsGateGateway{
@@ -71,14 +71,14 @@ func (g *WhatsGateGateway) SendTextMessage(ctx context.Context, phoneNumber, mes
 		}, nil
 	}
 
-	request := types.SendMessageRequest{
+	request := types2.SendMessageRequest{
 		WhatsappID: g.config.WhatsappID,
 		Async:      async,
-		Recipient: types.Recipient{
+		Recipient: types2.Recipient{
 			Number: phoneNumber,
 		},
-		Message: types.Message{
-			Type: types.MessageTypeText,
+		Message: types2.Message{
+			Type: types2.MessageTypeText,
 			Body: message,
 		},
 	}
@@ -87,7 +87,7 @@ func (g *WhatsGateGateway) SendTextMessage(ctx context.Context, phoneNumber, mes
 }
 
 func (g *WhatsGateGateway) TestConnection(ctx context.Context) (*dto.ConnectionTestResult, error) {
-	request := types.TestConnectionRequest{
+	request := types2.TestConnectionRequest{
 		WhatsappID: g.config.WhatsappID,
 		Number:     "79317019910",
 	}
@@ -96,7 +96,7 @@ func (g *WhatsGateGateway) TestConnection(ctx context.Context) (*dto.ConnectionT
 }
 
 // SendMediaMessage отправляет медиа-сообщение
-func (g *WhatsGateGateway) SendMediaMessage(ctx context.Context, phoneNumber string, messageType entities.MessageType, message string, filename string, mediaData io.Reader, mimeType string, async bool) (*dto.MessageSendResult, error) {
+func (g *WhatsGateGateway) SendMediaMessage(ctx context.Context, phoneNumber string, messageType campaign.MessageType, message string, filename string, mediaData io.Reader, mimeType string, async bool) (*dto.MessageSendResult, error) {
 	if err := g.validatePhoneNumber(phoneNumber); err != nil {
 		return &dto.MessageSendResult{
 			PhoneNumber: phoneNumber,
@@ -136,16 +136,16 @@ func (g *WhatsGateGateway) SendMediaMessage(ctx context.Context, phoneNumber str
 
 	encodedData := base64.StdEncoding.EncodeToString(fileData)
 
-	request := types.SendMessageRequest{
+	request := types2.SendMessageRequest{
 		WhatsappID: g.config.WhatsappID,
 		Async:      async,
-		Recipient: types.Recipient{
+		Recipient: types2.Recipient{
 			Number: phoneNumber,
 		},
-		Message: types.Message{
+		Message: types2.Message{
 			Type: string(messageType),
 			Body: message,
-			Media: &types.Media{
+			Media: &types2.Media{
 				MimeType: mimeType,
 				Data:     encodedData,
 				Filename: filename,
@@ -157,13 +157,13 @@ func (g *WhatsGateGateway) SendMediaMessage(ctx context.Context, phoneNumber str
 }
 
 // sendMessageWithRetry отправляет сообщение с повторными попытками
-func (g *WhatsGateGateway) sendMessageWithRetry(ctx context.Context, request types.SendMessageRequest, phoneNumber string) (*dto.MessageSendResult, error) {
-	var lastResult types.MessageResult
+func (g *WhatsGateGateway) sendMessageWithRetry(ctx context.Context, request types2.SendMessageRequest, phoneNumber string) (*dto.MessageSendResult, error) {
+	var lastResult types2.MessageResult
 
 	for attempt := 1; attempt <= g.config.RetryAttempts; attempt++ {
 		result, err := g.sendMessage(ctx, request, phoneNumber)
 		if err != nil {
-			lastResult = types.MessageResult{
+			lastResult = types2.MessageResult{
 				PhoneNumber: phoneNumber,
 				Success:     false,
 				Error:       fmt.Sprintf("attempt %d failed: %v", attempt, err),
@@ -180,7 +180,7 @@ func (g *WhatsGateGateway) sendMessageWithRetry(ctx context.Context, request typ
 		if attempt < g.config.RetryAttempts {
 			select {
 			case <-ctx.Done():
-				lastResult = types.MessageResult{
+				lastResult = types2.MessageResult{
 					PhoneNumber: phoneNumber,
 					Success:     false,
 					Error:       "context cancelled during retry",
@@ -204,14 +204,14 @@ endRetry:
 }
 
 // testConnectionWithRetry проверяет соединение с повторными попытками
-func (g *WhatsGateGateway) testConnectionWithRetry(ctx context.Context, request types.TestConnectionRequest) (*dto.ConnectionTestResult, error) {
-	var lastInfraResult types.TestConnectionResult
+func (g *WhatsGateGateway) testConnectionWithRetry(ctx context.Context, request types2.TestConnectionRequest) (*dto.ConnectionTestResult, error) {
+	var lastInfraResult types2.TestConnectionResult
 	var lastError error
 
 	for attempt := 1; attempt <= g.config.RetryAttempts; attempt++ {
 		result, err := g.testConnection(ctx, request)
 		if err != nil {
-			lastInfraResult = types.TestConnectionResult{
+			lastInfraResult = types2.TestConnectionResult{
 				Success:   false,
 				Error:     fmt.Sprintf("attempt %d failed: %v", attempt, err),
 				Timestamp: time.Now().Format(time.RFC3339),
@@ -229,7 +229,7 @@ func (g *WhatsGateGateway) testConnectionWithRetry(ctx context.Context, request 
 		if attempt < g.config.RetryAttempts {
 			select {
 			case <-ctx.Done():
-				lastInfraResult = types.TestConnectionResult{
+				lastInfraResult = types2.TestConnectionResult{
 					Success:   false,
 					Error:     "context cancelled during retry",
 					Timestamp: time.Now().Format(time.RFC3339),
@@ -293,11 +293,11 @@ func (g *WhatsGateGateway) validatePhoneNumber(phoneNumber string) error {
 // validateMessageType валидирует тип сообщения
 func (g *WhatsGateGateway) validateMessageType(messageType string) error {
 	allowedTypes := map[string]struct{}{
-		types.MessageTypeText:    {},
-		types.MessageTypeImage:   {},
-		types.MessageTypeDoc:     {},
-		types.MessageTypeVoice:   {},
-		types.MessageTypeSticker: {},
+		types2.MessageTypeText:    {},
+		types2.MessageTypeImage:   {},
+		types2.MessageTypeDoc:     {},
+		types2.MessageTypeVoice:   {},
+		types2.MessageTypeSticker: {},
 	}
 
 	if _, exists := allowedTypes[messageType]; !exists {
@@ -308,10 +308,10 @@ func (g *WhatsGateGateway) validateMessageType(messageType string) error {
 }
 
 // sendMessage общий метод для отправки сообщений
-func (g *WhatsGateGateway) sendMessage(ctx context.Context, request types.SendMessageRequest, phoneNumber string) (types.MessageResult, error) {
+func (g *WhatsGateGateway) sendMessage(ctx context.Context, request types2.SendMessageRequest, phoneNumber string) (types2.MessageResult, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {
-		return types.MessageResult{
+		return types2.MessageResult{
 			PhoneNumber: phoneNumber,
 			Success:     false,
 			Error:       fmt.Sprintf("failed to marshal request: %v", err),
@@ -321,7 +321,7 @@ func (g *WhatsGateGateway) sendMessage(ctx context.Context, request types.SendMe
 
 	req, err := http.NewRequestWithContext(ctx, "POST", g.config.BaseURL+"/send", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return types.MessageResult{
+		return types2.MessageResult{
 			PhoneNumber: phoneNumber,
 			Success:     false,
 			Error:       fmt.Sprintf("failed to create request: %v", err),
@@ -334,7 +334,7 @@ func (g *WhatsGateGateway) sendMessage(ctx context.Context, request types.SendMe
 
 	resp, err := g.client.Do(req)
 	if err != nil {
-		return types.MessageResult{
+		return types2.MessageResult{
 			PhoneNumber: phoneNumber,
 			Success:     false,
 			Error:       fmt.Sprintf("network error: %v", err),
@@ -347,7 +347,7 @@ func (g *WhatsGateGateway) sendMessage(ctx context.Context, request types.SendMe
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return types.MessageResult{
+		return types2.MessageResult{
 			PhoneNumber: phoneNumber,
 			Success:     false,
 			Error:       fmt.Sprintf("failed to read response: %v", err),
@@ -361,12 +361,12 @@ func (g *WhatsGateGateway) sendMessage(ctx context.Context, request types.SendMe
 		if resp.StatusCode >= 500 {
 			errorMsg = fmt.Sprintf("server error: API returned HTTP %d - %s", resp.StatusCode, string(body))
 		} else {
-			var errResp types.SendMessageResponse
+			var errResp types2.SendMessageResponse
 			_ = json.Unmarshal(body, &errResp) // Игнорируем ошибку, если тело пустое
 			errorMsg = fmt.Sprintf("API client error: HTTP %d. Status: %s. Message: %s", resp.StatusCode, errResp.Status, errResp.Message)
 		}
 
-		return types.MessageResult{
+		return types2.MessageResult{
 			PhoneNumber: phoneNumber,
 			Success:     false,
 			Status:      "failed",
@@ -375,9 +375,9 @@ func (g *WhatsGateGateway) sendMessage(ctx context.Context, request types.SendMe
 		}, nil
 	}
 
-	var response types.SendMessageResponse
+	var response types2.SendMessageResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return types.MessageResult{
+		return types2.MessageResult{
 			PhoneNumber: phoneNumber,
 			Success:     true,
 			Status:      "sent",
@@ -385,7 +385,7 @@ func (g *WhatsGateGateway) sendMessage(ctx context.Context, request types.SendMe
 		}, nil
 	}
 
-	return types.MessageResult{
+	return types2.MessageResult{
 		PhoneNumber: phoneNumber,
 		Success:     true,
 		Status:      "sent",
@@ -394,10 +394,10 @@ func (g *WhatsGateGateway) sendMessage(ctx context.Context, request types.SendMe
 }
 
 // TestConnection проверяет соединение с API
-func (g *WhatsGateGateway) testConnection(ctx context.Context, request types.TestConnectionRequest) (types.TestConnectionResult, error) {
+func (g *WhatsGateGateway) testConnection(ctx context.Context, request types2.TestConnectionRequest) (types2.TestConnectionResult, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {
-		return types.TestConnectionResult{
+		return types2.TestConnectionResult{
 			Success:   false,
 			Error:     fmt.Sprintf("failed to marshal request: %v", err),
 			Timestamp: time.Now().Format(time.RFC3339),
@@ -406,7 +406,7 @@ func (g *WhatsGateGateway) testConnection(ctx context.Context, request types.Tes
 
 	req, err := http.NewRequestWithContext(ctx, "POST", g.config.BaseURL+"/check", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return types.TestConnectionResult{
+		return types2.TestConnectionResult{
 			Success:   false,
 			Error:     fmt.Sprintf("failed to create request: %v", err),
 			Timestamp: time.Now().Format(time.RFC3339),
@@ -418,7 +418,7 @@ func (g *WhatsGateGateway) testConnection(ctx context.Context, request types.Tes
 
 	resp, err := g.client.Do(req)
 	if err != nil {
-		return types.TestConnectionResult{
+		return types2.TestConnectionResult{
 			Success:   false,
 			Error:     fmt.Sprintf("network error: %v", err),
 			Timestamp: time.Now().Format(time.RFC3339),
@@ -428,7 +428,7 @@ func (g *WhatsGateGateway) testConnection(ctx context.Context, request types.Tes
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return types.TestConnectionResult{Success: false, Error: "failed to read response body"}, fmt.Errorf("read response: %w", err)
+		return types2.TestConnectionResult{Success: false, Error: "failed to read response body"}, fmt.Errorf("read response: %w", err)
 	}
 
 	// Сначала проверяем статус HTTP
@@ -439,12 +439,12 @@ func (g *WhatsGateGateway) testConnection(ctx context.Context, request types.Tes
 		} else {
 			errorMsg = fmt.Sprintf("API client error: HTTP %d - %s", resp.StatusCode, string(body))
 		}
-		return types.TestConnectionResult{Success: false, Error: errorMsg, Timestamp: time.Now().Format(time.RFC3339)}, nil
+		return types2.TestConnectionResult{Success: false, Error: errorMsg, Timestamp: time.Now().Format(time.RFC3339)}, nil
 	}
 
-	var response types.TestConnectionResponse
+	var response types2.TestConnectionResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return types.TestConnectionResult{Success: false, Error: "failed to decode response", Timestamp: time.Now().Format(time.RFC3339)}, fmt.Errorf("decode response: %w", err)
+		return types2.TestConnectionResult{Success: false, Error: "failed to decode response", Timestamp: time.Now().Format(time.RFC3339)}, fmt.Errorf("decode response: %w", err)
 	}
 
 	// Теперь проверяем содержимое ответа
@@ -454,7 +454,7 @@ func (g *WhatsGateGateway) testConnection(ctx context.Context, request types.Tes
 		errorMessage = fmt.Sprintf("Connection test failed: %s", response.Result)
 	}
 
-	return types.TestConnectionResult{
+	return types2.TestConnectionResult{
 		Success:   isSuccess,
 		Error:     errorMessage,
 		Timestamp: time.Now().Format(time.RFC3339),
