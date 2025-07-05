@@ -9,6 +9,7 @@ import (
 	"time"
 	"whatsapp-service/internal/entities/campaign"
 	"whatsapp-service/internal/infrastructure/dispatcher/messaging/ports"
+	"whatsapp-service/internal/shared/logger"
 	"whatsapp-service/internal/usecases/dto"
 )
 
@@ -16,7 +17,7 @@ type Dispatcher struct {
 	// Зависимости
 	gateway ports.MessageGateway
 	limiter ports.GlobalRateLimiter
-	logger  *zap.Logger
+	logger  logger.Logger
 
 	// Внутреннее состояние
 	mu              sync.Mutex
@@ -31,11 +32,11 @@ type Dispatcher struct {
 	wg       sync.WaitGroup
 }
 
-func NewDispatcher(gateway ports.MessageGateway, limiter ports.GlobalRateLimiter, logger *zap.Logger) *Dispatcher {
+func NewDispatcher(gateway ports.MessageGateway, limiter ports.GlobalRateLimiter, logger logger.Logger) *Dispatcher {
 	return &Dispatcher{
 		gateway:         gateway,
 		limiter:         limiter,
-		logger:          logger.Named("dispatcher"),
+		logger:          logger,
 		activeCampaigns: list.New(),
 		queues:          make(map[string]*list.List),
 		resultsChans:    make(map[string]chan<- *dto.MessageSendResult),

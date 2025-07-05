@@ -9,7 +9,7 @@ import (
 	"whatsapp-service/internal/infrastructure/dispatcher/messaging/ports"
 	"whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate"
 	"whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate/types"
-	ports2 "whatsapp-service/internal/usecases/settings/ports"
+	settingsPorts "whatsapp-service/internal/usecases/settings/ports"
 
 	"whatsapp-service/internal/usecases/dto"
 )
@@ -23,7 +23,7 @@ const (
 // SettingsAwareGateway получает актуальные креды из репозитория в рантайме
 // и кэширует их для повышения производительности.
 type SettingsAwareGateway struct {
-	repo           ports2.WhatsGateSettingsRepository
+	repo           settingsPorts.WhatsGateSettingsRepository
 	cachedGateway  ports.MessageGateway
 	cacheTimestamp time.Time
 	cacheTTL       time.Duration
@@ -31,7 +31,7 @@ type SettingsAwareGateway struct {
 }
 
 // NewSettingsAwareGateway создаёт ленивый кэширующий шлюз.
-func NewSettingsAwareGateway(repo ports2.WhatsGateSettingsRepository) *SettingsAwareGateway {
+func NewSettingsAwareGateway(repo settingsPorts.WhatsGateSettingsRepository) *SettingsAwareGateway {
 	return &SettingsAwareGateway{
 		repo:     repo,
 		cacheTTL: defaultCacheTTL,
