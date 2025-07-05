@@ -1,4 +1,4 @@
-package parsers
+package excel
 
 import (
 	"bytes"

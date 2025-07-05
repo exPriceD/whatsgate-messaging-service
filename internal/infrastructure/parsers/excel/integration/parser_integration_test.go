@@ -1,10 +1,9 @@
-package integration
+package integration_test
 
 import (
 	"os"
 	"testing"
-
-	"whatsapp-service/internal/infrastructure/parsers"
+	"whatsapp-service/internal/infrastructure/parsers/excel"
 )
 
 // TestExcelParser_EndToEnd проверяет работу ExcelParser на реальном файле.
@@ -19,7 +18,7 @@ func TestExcelParser_EndToEnd(t *testing.T) {
 	}
 	defer file.Close()
 
-	p := parsers.NewExcelParser()
+	p := excel.NewExcelParser()
 	res, err := p.ParsePhoneNumbersDetailed(file, "")
 	if err != nil {
 		t.Fatalf("parse error: %v", err)

@@ -1,4 +1,4 @@
-package parsers
+package excel
 
 import (
 	"errors"
@@ -6,8 +6,8 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"whatsapp-service/internal/entities/campaign"
 
-	"whatsapp-service/internal/entities"
 	"whatsapp-service/internal/usecases/dto"
 
 	"github.com/xuri/excelize/v2"
@@ -50,7 +50,7 @@ func (p *ExcelParser) findPhoneColumn(headerRow []string, preferredColumnName st
 }
 
 // ParsePhoneNumbers парсит номера телефонов из Excel файла (основной метод интерфейса)
-func (p *ExcelParser) ParsePhoneNumbers(fileData io.Reader) ([]entities.PhoneNumber, error) {
+func (p *ExcelParser) ParsePhoneNumbers(fileData io.Reader) ([]campaign.PhoneNumber, error) {
 	result, err := p.ParsePhoneNumbersDetailed(fileData, "")
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (p *ExcelParser) ParsePhoneNumbersDetailed(fileData io.Reader, columnName s
 	}
 
 	result := &dto.ParseResult{
-		ValidPhones:     make([]entities.PhoneNumber, 0),
+		ValidPhones:     make([]campaign.PhoneNumber, 0),
 		InvalidPhones:   make([]dto.InvalidPhone, 0),
 		DuplicatePhones: make([]dto.DuplicatePhone, 0),
 		Warnings:        make([]string, 0),
@@ -122,7 +122,7 @@ func (p *ExcelParser) ParsePhoneNumbersDetailed(fileData io.Reader, columnName s
 			continue
 		}
 
-		phone, err := entities.NewPhoneNumber(rawValue)
+		phone, err := campaign.NewPhoneNumber(rawValue)
 		if err != nil {
 			result.InvalidPhones = append(result.InvalidPhones, dto.InvalidPhone{
 				RawValue: rawValue,
