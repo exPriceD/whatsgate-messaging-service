@@ -18,16 +18,18 @@ type CampaignConverter interface {
 
 	// UseCase -> HTTP
 	ToCreateCampaignResponse(ucResp *dto.CreateCampaignResponse) httpDTO.CreateCampaignResponse
-	ToStartCampaignResponse(ucResp *dto.StartCampaignResponse) map[string]interface{}
-	ToCancelCampaignResponse(ucResp *dto.CancelCampaignResponse) map[string]interface{}
-	ToGetCampaignByIDResponse(ucResp *dto.GetCampaignByIDResponse) map[string]interface{}
-	ToListCampaignsResponse(ucResp *dto.ListCampaignsResponse) map[string]interface{}
+	ToStartCampaignResponse(ucResp *dto.StartCampaignResponse) httpDTO.StartCampaignResponse
+	ToCancelCampaignResponse(ucResp *dto.CancelCampaignResponse) httpDTO.CancelCampaignResponse
+	ToGetCampaignByIDResponse(ucResp *dto.GetCampaignByIDResponse) httpDTO.GetCampaignByIDResponse
+	ToListCampaignsResponse(ucResp *dto.ListCampaignsResponse) httpDTO.ListCampaignsResponse
 
 	// Entity -> HTTP
 	ToCampaignResponse(entity *campaign.Campaign) httpDTO.CampaignResponse
 	ToBriefCampaignResponse(entity *campaign.Campaign) httpDTO.BriefCampaignResponse
 	ToCampaignResponseList(entities []*campaign.Campaign) []httpDTO.CampaignResponse
 	ToBriefCampaignResponseList(entities []*campaign.Campaign) []httpDTO.BriefCampaignResponse
+	ToCampaignSummary(entity *campaign.Campaign) httpDTO.CampaignSummary
+	ToCampaignSummaryList(entities []*campaign.Campaign) []httpDTO.CampaignSummary
 }
 
 // campaignConverter реализация конвертера
@@ -95,55 +97,51 @@ func (c *campaignConverter) ToCreateCampaignResponse(ucResp *dto.CreateCampaignR
 }
 
 // ToStartCampaignResponse преобразует UseCase ответ в HTTP ответ
-func (c *campaignConverter) ToStartCampaignResponse(ucResp *dto.StartCampaignResponse) map[string]interface{} {
-	return map[string]interface{}{
-		"message":              "Campaign started successfully",
-		"campaign_id":          ucResp.CampaignID,
-		"status":               string(ucResp.Status),
-		"total_numbers":        ucResp.TotalNumbers,
-		"estimated_completion": ucResp.EstimatedCompletion,
-		"worker_started":       ucResp.WorkerStarted,
-		"async":                true,
+func (c *campaignConverter) ToStartCampaignResponse(ucResp *dto.StartCampaignResponse) httpDTO.StartCampaignResponse {
+	return httpDTO.StartCampaignResponse{
+		Message:             "Campaign started successfully",
+		CampaignID:          ucResp.CampaignID,
+		Status:              string(ucResp.Status),
+		TotalNumbers:        ucResp.TotalNumbers,
+		EstimatedCompletion: ucResp.EstimatedCompletion,
+		WorkerStarted:       ucResp.WorkerStarted,
+		Async:               true,
 	}
 }
 
 // ToCancelCampaignResponse преобразует UseCase ответ в HTTP ответ
-func (c *campaignConverter) ToCancelCampaignResponse(ucResp *dto.CancelCampaignResponse) map[string]interface{} {
-	response := map[string]interface{}{
-		"message":              "Campaign cancelled successfully",
-		"campaign_id":          ucResp.CampaignID,
-		"status":               string(ucResp.Status),
-		"cancelled_numbers":    ucResp.CancelledNumbers,
-		"already_sent_numbers": ucResp.AlreadySentNumbers,
-		"total_numbers":        ucResp.TotalNumbers,
-		"worker_stopped":       ucResp.WorkerStopped,
+func (c *campaignConverter) ToCancelCampaignResponse(ucResp *dto.CancelCampaignResponse) httpDTO.CancelCampaignResponse {
+	return httpDTO.CancelCampaignResponse{
+		Message:            "Campaign cancelled successfully",
+		CampaignID:         ucResp.CampaignID,
+		Status:             string(ucResp.Status),
+		CancelledNumbers:   ucResp.CancelledNumbers,
+		AlreadySentNumbers: ucResp.AlreadySentNumbers,
+		TotalNumbers:       ucResp.TotalNumbers,
+		WorkerStopped:      ucResp.WorkerStopped,
+		Reason:             ucResp.Reason,
 	}
-
-	if ucResp.Reason != "" {
-		response["reason"] = ucResp.Reason
-	}
-
-	return response
 }
 
 // ToGetCampaignByIDResponse преобразует UseCase ответ в HTTP ответ
-func (c *campaignConverter) ToGetCampaignByIDResponse(ucResp *dto.GetCampaignByIDResponse) map[string]interface{} {
-	response := map[string]interface{}{
-		"id":                ucResp.ID,
-		"name":              ucResp.Name,
-		"message":           ucResp.Message,
-		"status":            string(ucResp.Status),
-		"total_count":       ucResp.TotalCount,
-		"processed_count":   ucResp.ProcessedCount,
-		"error_count":       ucResp.ErrorCount,
-		"messages_per_hour": ucResp.MessagesPerHour,
-		"created_at":        ucResp.CreatedAt,
-		"sent_numbers":      c.convertPhoneNumberStatuses(ucResp.SentNumbers),
-		"failed_numbers":    c.convertPhoneNumberStatuses(ucResp.FailedNumbers),
+func (c *campaignConverter) ToGetCampaignByIDResponse(ucResp *dto.GetCampaignByIDResponse) httpDTO.GetCampaignByIDResponse {
+	response := httpDTO.GetCampaignByIDResponse{
+		ID:              ucResp.ID,
+		Name:            ucResp.Name,
+		Message:         ucResp.Message,
+		Status:          string(ucResp.Status),
+		TotalCount:      ucResp.TotalCount,
+		ProcessedCount:  ucResp.ProcessedCount,
+		ErrorCount:      ucResp.ErrorCount,
+		MessagesPerHour: ucResp.MessagesPerHour,
+		CreatedAt:       ucResp.CreatedAt,
+		SentNumbers:     c.convertPhoneNumberStatuses(ucResp.SentNumbers),
+		FailedNumbers:   c.convertPhoneNumberStatuses(ucResp.FailedNumbers),
 	}
 
 	if ucResp.Media != nil {
-		response["media"] = c.convertMediaInfo(ucResp.Media)
+		mediaInfo := c.convertMediaInfo(ucResp.Media)
+		response.Media = &mediaInfo
 	}
 
 	return response
@@ -178,26 +176,26 @@ func (c *campaignConverter) convertMediaInfo(ucMedia *dto.MediaInfo) httpDTO.Med
 }
 
 // ToListCampaignsResponse преобразует UseCase ответ в HTTP ответ
-func (c *campaignConverter) ToListCampaignsResponse(ucResp *dto.ListCampaignsResponse) map[string]interface{} {
-	campaigns := make([]map[string]interface{}, len(ucResp.Campaigns))
+func (c *campaignConverter) ToListCampaignsResponse(ucResp *dto.ListCampaignsResponse) httpDTO.ListCampaignsResponse {
+	campaigns := make([]httpDTO.CampaignSummary, len(ucResp.Campaigns))
 	for i, summary := range ucResp.Campaigns {
-		campaigns[i] = map[string]interface{}{
-			"id":                summary.ID,
-			"name":              summary.Name,
-			"status":            string(summary.Status),
-			"total_count":       summary.TotalCount,
-			"processed_count":   summary.ProcessedCount,
-			"error_count":       summary.ErrorCount,
-			"messages_per_hour": summary.MessagesPerHour,
-			"created_at":        summary.CreatedAt,
+		campaigns[i] = httpDTO.CampaignSummary{
+			ID:              summary.ID,
+			Name:            summary.Name,
+			Status:          string(summary.Status),
+			TotalCount:      summary.TotalCount,
+			ProcessedCount:  summary.ProcessedCount,
+			ErrorCount:      summary.ErrorCount,
+			MessagesPerHour: summary.MessagesPerHour,
+			CreatedAt:       summary.CreatedAt,
 		}
 	}
 
-	return map[string]interface{}{
-		"campaigns": campaigns,
-		"total":     ucResp.Total,
-		"limit":     ucResp.Limit,
-		"offset":    ucResp.Offset,
+	return httpDTO.ListCampaignsResponse{
+		Campaigns: campaigns,
+		Total:     ucResp.Total,
+		Limit:     ucResp.Limit,
+		Offset:    ucResp.Offset,
 	}
 }
 
@@ -230,6 +228,20 @@ func (c *campaignConverter) ToBriefCampaignResponse(entity *campaign.Campaign) h
 	}
 }
 
+// ToCampaignSummary преобразует Entity в краткую информацию для списка
+func (c *campaignConverter) ToCampaignSummary(entity *campaign.Campaign) httpDTO.CampaignSummary {
+	return httpDTO.CampaignSummary{
+		ID:              entity.ID(),
+		Name:            entity.Name(),
+		Status:          string(entity.Status()),
+		TotalCount:      entity.Metrics().Total,
+		ProcessedCount:  entity.Metrics().Processed,
+		ErrorCount:      entity.Metrics().Errors,
+		MessagesPerHour: entity.MessagesPerHour(),
+		CreatedAt:       entity.CreatedAt().Format("2006-01-02T15:04:05Z07:00"),
+	}
+}
+
 // ToCampaignResponseList преобразует список Entity в список HTTP ответов
 func (c *campaignConverter) ToCampaignResponseList(entities []*campaign.Campaign) []httpDTO.CampaignResponse {
 	responses := make([]httpDTO.CampaignResponse, len(entities))
@@ -246,4 +258,13 @@ func (c *campaignConverter) ToBriefCampaignResponseList(entities []*campaign.Cam
 		responses[i] = c.ToBriefCampaignResponse(entity)
 	}
 	return responses
+}
+
+// ToCampaignSummaryList преобразует список Entity в список кратких DTO для списка кампаний
+func (c *campaignConverter) ToCampaignSummaryList(entities []*campaign.Campaign) []httpDTO.CampaignSummary {
+	summaries := make([]httpDTO.CampaignSummary, len(entities))
+	for i, entity := range entities {
+		summaries[i] = c.ToCampaignSummary(entity)
+	}
+	return summaries
 }
