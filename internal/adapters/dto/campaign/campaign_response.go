@@ -1,5 +1,21 @@
 package campaign
 
+// PhoneNumberStatus представляет информацию о номере телефона и его статусе для HTTP ответа
+type PhoneNumberStatus struct {
+	PhoneNumber string `json:"phone_number"`
+	Status      string `json:"status"`
+	Error       string `json:"error"`
+	SentAt      string `json:"sent_at"`
+}
+
+// MediaInfo представляет информацию о медиафайле в кампании для HTTP ответа
+type MediaInfo struct {
+	Filename    string `json:"filename"`
+	MimeType    string `json:"mime_type"`
+	MessageType string `json:"message_type"`
+	Size        int    `json:"size"`
+}
+
 type BriefCampaignResponse struct {
 	ID              string `json:"id"`
 	Name            string `json:"name"`

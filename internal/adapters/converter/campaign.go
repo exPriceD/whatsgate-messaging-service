@@ -138,20 +138,43 @@ func (c *campaignConverter) ToGetCampaignByIDResponse(ucResp *dto.GetCampaignByI
 		"error_count":       ucResp.ErrorCount,
 		"messages_per_hour": ucResp.MessagesPerHour,
 		"created_at":        ucResp.CreatedAt,
-		"sent_numbers":      ucResp.SentNumbers,
-		"failed_numbers":    ucResp.FailedNumbers,
+		"sent_numbers":      c.convertPhoneNumberStatuses(ucResp.SentNumbers),
+		"failed_numbers":    c.convertPhoneNumberStatuses(ucResp.FailedNumbers),
 	}
 
 	if ucResp.Media != nil {
-		response["media"] = map[string]interface{}{
-			"filename":     ucResp.Media.Filename,
-			"mime_type":    ucResp.Media.MimeType,
-			"message_type": ucResp.Media.MessageType,
-			"size":         ucResp.Media.Size,
-		}
+		response["media"] = c.convertMediaInfo(ucResp.Media)
 	}
 
 	return response
+}
+
+// convertPhoneNumberStatuses преобразует UseCase PhoneNumberStatus в HTTP DTO
+func (c *campaignConverter) convertPhoneNumberStatuses(ucStatuses []dto.PhoneNumberStatus) []httpDTO.PhoneNumberStatus {
+	if ucStatuses == nil {
+		return nil
+	}
+
+	httpStatuses := make([]httpDTO.PhoneNumberStatus, len(ucStatuses))
+	for i, ucStatus := range ucStatuses {
+		httpStatuses[i] = httpDTO.PhoneNumberStatus{
+			PhoneNumber: ucStatus.PhoneNumber,
+			Status:      ucStatus.Status,
+			Error:       ucStatus.Error,
+			SentAt:      ucStatus.SentAt,
+		}
+	}
+	return httpStatuses
+}
+
+// convertMediaInfo преобразует UseCase MediaInfo в HTTP DTO
+func (c *campaignConverter) convertMediaInfo(ucMedia *dto.MediaInfo) httpDTO.MediaInfo {
+	return httpDTO.MediaInfo{
+		Filename:    ucMedia.Filename,
+		MimeType:    ucMedia.MimeType,
+		MessageType: ucMedia.MessageType,
+		Size:        ucMedia.Size,
+	}
 }
 
 // ToListCampaignsResponse преобразует UseCase ответ в HTTP ответ
