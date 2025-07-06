@@ -17,6 +17,6 @@ type CampaignModel struct {
 	MediaMime     *string `db:"media_mime"`
 	MediaType     *string `db:"media_type"`
 
-	Initiator string    `db:"initiator"`
+	Initiator *string   `db:"initiator"`
 	CreatedAt time.Time `db:"created_at"`
 }

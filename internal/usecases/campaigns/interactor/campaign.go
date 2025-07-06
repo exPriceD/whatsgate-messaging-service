@@ -254,15 +254,13 @@ func (ci *CampaignInteractor) List(ctx context.Context, req dto.ListCampaignsReq
 			"index", i,
 		)
 
-		processedCount, errorCount := ci.getCampaignStatistics(ctx, campaignEntity.ID())
-
 		summary := dto.CampaignSummary{
 			ID:              campaignEntity.ID(),
 			Name:            campaignEntity.Name(),
 			Status:          campaignEntity.Status(),
 			TotalCount:      campaignEntity.Metrics().Total,
-			ProcessedCount:  processedCount,
-			ErrorCount:      errorCount,
+			ProcessedCount:  campaignEntity.Metrics().Processed,
+			ErrorCount:      campaignEntity.Metrics().Errors,
 			MessagesPerHour: campaignEntity.MessagesPerHour(),
 			CreatedAt:       campaignEntity.CreatedAt().Format("2006-01-02T15:04:05Z07:00"),
 		}
@@ -286,26 +284,4 @@ func (ci *CampaignInteractor) List(ctx context.Context, req dto.ListCampaignsReq
 	}
 
 	return response, nil
-}
-
-// getCampaignStatistics получает статистику обработки для кампании
-func (ci *CampaignInteractor) getCampaignStatistics(ctx context.Context, campaignID string) (processedCount, errorCount int) {
-	campaignStatuses, err := ci.campaignStatusRepo.ListByCampaignID(ctx, campaignID)
-	if err != nil {
-		ci.logger.Error("failed to get campaign statuses for statistics",
-			"campaign_id", campaignID,
-			"error", err)
-		return 0, 0
-	}
-
-	for _, status := range campaignStatuses {
-		switch status.Status() {
-		case campaign.CampaignStatusTypeSent:
-			processedCount++
-		case campaign.CampaignStatusTypeFailed:
-			errorCount++
-		}
-	}
-
-	return processedCount, errorCount
 }

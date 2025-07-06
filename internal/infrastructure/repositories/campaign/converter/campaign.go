@@ -15,6 +15,12 @@ func MapCampaignEntityToModel(c *campaign.Campaign) models.CampaignModel {
 		filename, mimeType, messageType = &f, &m, &t
 	}
 
+	var initiator *string
+	if c.Initiator() != "" {
+		init := c.Initiator()
+		initiator = &init
+	}
+
 	return models.CampaignModel{
 		ID:      c.ID(),
 		Name:    c.Name(),
@@ -30,7 +36,7 @@ func MapCampaignEntityToModel(c *campaign.Campaign) models.CampaignModel {
 		MediaMime:     mimeType,
 		MediaType:     messageType,
 
-		Initiator: c.Initiator(),
+		Initiator: initiator,
 		CreatedAt: c.CreatedAt(),
 	}
 }
@@ -43,11 +49,16 @@ func MapCampaignModelToEntity(db models.CampaignModel) *campaign.Campaign {
 		media.SetMessageType(campaign.MessageType(*db.MediaType))
 	}
 
+	initiator := ""
+	if db.Initiator != nil {
+		initiator = *db.Initiator
+	}
+
 	return campaign.RestoreCampaign(
 		db.ID,
 		db.Name,
 		db.Message,
-		db.Initiator,
+		initiator,
 		campaign.CampaignStatus(db.Status),
 		media,
 		db.MessagesPerHour,
