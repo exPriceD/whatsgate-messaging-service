@@ -90,9 +90,9 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 	}
 
 	// Репозитории
-	var campaignRepo ports.CampaignRepository = campaignRepository.NewPostgresCampaignRepository(pool)
-	var campaignStatusRepo ports.CampaignStatusRepository = campaignRepository.NewPostgresCampaignStatusRepository(pool)
-	var settingsRepo settingsPorts.WhatsGateSettingsRepository = settingsRepository.NewPostgresWhatsGateSettingsRepository(pool)
+	var campaignRepo ports.CampaignRepository = campaignRepository.NewPostgresCampaignRepository(pool, sharedLogger)
+	var campaignStatusRepo ports.CampaignStatusRepository = campaignRepository.NewPostgresCampaignStatusRepository(pool, sharedLogger)
+	var settingsRepo settingsPorts.WhatsGateSettingsRepository = settingsRepository.NewPostgresWhatsGateSettingsRepository(pool, sharedLogger)
 
 	// Утилитарные сервисы
 	var globalRateLimiter messagingPorts.GlobalRateLimiter = ratelimiter.NewGlobalMemoryRateLimiter()
