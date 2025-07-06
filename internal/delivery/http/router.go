@@ -76,7 +76,7 @@ func (rt *Router) SetupRoutes() http.Handler {
 		r.Route("/settings", func(r chi.Router) {
 			r.Get("/", rt.settings.Get)
 			r.Put("/", rt.settings.Update)
-			r.Post("/reset", rt.settings.Reset)
+			r.Delete("/reset", rt.settings.Reset)
 		})
 	})
 
