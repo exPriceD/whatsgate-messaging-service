@@ -256,7 +256,7 @@ func (h *CampaignsHandler) validateCreateRequest(req httpDTO.CreateCampaignReque
 
 // parseFiles парсит файлы из multipart form
 func (h *CampaignsHandler) parseFiles(r *http.Request) (*multipart.FileHeader, *multipart.FileHeader, error) {
-	phoneFile, phoneHeader, err := r.FormFile("file")
+	phoneFile, phoneHeader, err := r.FormFile("numbers_file")
 	if err != nil {
 		return nil, nil, errors.New("phone file is required")
 	}

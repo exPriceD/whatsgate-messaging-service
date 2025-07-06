@@ -275,6 +275,8 @@ func (ci *CampaignInteractor) processStartResults(ctx context.Context, campaignI
 
 // processStartMessageResult обрабатывает результат отправки одного сообщения
 func (ci *CampaignInteractor) processStartMessageResult(campaignID string, result *infraDTO.MessageSendResult) {
+	ctx := context.Background()
+
 	ci.logger.Debug("Processing message result", map[string]interface{}{
 		"campaignID":  campaignID,
 		"phoneNumber": result.PhoneNumber,
@@ -291,8 +293,9 @@ func (ci *CampaignInteractor) processStartMessageResult(campaignID string, resul
 		errMsg = result.Error
 	}
 
+	// Обновляем статус конкретного номера
 	err := ci.campaignStatusRepo.UpdateByPhoneNumber(
-		context.Background(),
+		ctx,
 		campaignID,
 		result.PhoneNumber,
 		newStatus,
@@ -306,7 +309,38 @@ func (ci *CampaignInteractor) processStartMessageResult(campaignID string, resul
 			"phoneNumber": result.PhoneNumber,
 			"success":     result.Success,
 		})
+		return
 	}
+
+	// Инкрементируем счетчик обработанных сообщений в БД
+	err = ci.campaignRepo.IncrementProcessedCount(ctx, campaignID)
+	if err != nil {
+		ci.logger.Error("Failed to increment processed count", map[string]interface{}{
+			"error":       err.Error(),
+			"campaignID":  campaignID,
+			"phoneNumber": result.PhoneNumber,
+		})
+		// Не возвращаем ошибку, так как статус номера уже обновлен
+	}
+
+	// Если сообщение не удалось отправить, инкрементируем счетчик ошибок
+	if !result.Success {
+		err = ci.campaignRepo.IncrementErrorCount(ctx, campaignID)
+		if err != nil {
+			ci.logger.Error("Failed to increment error count", map[string]interface{}{
+				"error":       err.Error(),
+				"campaignID":  campaignID,
+				"phoneNumber": result.PhoneNumber,
+			})
+		}
+	}
+
+	ci.logger.Debug("Message result processed successfully", map[string]interface{}{
+		"campaignID":  campaignID,
+		"phoneNumber": result.PhoneNumber,
+		"success":     result.Success,
+		"status":      newStatus,
+	})
 }
 
 // finalizeStartCampaignStatus обновляет финальный статус кампании в БД
@@ -322,6 +356,38 @@ func (ci *CampaignInteractor) finalizeStartCampaignStatus(campaignID string, was
 		return
 	}
 
+	// Получаем статистику обработанных сообщений
+	statuses, err := ci.campaignStatusRepo.ListByCampaignID(ctx, campaignID)
+	if err != nil {
+		ci.logger.Error("Failed to get campaign statuses for final update", map[string]interface{}{
+			"error":      err.Error(),
+			"campaignID": campaignID,
+		})
+	} else {
+		// Подсчитываем количество обработанных сообщений и ошибок
+		processedCount := 0
+		errorCount := 0
+		for _, status := range statuses {
+			if status.Status() == campaign.CampaignStatusTypeSent || status.Status() == campaign.CampaignStatusTypeFailed {
+				processedCount++
+				if status.Status() == campaign.CampaignStatusTypeFailed {
+					errorCount++
+				}
+			}
+		}
+
+		// Обновляем метрики в entity
+		c.Metrics().Processed = processedCount
+		c.Metrics().Errors = errorCount
+
+		ci.logger.Debug("Updated campaign metrics", map[string]interface{}{
+			"campaignID":     campaignID,
+			"processedCount": processedCount,
+			"errorCount":     errorCount,
+			"totalStatuses":  len(statuses),
+		})
+	}
+
 	if wasCancelled {
 		if err := c.Cancel(); err != nil {
 			ci.logger.Error("Failed to transition campaign to cancelled state", map[string]interface{}{
@@ -333,16 +399,19 @@ func (ci *CampaignInteractor) finalizeStartCampaignStatus(campaignID string, was
 		c.Finish()
 	}
 
-	if err := ci.campaignRepo.UpdateStatus(ctx, c.ID(), c.Status()); err != nil {
-		ci.logger.Error("Failed to update final campaign status in DB", map[string]interface{}{
+	// Обновляем полную кампанию (статус + метрики)
+	if err := ci.campaignRepo.Update(ctx, c); err != nil {
+		ci.logger.Error("Failed to update final campaign in DB", map[string]interface{}{
 			"error":      err.Error(),
 			"campaignID": campaignID,
 			"status":     string(c.Status()),
 		})
 	} else {
-		ci.logger.Info("Final campaign status updated", map[string]interface{}{
-			"campaignID": campaignID,
-			"status":     string(c.Status()),
+		ci.logger.Info("Final campaign status and metrics updated", map[string]interface{}{
+			"campaignID":     campaignID,
+			"status":         string(c.Status()),
+			"processedCount": c.Metrics().Processed,
+			"errorCount":     c.Metrics().Errors,
 		})
 	}
 }

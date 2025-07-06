@@ -146,7 +146,7 @@ func (r *PostgresCampaignStatusRepository) UpdateByPhoneNumber(ctx context.Conte
 		"has_error", errorMessage != "",
 	)
 
-	query := `UPDATE bulk_campaign_statuses SET status = $1, error = $2, updated_at = NOW() WHERE campaign_id = $3 AND phone_number = $4`
+	query := `UPDATE bulk_campaign_statuses SET status = $1, error = $2 WHERE campaign_id = $3 AND phone_number = $4`
 	ct, err := r.pool.Exec(ctx, query, newStatus, errorMessage, campaignID, phoneNumber)
 	if err != nil {
 		r.logger.Error("campaign status repository UpdateByPhoneNumber failed",

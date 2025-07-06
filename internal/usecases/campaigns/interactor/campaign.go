@@ -155,6 +155,39 @@ func (ci *CampaignInteractor) GetByID(ctx context.Context, req dto.GetCampaignBy
 	return response, nil
 }
 
+// calculateCampaignMetrics рассчитывает актуальные метрики кампании из статусов
+func (ci *CampaignInteractor) calculateCampaignMetrics(ctx context.Context, campaignID string) (processedCount int, errorCount int) {
+	// Получаем все статусы для кампании
+	statuses, err := ci.campaignStatusRepo.ListByCampaignID(ctx, campaignID)
+	if err != nil {
+		ci.logger.Error("failed to get campaign statuses for metrics calculation",
+			"campaign_id", campaignID,
+			"error", err,
+		)
+		return 0, 0
+	}
+
+	// Подсчитываем метрики
+	for _, status := range statuses {
+		switch status.Status() {
+		case campaign.CampaignStatusTypeSent:
+			processedCount++
+		case campaign.CampaignStatusTypeFailed:
+			processedCount++
+			errorCount++
+		}
+	}
+
+	ci.logger.Debug("campaign metrics calculated",
+		"campaign_id", campaignID,
+		"total_statuses", len(statuses),
+		"processed_count", processedCount,
+		"error_count", errorCount,
+	)
+
+	return processedCount, errorCount
+}
+
 // List получает список всех кампаний с возможностью фильтрации и пагинации
 func (ci *CampaignInteractor) List(ctx context.Context, req dto.ListCampaignsRequest) (*dto.ListCampaignsResponse, error) {
 	ci.logger.Debug("list campaigns usecase started",
@@ -254,13 +287,16 @@ func (ci *CampaignInteractor) List(ctx context.Context, req dto.ListCampaignsReq
 			"index", i,
 		)
 
+		// Получаем актуальную статистику для кампании
+		processedCount, errorCount := ci.calculateCampaignMetrics(ctx, campaignEntity.ID())
+
 		summary := dto.CampaignSummary{
 			ID:              campaignEntity.ID(),
 			Name:            campaignEntity.Name(),
 			Status:          campaignEntity.Status(),
 			TotalCount:      campaignEntity.Metrics().Total,
-			ProcessedCount:  campaignEntity.Metrics().Processed,
-			ErrorCount:      campaignEntity.Metrics().Errors,
+			ProcessedCount:  processedCount,
+			ErrorCount:      errorCount,
 			MessagesPerHour: campaignEntity.MessagesPerHour(),
 			CreatedAt:       campaignEntity.CreatedAt().Format("2006-01-02T15:04:05Z07:00"),
 		}

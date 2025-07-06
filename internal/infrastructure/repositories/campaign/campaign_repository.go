@@ -42,14 +42,14 @@ func (r *PostgresCampaignRepository) Save(ctx context.Context, campaign *campaig
 
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO bulk_campaigns (
-			id, name, message, total, status, media_filename, 
+			id, name, message, total, processed_count, status, media_filename, 
 			media_mime, media_type, messages_per_hour, error_count, 
 			initiator, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`,
-		model.ID, model.Name, model.Message, model.TotalCount, model.Status,
-		model.MediaFilename, model.MediaMime, model.MediaType, model.MessagesPerHour,
-		model.ErrorCount, model.Initiator, model.CreatedAt,
+		model.ID, model.Name, model.Message, model.TotalCount, model.ProcessedCount,
+		model.Status, model.MediaFilename, model.MediaMime, model.MediaType,
+		model.MessagesPerHour, model.ErrorCount, model.Initiator, model.CreatedAt,
 	)
 
 	if err != nil {
@@ -75,7 +75,7 @@ func (r *PostgresCampaignRepository) GetByID(ctx context.Context, id string) (*c
 	)
 
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, name, message, total, status, media_filename, 
+		SELECT id, name, message, total, processed_count, status, media_filename, 
 		       media_mime, media_type, messages_per_hour, error_count, 
 		       initiator, created_at
 		FROM bulk_campaigns WHERE id = $1
@@ -85,8 +85,8 @@ func (r *PostgresCampaignRepository) GetByID(ctx context.Context, id string) (*c
 	var mediaFilename, mediaMime, mediaType, initiator sql.NullString
 
 	err := row.Scan(
-		&model.ID, &model.Name, &model.Message, &model.TotalCount, &model.Status,
-		&mediaFilename, &mediaMime, &mediaType,
+		&model.ID, &model.Name, &model.Message, &model.TotalCount, &model.ProcessedCount,
+		&model.Status, &mediaFilename, &mediaMime, &mediaType,
 		&model.MessagesPerHour, &model.ErrorCount, &initiator, &model.CreatedAt,
 	)
 	if err != nil {
@@ -134,12 +134,12 @@ func (r *PostgresCampaignRepository) Update(ctx context.Context, campaign *campa
 
 	_, err := r.pool.Exec(ctx, `
 		UPDATE bulk_campaigns SET
-			name = $2, message = $3, total = $4, status = $5,
-			media_filename = $6, media_mime = $7, media_type = $8,
-			messages_per_hour = $9, error_count = $10, initiator = $11
+			name = $2, message = $3, total = $4, processed_count = $5, status = $6,
+			media_filename = $7, media_mime = $8, media_type = $9,
+			messages_per_hour = $10, error_count = $11, initiator = $12
 		WHERE id = $1
 	`,
-		model.ID, model.Name, model.Message, model.TotalCount,
+		model.ID, model.Name, model.Message, model.TotalCount, model.ProcessedCount,
 		model.Status, model.MediaFilename, model.MediaMime, model.MediaType,
 		model.MessagesPerHour, model.ErrorCount, model.Initiator,
 	)
@@ -305,7 +305,7 @@ func (r *PostgresCampaignRepository) UpdateProcessedCount(ctx context.Context, i
 	)
 
 	_, err := r.pool.Exec(ctx,
-		"UPDATE bulk_campaigns SET total = $2 WHERE id = $1", id, processedCount)
+		"UPDATE bulk_campaigns SET processed_count = $2 WHERE id = $1", id, processedCount)
 
 	if err != nil {
 		r.logger.Error("campaign repository UpdateProcessedCount failed",
@@ -348,6 +348,30 @@ func (r *PostgresCampaignRepository) IncrementErrorCount(ctx context.Context, id
 	return err
 }
 
+// IncrementProcessedCount увеличивает счетчик обработанных сообщений
+func (r *PostgresCampaignRepository) IncrementProcessedCount(ctx context.Context, id string) error {
+	r.logger.Debug("campaign repository IncrementProcessedCount started",
+		"campaign_id", id,
+	)
+
+	_, err := r.pool.Exec(ctx,
+		"UPDATE bulk_campaigns SET processed_count = processed_count + 1 WHERE id = $1", id)
+
+	if err != nil {
+		r.logger.Error("campaign repository IncrementProcessedCount failed",
+			"campaign_id", id,
+			"error", err,
+		)
+		return err
+	}
+
+	r.logger.Debug("campaign repository IncrementProcessedCount completed successfully",
+		"campaign_id", id,
+	)
+
+	return err
+}
+
 // GetActiveCampaigns возвращает активные кампании
 func (r *PostgresCampaignRepository) GetActiveCampaigns(ctx context.Context) ([]*campaign.Campaign, error) {
 	r.logger.Debug("campaign repository GetActiveCampaigns started")
@@ -376,7 +400,7 @@ func (r *PostgresCampaignRepository) getCampaignsByStatus(ctx context.Context, s
 	)
 
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, name, message, total, status, media_filename, 
+		SELECT id, name, message, total, processed_count, status, media_filename, 
 		       media_mime, media_type, messages_per_hour, error_count, 
 		       initiator, created_at
 		FROM bulk_campaigns 
@@ -403,8 +427,8 @@ func (r *PostgresCampaignRepository) getCampaignsByStatus(ctx context.Context, s
 		var mediaFilename, mediaMime, mediaType, initiator sql.NullString
 
 		err := rows.Scan(
-			&model.ID, &model.Name, &model.Message, &model.TotalCount, &model.Status,
-			&mediaFilename, &mediaMime, &mediaType,
+			&model.ID, &model.Name, &model.Message, &model.TotalCount, &model.ProcessedCount,
+			&model.Status, &mediaFilename, &mediaMime, &mediaType,
 			&model.MessagesPerHour, &model.ErrorCount, &initiator, &model.CreatedAt,
 		)
 		if err != nil {
@@ -452,7 +476,7 @@ func (r *PostgresCampaignRepository) ListByStatus(ctx context.Context, status st
 	)
 
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, name, message, total, status, media_filename, 
+		SELECT id, name, message, total, processed_count, status, media_filename, 
 		       media_mime, media_type, messages_per_hour, error_count, 
 		       initiator, created_at
 		FROM bulk_campaigns 
@@ -482,8 +506,8 @@ func (r *PostgresCampaignRepository) ListByStatus(ctx context.Context, status st
 		var mediaFilename, mediaMime, mediaType, initiator sql.NullString
 
 		err := rows.Scan(
-			&model.ID, &model.Name, &model.Message, &model.TotalCount, &model.Status,
-			&mediaFilename, &mediaMime, &mediaType,
+			&model.ID, &model.Name, &model.Message, &model.TotalCount, &model.ProcessedCount,
+			&model.Status, &mediaFilename, &mediaMime, &mediaType,
 			&model.MessagesPerHour, &model.ErrorCount, &initiator, &model.CreatedAt,
 		)
 		if err != nil {

@@ -34,27 +34,46 @@ func New(cfg config.LoggingConfig) (logger.Logger, error) {
 
 // Info logs a message at InfoLevel.
 func (l *zapAdapter) Info(msg string, fields ...any) {
-	l.sugar.Infow(msg, fields...)
+	l.sugar.Infow(msg, l.convertFields(fields)...)
 }
 
 // Warn logs a message at WarnLevel.
 func (l *zapAdapter) Warn(msg string, fields ...any) {
-	l.sugar.Warnw(msg, fields...)
+	l.sugar.Warnw(msg, l.convertFields(fields)...)
 }
 
 // Error logs a message at ErrorLevel.
 func (l *zapAdapter) Error(msg string, fields ...any) {
-	l.sugar.Errorw(msg, fields...)
+	l.sugar.Errorw(msg, l.convertFields(fields)...)
 }
 
 // Debug logs a message at DebugLevel.
 func (l *zapAdapter) Debug(msg string, fields ...any) {
-	l.sugar.Debugw(msg, fields...)
+	l.sugar.Debugw(msg, l.convertFields(fields)...)
 }
 
 // With returns a child logger with structured context.
 func (l *zapAdapter) With(fields ...any) logger.Logger {
-	return &zapAdapter{sugar: l.sugar.With(fields...)}
+	return &zapAdapter{sugar: l.sugar.With(l.convertFields(fields)...)}
+}
+
+// convertFields преобразует различные форматы полей в формат zap
+func (l *zapAdapter) convertFields(fields []any) []any {
+	if len(fields) == 0 {
+		return fields
+	}
+
+	if len(fields) == 1 {
+		if fieldMap, ok := fields[0].(map[string]interface{}); ok {
+			result := make([]any, 0, len(fieldMap)*2)
+			for key, value := range fieldMap {
+				result = append(result, key, value)
+			}
+			return result
+		}
+	}
+
+	return fields
 }
 
 // Sync flushes any buffered log entries.

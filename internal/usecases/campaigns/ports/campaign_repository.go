@@ -17,6 +17,7 @@ type CampaignRepository interface {
 	// Операции со статусами кампаний
 	UpdateStatus(ctx context.Context, id string, status campaign.CampaignStatus) error
 	UpdateProcessedCount(ctx context.Context, id string, processedCount int) error
+	IncrementProcessedCount(ctx context.Context, id string) error
 	IncrementErrorCount(ctx context.Context, id string) error
 
 	// Активные кампании
