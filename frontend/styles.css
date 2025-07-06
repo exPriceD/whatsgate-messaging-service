@@ -1551,8 +1551,237 @@ button[type="button"]:not(#send-test):hover {
 }
 
 .no-errors {
-  padding: 16px;
   text-align: center;
+  color: #888;
+  font-style: italic;
+  margin: 20px 0;
+}
+
+/* Стили для новых элементов в деталях кампании */
+.phone-numbers-container {
+  margin-top: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e0e6ed;
+}
+
+.phone-numbers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.phone-numbers-label {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.phone-numbers-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e0e6ed;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.phone-number-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+}
+
+.phone-number-item:last-child {
+  border-bottom: none;
+}
+
+.phone-number-item.success {
+  background: #f6ffed;
+  border-left: 3px solid #52c41a;
+}
+
+.phone-number-item.error {
+  background: #fff2f0;
+  border-left: 3px solid #ff4d4f;
+}
+
+.phone-number {
+  font-weight: 600;
+  color: #333;
+  font-family: 'Courier New', monospace;
+}
+
+.phone-time {
+  color: #666;
+  font-size: 12px;
+}
+
+.phone-error {
+  color: #ff4d4f;
+  font-size: 12px;
+  max-width: 200px;
+  text-align: right;
+}
+
+.phone-numbers-more {
+  text-align: center;
+  padding: 12px;
   color: #666;
   font-style: italic;
+  border-top: 1px solid #f0f0f0;
+}
+
+.phone-numbers-textarea-container {
+  margin-top: 16px;
+  border-top: 1px solid #f0f0f0;
+  padding-top: 16px;
+}
+
+.textarea-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 12px;
+}
+
+.phone-numbers-textarea-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0;
+  color: #333;
+  font-size: 0.9em;
+  flex: 1;
+}
+
+.copy-textarea-btn {
+  background: #2d8cff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 140px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy-textarea-btn:hover {
+  background: #1766d9;
+  transform: translateY(-1px);
+}
+
+.copy-textarea-btn:active {
+  transform: translateY(0);
+}
+
+.copy-btn-text {
+  transition: all 0.2s ease;
+}
+
+.phone-numbers-textarea {
+  width: 100%;
+  min-height: 120px;
+  max-height: 300px;
+  padding: 12px;
+  border: 1px solid #e0e6ed;
+  border-radius: 8px;
+  background: #f7f9fb;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.85em;
+  line-height: 1.4;
+  resize: vertical;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.phone-numbers-textarea:hover {
+  border-color: #2d8cff;
+  background: #fff;
+}
+
+.phone-numbers-textarea:focus {
+  outline: none;
+  border-color: #2d8cff;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(45, 140, 255, 0.1);
+}
+
+.media-size {
+  color: #666;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.detail-value.success {
+  color: #52c41a;
+  font-weight: 600;
+}
+
+.detail-value.numbers-error {
+  color: #ff4d4f;
+  font-weight: 600;
+}
+
+/* Улучшения для существующих элементов */
+.copy-numbers-btn {
+  background: #1890ff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.copy-numbers-btn:hover {
+  background: #40a9ff;
+}
+
+.error-state .error-details {
+  color: #666;
+  font-size: 14px;
+  margin-top: 8px;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .phone-numbers-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .textarea-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .copy-textarea-btn {
+    min-width: auto;
+    width: 100%;
+    font-size: 0.9em;
+  }
+  
+  .phone-number-item {
+    padding: 8px 0;
+  }
+  
+  .phone-error {
+    font-size: 0.8em;
+  }
 } 

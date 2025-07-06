@@ -160,14 +160,34 @@ export function initBulkForm(showToast) {
     }
     
     setLoading(true, testBtn);
-    const fd = new FormData();
-    fd.append('phone', testPhone);
-    fd.append('message', message);
-    if (form.media_file.files[0]) fd.append('media_file', form.media_file.files[0]);
     
     try {
-      await apiPost('/api/v1/messages/test-send', fd, showToast);
-      showToast('Тестовое сообщение отправлено', 'success');
+      // Для тестовой отправки используем дополнительные номера вместо файла
+      const fd = new FormData();
+      fd.append('name', `Тест от ${new Date().toLocaleString()}`);
+      fd.append('message', message);
+      fd.append('messages_per_hour', '60');
+      fd.append('initiator', 'test');
+      
+      // Добавляем тестовый номер как дополнительный номер (файл не обязателен!)
+      fd.append('additional_numbers', testPhone);
+      
+      // Добавляем медиа если есть
+      if (form.media_file.files[0]) {
+        fd.append('media', form.media_file.files[0]);
+      }
+      
+      const response = await apiPost('/api/v1/campaigns', fd, showToast);
+       
+      // Наш API возвращает данные в формате {campaign: {...}}
+      const campaignId = response.campaign?.id;
+      
+      if (campaignId) {
+        await apiPost(`/api/v1/campaigns/${campaignId}/start`, {}, showToast);
+        showToast('Тестовое сообщение отправлено', 'success');
+      } else {
+        showToast('Ошибка при создании тестовой кампании', 'danger');
+      }
     } catch (error) {
       console.error('Error sending test message:', error);
       // Ошибка уже обработана в apiPost
@@ -210,8 +230,8 @@ export function initBulkForm(showToast) {
     fd.append('message', message);
     fd.append('messages_per_hour', form.messages_per_hour.value);
     fd.append('numbers_file', form.numbers_file.files[0]);
-    if (form.media_file.files[0]) fd.append('media_file', form.media_file.files[0]);
-    fd.append('async', 'false');
+    if (form.media_file.files[0]) fd.append('media', form.media_file.files[0]);
+    fd.append('initiator', 'frontend');
     
     // Добавляем дополнительные и исключаемые номера
     const additionalTextarea = document.querySelector('textarea[name="additional_numbers"]');
@@ -228,8 +248,24 @@ export function initBulkForm(showToast) {
     }
     
     try {
-      await apiPost('/api/v1/messages/bulk-send', fd, showToast);
-      showToast('Рассылка запущена', 'success');
+      const response = await apiPost('/api/v1/campaigns', fd, showToast);
+      
+      // Наш API возвращает данные в формате {campaign: {...}}
+      const campaignId = response.campaign?.id;
+      
+      if (campaignId) {
+        // Автоматически запускаем кампанию
+        await apiPost(`/api/v1/campaigns/${campaignId}/start`, {}, showToast);
+        showToast('Рассылка создана и запущена', 'success');
+        
+        // Очищаем форму
+        form.reset();
+        document.getElementById('file-name-xlsx').textContent = 'Файл не выбран';
+        document.getElementById('file-name-media').textContent = 'Файл не выбран';
+        updateNumbersSummary();
+      } else {
+        showToast('Ошибка при создании кампании', 'danger');
+      }
     } catch (error) {
       console.error('Error starting bulk campaign:', error);
       // Ошибка уже обработана в apiPost
@@ -238,40 +274,35 @@ export function initBulkForm(showToast) {
     }
   };
 
-  // Функция для подсчета строк в Excel файле
+  // Функция для подсчета строк в Excel файле (приблизительная)
   async function countRowsInFile(file) {
     try {
       // Показываем индикатор загрузки
       const fileCountElement = document.getElementById('file-count');
       fileCountElement.textContent = '...';
       
-      const formData = new FormData();
-      formData.append('file', file);
+      // Простая эвристика: размер файла в байтах / примерный размер строки
+      // Это очень приблизительная оценка для Excel файлов
+      const fileSizeKB = file.size / 1024;
+      let estimatedRows;
       
-      const response = await fetch('/api/v1/messages/count-file-rows', {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.rows > 0) {
-          fileCountElement.textContent = data.rows;
-          // Добавляем подсказку, что это приблизительное значение
-          fileCountElement.title = 'Приблизительное количество строк в файле';
-        } else {
-          fileCountElement.textContent = '~';
-          fileCountElement.title = 'Не удалось точно подсчитать строки';
-        }
+      if (fileSizeKB < 50) {
+        estimatedRows = Math.floor(fileSizeKB * 50); // ~50 строк на КБ для маленьких файлов
       } else {
-        fileCountElement.textContent = '~';
-        fileCountElement.title = 'Ошибка при подсчете строк';
+        estimatedRows = Math.floor(fileSizeKB * 30); // ~30 строк на КБ для больших файлов
       }
+      
+      // Ограничиваем диапазон разумными значениями
+      estimatedRows = Math.max(10, Math.min(estimatedRows, 50000));
+      
+      fileCountElement.textContent = `~${estimatedRows}`;
+      fileCountElement.title = 'Приблизительная оценка на основе размера файла';
+      
     } catch (error) {
-      console.error('Error counting rows in file:', error);
+      console.error('Error estimating rows in file:', error);
       const fileCountElement = document.getElementById('file-count');
       fileCountElement.textContent = '~';
-      fileCountElement.title = 'Ошибка при подсчете строк';
+      fileCountElement.title = 'Ошибка при оценке строк';
     }
   }
 

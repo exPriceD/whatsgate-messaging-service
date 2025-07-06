@@ -106,5 +106,5 @@ export async function apiDelete(url, showToast = null) {
 }
 
 export async function apiGetCampaignErrors(campaignId, showToast = null) {
-  return apiGet(`/api/v1/messages/campaigns/${campaignId}/errors`, showToast);
+  return apiGet(`/api/v1/campaigns/${campaignId}/errors`, showToast);
 } 

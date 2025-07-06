@@ -22,7 +22,9 @@ export function initSettingsForm(showToast) {
   
   // Загрузка настроек
   apiGet('/api/v1/settings', showToast)
-    .then(data => {
+    .then(response => {
+      // Бэкенд возвращает данные в формате {data: {...}}
+      const data = response.data || response;
       if (data && data.api_key) {
         form.apiKey.value = data.api_key;
         form.whatsappId.value = data.whatsapp_id;
