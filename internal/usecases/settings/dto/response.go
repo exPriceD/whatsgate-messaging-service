@@ -14,3 +14,14 @@ type UpdateWhatsgateSettingsResponse struct {
 	BaseURL    string
 	UpdatedAt  time.Time
 }
+
+type GetRetailCRMSettingsResponse struct {
+	APIKey  string
+	BaseURL string
+}
+
+type UpdateRetailCRMSettingsResponse struct {
+	APIKey    string
+	BaseURL   string
+	UpdatedAt time.Time
+}

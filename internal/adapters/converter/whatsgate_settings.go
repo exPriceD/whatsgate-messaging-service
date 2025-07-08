@@ -8,11 +8,11 @@ import (
 // WhatsgateSettingsConverter интерфейс для конверсий settings
 type WhatsgateSettingsConverter interface {
 	// HTTP -> UseCase
-	HTTPRequestToUseCaseDTO(httpReq httpDTO.UpdateWhatsgateSettingsRequest) usecaseDTO.UpdateWhatsgateSettingsRequest
+	WhatsgateHTTPRequestToUseCaseDTO(httpReq httpDTO.UpdateWhatsgateSettingsRequest) usecaseDTO.UpdateWhatsgateSettingsRequest
 
 	// UseCase -> HTTP
-	GetResponseToHTTP(ucResponse *usecaseDTO.GetWhatsgateSettingsResponse) httpDTO.GetWhatsgateSettingsResponse
-	UpdateResponseToHTTP(ucResponse *usecaseDTO.UpdateWhatsgateSettingsResponse) httpDTO.GetWhatsgateSettingsResponse
+	WhatsgateGetResponseToHTTP(ucResponse *usecaseDTO.GetWhatsgateSettingsResponse) httpDTO.GetWhatsgateSettingsResponse
+	WhatsgateUpdateResponseToHTTP(ucResponse *usecaseDTO.UpdateWhatsgateSettingsResponse) httpDTO.GetWhatsgateSettingsResponse
 }
 
 // whatsgateSettingsConverter реализация конвертера
@@ -25,8 +25,8 @@ func NewWhatsgateSettingsConverter() WhatsgateSettingsConverter {
 
 // === HTTP Request -> UseCase DTO ===
 
-// HTTPRequestToUseCaseDTO конвертирует HTTP запрос в UseCase DTO
-func HTTPRequestToUseCaseDTO(httpReq httpDTO.UpdateWhatsgateSettingsRequest) usecaseDTO.UpdateWhatsgateSettingsRequest {
+// WhatsgateHTTPRequestToUseCaseDTO конвертирует HTTP запрос в UseCase DTO
+func WhatsgateHTTPRequestToUseCaseDTO(httpReq httpDTO.UpdateWhatsgateSettingsRequest) usecaseDTO.UpdateWhatsgateSettingsRequest {
 	return usecaseDTO.UpdateWhatsgateSettingsRequest{
 		WhatsappID: httpReq.WhatsappID,
 		APIKey:     httpReq.APIKey,
@@ -35,14 +35,14 @@ func HTTPRequestToUseCaseDTO(httpReq httpDTO.UpdateWhatsgateSettingsRequest) use
 }
 
 // HTTPRequestToUseCaseDTO конвертирует HTTP запрос в UseCase DTO (метод интерфейса)
-func (c *whatsgateSettingsConverter) HTTPRequestToUseCaseDTO(httpReq httpDTO.UpdateWhatsgateSettingsRequest) usecaseDTO.UpdateWhatsgateSettingsRequest {
-	return HTTPRequestToUseCaseDTO(httpReq)
+func (c *whatsgateSettingsConverter) WhatsgateHTTPRequestToUseCaseDTO(httpReq httpDTO.UpdateWhatsgateSettingsRequest) usecaseDTO.UpdateWhatsgateSettingsRequest {
+	return WhatsgateHTTPRequestToUseCaseDTO(httpReq)
 }
 
 // === UseCase DTO -> HTTP Response ===
 
-// GetResponseToHTTP конвертирует UseCase Get DTO в HTTP Response
-func GetResponseToHTTP(ucResponse *usecaseDTO.GetWhatsgateSettingsResponse) httpDTO.GetWhatsgateSettingsResponse {
+// WhatsgateGetResponseToHTTP конвертирует UseCase Get DTO в HTTP Response
+func WhatsgateGetResponseToHTTP(ucResponse *usecaseDTO.GetWhatsgateSettingsResponse) httpDTO.GetWhatsgateSettingsResponse {
 	return httpDTO.GetWhatsgateSettingsResponse{
 		WhatsappID: ucResponse.WhatsappID,
 		APIKey:     ucResponse.APIKey,
@@ -50,13 +50,13 @@ func GetResponseToHTTP(ucResponse *usecaseDTO.GetWhatsgateSettingsResponse) http
 	}
 }
 
-// GetResponseToHTTP конвертирует UseCase Get DTO в HTTP Response (метод интерфейса)
-func (c *whatsgateSettingsConverter) GetResponseToHTTP(ucResponse *usecaseDTO.GetWhatsgateSettingsResponse) httpDTO.GetWhatsgateSettingsResponse {
-	return GetResponseToHTTP(ucResponse)
+// WhatsgateGetResponseToHTTP конвертирует UseCase Get DTO в HTTP Response (метод интерфейса)
+func (c *whatsgateSettingsConverter) WhatsgateGetResponseToHTTP(ucResponse *usecaseDTO.GetWhatsgateSettingsResponse) httpDTO.GetWhatsgateSettingsResponse {
+	return WhatsgateGetResponseToHTTP(ucResponse)
 }
 
-// UpdateResponseToHTTP конвертирует UseCase Update DTO в HTTP Response
-func UpdateResponseToHTTP(ucResponse *usecaseDTO.UpdateWhatsgateSettingsResponse) httpDTO.GetWhatsgateSettingsResponse {
+// WhatsgateUpdateResponseToHTTP конвертирует UseCase Update DTO в HTTP Response
+func WhatsgateUpdateResponseToHTTP(ucResponse *usecaseDTO.UpdateWhatsgateSettingsResponse) httpDTO.GetWhatsgateSettingsResponse {
 	return httpDTO.GetWhatsgateSettingsResponse{
 		WhatsappID: ucResponse.WhatsappID,
 		APIKey:     ucResponse.APIKey,
@@ -64,7 +64,7 @@ func UpdateResponseToHTTP(ucResponse *usecaseDTO.UpdateWhatsgateSettingsResponse
 	}
 }
 
-// UpdateResponseToHTTP конвертирует UseCase Update DTO в HTTP Response (метод интерфейса)
-func (c *whatsgateSettingsConverter) UpdateResponseToHTTP(ucResponse *usecaseDTO.UpdateWhatsgateSettingsResponse) httpDTO.GetWhatsgateSettingsResponse {
-	return UpdateResponseToHTTP(ucResponse)
+// WhatsgateUpdateResponseToHTTP конвертирует UseCase Update DTO в HTTP Response (метод интерфейса)
+func (c *whatsgateSettingsConverter) WhatsgateUpdateResponseToHTTP(ucResponse *usecaseDTO.UpdateWhatsgateSettingsResponse) httpDTO.GetWhatsgateSettingsResponse {
+	return WhatsgateUpdateResponseToHTTP(ucResponse)
 }

@@ -2,6 +2,8 @@ package settingsRepository
 
 import (
 	"context"
+	"errors"
+	"github.com/jackc/pgx/v5"
 	"whatsapp-service/internal/entities/settings"
 	"whatsapp-service/internal/infrastructure/repositories/settings/converter"
 	"whatsapp-service/internal/infrastructure/repositories/settings/models"
@@ -27,7 +29,7 @@ func NewPostgresWhatsGateSettingsRepository(pool *pgxpool.Pool, logger logger.Lo
 }
 
 func (r *PostgresWhatsGateSettingsRepository) Get(ctx context.Context) (*settings.WhatsGateSettings, error) {
-	r.logger.Debug("settings repository Get started")
+	r.logger.Debug("whatsgate settings repository Get started")
 
 	row := r.pool.QueryRow(ctx, `
 		SELECT id, whatsapp_id, api_key, base_url, created_at, updated_at 
@@ -37,17 +39,18 @@ func (r *PostgresWhatsGateSettingsRepository) Get(ctx context.Context) (*setting
 `)
 	var model models.WhatsGateSettingsModel
 	if err := row.Scan(&model.ID, &model.WhatsappID, &model.APIKey, &model.BaseURL, &model.CreatedAt, &model.UpdatedAt); err != nil {
-		if err.Error() != "no rows in result set" {
-			r.logger.Error("settings repository Get failed",
+		if !errors.Is(err, pgx.ErrNoRows) {
+			r.logger.Error("whatsgate settings repository Get failed",
 				"error", err,
 			)
 			return nil, err
 		}
+		r.logger.Debug("whatsgate settings repository Get: no settings found")
 	}
 
 	result := converter.MapWhatsgateSettingsModelToEntity(&model)
 
-	r.logger.Debug("settings repository Get completed successfully",
+	r.logger.Debug("whatsgate settings repository Get completed successfully",
 		"whatsapp_id", result.WhatsappID(),
 		"base_url", result.BaseURL(),
 	)
@@ -56,22 +59,22 @@ func (r *PostgresWhatsGateSettingsRepository) Get(ctx context.Context) (*setting
 }
 
 func (r *PostgresWhatsGateSettingsRepository) Save(ctx context.Context, s *settings.WhatsGateSettings) error {
-	r.logger.Debug("settings repository Save started",
+	r.logger.Debug("whatsgate settings repository Save started",
 		"whatsapp_id", s.WhatsappID(),
 		"base_url", s.BaseURL(),
 	)
 
-	query := `INSERT INTO whatsgate_settings (whatsapp_id, api_key, base_url) VALUES ($1,$2,$3)
+	query := `INSERT INTO whatsgate_settings (id, whatsapp_id, api_key, base_url) VALUES ($1,$2,$3,$4)
             ON CONFLICT (id) DO 
             UPDATE SET whatsapp_id = EXCLUDED.whatsapp_id, 
                        api_key = EXCLUDED.api_key, 
                        base_url = EXCLUDED.base_url, 
                        updated_at = now()
 `
-	_, err := r.pool.Exec(ctx, query, s.WhatsappID(), s.APIKey(), s.BaseURL())
+	_, err := r.pool.Exec(ctx, query, s.ID(), s.WhatsappID(), s.APIKey(), s.BaseURL())
 
 	if err != nil {
-		r.logger.Error("settings repository Save failed",
+		r.logger.Error("whatsgate settings repository Save failed",
 			"whatsapp_id", s.WhatsappID(),
 			"base_url", s.BaseURL(),
 			"error", err,
@@ -79,7 +82,7 @@ func (r *PostgresWhatsGateSettingsRepository) Save(ctx context.Context, s *setti
 		return err
 	}
 
-	r.logger.Debug("settings repository Save completed successfully",
+	r.logger.Debug("whatsgate settings repository Save completed successfully",
 		"whatsapp_id", s.WhatsappID(),
 		"base_url", s.BaseURL(),
 	)
@@ -88,18 +91,18 @@ func (r *PostgresWhatsGateSettingsRepository) Save(ctx context.Context, s *setti
 }
 
 func (r *PostgresWhatsGateSettingsRepository) Reset(ctx context.Context) error {
-	r.logger.Debug("settings repository Reset started")
+	r.logger.Debug("whatsgate settings repository Reset started")
 
 	_, err := r.pool.Exec(ctx, `TRUNCATE TABLE whatsgate_settings`)
 
 	if err != nil {
-		r.logger.Error("settings repository Reset failed",
+		r.logger.Error("whatsgate settings repository Reset failed",
 			"error", err,
 		)
 		return err
 	}
 
-	r.logger.Debug("settings repository Reset completed successfully")
+	r.logger.Debug("whatsgate settings repository Reset completed successfully")
 
 	return err
 }

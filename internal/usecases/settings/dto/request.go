@@ -5,3 +5,8 @@ type UpdateWhatsgateSettingsRequest struct {
 	APIKey     string
 	BaseURL    string
 }
+
+type UpdateRetailCRMSettingsRequest struct {
+	APIKey  string
+	BaseURL string
+}

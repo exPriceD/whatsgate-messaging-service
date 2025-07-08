@@ -34,13 +34,13 @@ func NewWhatsgateSettingsPresenter(converter converter.WhatsgateSettingsConverte
 
 // PresentSettings представляет настройки
 func (p *WhatsgateSettingsPresenter) PresentSettings(w http.ResponseWriter, ucResponse *usecaseDTO.GetWhatsgateSettingsResponse) {
-	responseDTO := p.converter.GetResponseToHTTP(ucResponse)
+	responseDTO := p.converter.WhatsgateGetResponseToHTTP(ucResponse)
 	response.WriteJSON(w, http.StatusOK, responseDTO)
 }
 
 // PresentUpdateSuccess представляет успешное обновление настроек
 func (p *WhatsgateSettingsPresenter) PresentUpdateSuccess(w http.ResponseWriter, ucResponse *usecaseDTO.UpdateWhatsgateSettingsResponse) {
-	responseDTO := p.converter.UpdateResponseToHTTP(ucResponse)
+	responseDTO := p.converter.WhatsgateUpdateResponseToHTTP(ucResponse)
 	response.WriteJSON(w, http.StatusOK, responseDTO)
 }
 
