@@ -1,0 +1,1 @@
+ALTER TABLE retailcrm_settings ADD COLUMN is_active BOOLEAN NOT NULL default true;

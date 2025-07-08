@@ -11,22 +11,22 @@ import (
 	"whatsapp-service/internal/usecases/settings/interfaces"
 )
 
-// WhatsgateSettingsHandler обрабатывает все HTTP запросы связанные с настройками
-type WhatsgateSettingsHandler struct {
-	settingsUseCase interfaces.WhatsgateSettingsUseCase
-	presenter       presenters.WhatsgateSettingsPresenterInterface
-	converter       converter.WhatsgateSettingsConverter
+// RetailCRMSettingsHandler обрабатывает все HTTP запросы связанные с настройками RetailCRM
+type RetailCRMSettingsHandler struct {
+	settingsUseCase interfaces.RetailCRMSettingsUseCase
+	presenter       presenters.RetailCRMSettingsPresenterInterface
+	converter       converter.RetailCRMSettingsConverter
 	logger          logger.Logger
 }
 
-// NewWhatsgateSettingsHandler создает новый обработчик настроек
-func NewWhatsgateSettingsHandler(
-	settingsUseCase interfaces.WhatsgateSettingsUseCase,
-	presenter presenters.WhatsgateSettingsPresenterInterface,
-	converter converter.WhatsgateSettingsConverter,
+// NewRetailCRMSettingsHandler создает новый обработчик настроек RetailCRM
+func NewRetailCRMSettingsHandler(
+	settingsUseCase interfaces.RetailCRMSettingsUseCase,
+	presenter presenters.RetailCRMSettingsPresenterInterface,
+	converter converter.RetailCRMSettingsConverter,
 	logger logger.Logger,
-) *WhatsgateSettingsHandler {
-	return &WhatsgateSettingsHandler{
+) *RetailCRMSettingsHandler {
+	return &RetailCRMSettingsHandler{
 		settingsUseCase: settingsUseCase,
 		presenter:       presenter,
 		converter:       converter,
@@ -35,8 +35,8 @@ func NewWhatsgateSettingsHandler(
 }
 
 // Get получает текущие настройки
-func (h *WhatsgateSettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
-	h.logger.Info("get whatsgate settings request started",
+func (h *RetailCRMSettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("get retailcrm settings request started",
 		"method", r.Method,
 		"path", r.URL.Path,
 		"user_agent", r.UserAgent(),
@@ -45,15 +45,14 @@ func (h *WhatsgateSettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	ucResponse, err := h.settingsUseCase.Get(r.Context())
 	if err != nil {
-		h.logger.Error("get whatsgate settings usecase failed",
+		h.logger.Error("get retailcrm settings usecase failed",
 			"error", err.Error(),
 		)
 		h.presenter.PresentError(w, http.StatusInternalServerError, "Failed to fetch settings")
 		return
 	}
 
-	h.logger.Info("get whatsgate settings request completed successfully",
-		"whatsapp_id", ucResponse.WhatsappID,
+	h.logger.Info("get retailcrm settings request completed successfully",
 		"base_url", ucResponse.BaseURL,
 		"has_api_key", ucResponse.APIKey != "",
 	)
@@ -62,8 +61,8 @@ func (h *WhatsgateSettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update обновляет настройки
-func (h *WhatsgateSettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
-	h.logger.Info("update whatsgate settings request started",
+func (h *RetailCRMSettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("update retailcrm settings request started",
 		"method", r.Method,
 		"path", r.URL.Path,
 		"user_agent", r.UserAgent(),
@@ -72,42 +71,38 @@ func (h *WhatsgateSettingsHandler) Update(w http.ResponseWriter, r *http.Request
 
 	httpReq, err := h.parseUpdateRequest(r)
 	if err != nil {
-		h.logger.Warn("update whatsgate settings parsing failed",
+		h.logger.Warn("update retailcrm settings parsing failed",
 			"error", err.Error(),
 		)
 		h.presenter.PresentValidationError(w, err)
 		return
 	}
 
-	h.logger.Debug("update whatsgate settings request parsed",
-		"whatsapp_id", httpReq.WhatsappID,
+	h.logger.Debug("update retailcrm settings request parsed",
 		"base_url", httpReq.BaseURL,
 		"has_api_key", httpReq.APIKey != "",
 	)
 
 	if err := h.validateUpdateRequest(httpReq); err != nil {
-		h.logger.Warn("update whatsgate settings validation failed",
-			"whatsapp_id", httpReq.WhatsappID,
+		h.logger.Warn("update retailcrm settings validation failed",
 			"error", err.Error(),
 		)
 		h.presenter.PresentValidationError(w, err)
 		return
 	}
 
-	ucReq := h.converter.WhatsgateHTTPRequestToUseCaseDTO(httpReq)
+	ucReq := h.converter.RetailCRMHTTPRequestToUseCaseDTO(httpReq)
 
 	ucResponse, err := h.settingsUseCase.Update(r.Context(), ucReq)
 	if err != nil {
-		h.logger.Error("update whatsgate settings usecase failed",
-			"whatsapp_id", httpReq.WhatsappID,
+		h.logger.Error("update retailcrm settings usecase failed",
 			"error", err.Error(),
 		)
 		h.presenter.PresentError(w, http.StatusInternalServerError, "Failed to update whatsgate settings")
 		return
 	}
 
-	h.logger.Info("update whatsgate settings request completed successfully",
-		"whatsapp_id", ucResponse.WhatsappID,
+	h.logger.Info("update retailcrm settings request completed successfully",
 		"base_url", ucResponse.BaseURL,
 		"updated_at", ucResponse.UpdatedAt,
 	)
@@ -116,8 +111,8 @@ func (h *WhatsgateSettingsHandler) Update(w http.ResponseWriter, r *http.Request
 }
 
 // Reset сбрасывает настройки к значениям по умолчанию
-func (h *WhatsgateSettingsHandler) Reset(w http.ResponseWriter, r *http.Request) {
-	h.logger.Info("reset whatsgate settings request started",
+func (h *RetailCRMSettingsHandler) Reset(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("reset retailcrm settings request started",
 		"method", r.Method,
 		"path", r.URL.Path,
 		"user_agent", r.UserAgent(),
@@ -126,37 +121,29 @@ func (h *WhatsgateSettingsHandler) Reset(w http.ResponseWriter, r *http.Request)
 
 	err := h.settingsUseCase.Reset(r.Context())
 	if err != nil {
-		h.logger.Error("reset whatsgate settings usecase failed",
+		h.logger.Error("reset retailcrm settings usecase failed",
 			"error", err.Error(),
 		)
 		h.presenter.PresentError(w, http.StatusInternalServerError, "Failed to reset whatsgate settings")
 		return
 	}
 
-	h.logger.Info("reset whatsgate settings request completed successfully")
+	h.logger.Info("reset retailcrm settings request completed successfully")
 
 	h.presenter.PresentResetSuccess(w)
 }
 
 // parseUpdateRequest парсит HTTP запрос на обновление настроек
-func (h *WhatsgateSettingsHandler) parseUpdateRequest(r *http.Request) (httpDTO.UpdateWhatsgateSettingsRequest, error) {
-	var httpReq httpDTO.UpdateWhatsgateSettingsRequest
+func (h *RetailCRMSettingsHandler) parseUpdateRequest(r *http.Request) (httpDTO.UpdateRetailCRMSettingsRequest, error) {
+	var httpReq httpDTO.UpdateRetailCRMSettingsRequest
 	if err := json.NewDecoder(r.Body).Decode(&httpReq); err != nil {
-		return httpDTO.UpdateWhatsgateSettingsRequest{}, NewWhatsgateSettingsValidationError("body", "Invalid JSON format")
+		return httpDTO.UpdateRetailCRMSettingsRequest{}, NewRetailCRMSettingsValidationError("body", "Invalid JSON format")
 	}
 	return httpReq, nil
 }
 
 // validateUpdateRequest валидирует запрос на обновление настроек
-func (h *WhatsgateSettingsHandler) validateUpdateRequest(req httpDTO.UpdateWhatsgateSettingsRequest) error {
-	if strings.TrimSpace(req.WhatsappID) == "" {
-		return NewWhatsgateSettingsValidationError("whatsapp_id", "WhatsApp ID is required")
-	}
-
-	if len(req.WhatsappID) > 50 {
-		return NewWhatsgateSettingsValidationError("whatsapp_id", "WhatsApp ID must be less than 50 characters")
-	}
-
+func (h *RetailCRMSettingsHandler) validateUpdateRequest(req httpDTO.UpdateRetailCRMSettingsRequest) error {
 	if strings.TrimSpace(req.APIKey) == "" {
 		return NewWhatsgateSettingsValidationError("api_key", "API key is required")
 	}
@@ -181,34 +168,34 @@ func (h *WhatsgateSettingsHandler) validateUpdateRequest(req httpDTO.UpdateWhats
 }
 
 // isValidURL проверяет валидность URL
-func (h *WhatsgateSettingsHandler) isValidURL(url string) bool {
+func (h *RetailCRMSettingsHandler) isValidURL(url string) bool {
 	url = strings.TrimSpace(url)
 	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
 }
 
-// WhatsgateSettingsValidationError представляет ошибку валидации настроек
-type WhatsgateSettingsValidationError struct {
+// RetailCRMSettingsValidationError представляет ошибку валидации настроек
+type RetailCRMSettingsValidationError struct {
 	field   string
 	message string
 }
 
-func (e WhatsgateSettingsValidationError) Error() string {
+func (e RetailCRMSettingsValidationError) Error() string {
 	return e.message
 }
 
-func (e WhatsgateSettingsValidationError) Field() string {
+func (e RetailCRMSettingsValidationError) Field() string {
 	return e.field
 }
 
-func NewWhatsgateSettingsValidationError(field, message string) *WhatsgateSettingsValidationError {
-	return &WhatsgateSettingsValidationError{
+func NewRetailCRMSettingsValidationError(field, message string) *RetailCRMSettingsValidationError {
+	return &RetailCRMSettingsValidationError{
 		field:   field,
 		message: message,
 	}
 }
 
-type WhatsgateValidationError = WhatsgateSettingsValidationError
+type RetailCRMValidationError = RetailCRMSettingsValidationError
 
-func NewWhatsgateValidationError(field, message string) *WhatsgateValidationError {
-	return NewWhatsgateSettingsValidationError(field, message)
+func NewRetailCRMValidationError(field, message string) *RetailCRMValidationError {
+	return NewRetailCRMSettingsValidationError(field, message)
 }

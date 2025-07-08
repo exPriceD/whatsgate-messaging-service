@@ -1,0 +1,1 @@
+ALTER TABLE retailcrm_settings DROP COLUMN is_active;

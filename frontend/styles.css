@@ -1848,3 +1848,85 @@ button[type="button"]:not(#send-test):hover {
     font-size: 13px;
   }
 }
+
+/* Settings page styles */
+.settings-section {
+  margin-bottom: 32px;
+}
+
+.settings-section h3 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text);
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.settings-section .form {
+  margin-top: 16px;
+}
+
+/* Button variants for settings */
+button.primary {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  box-shadow: 0 2px 8px rgba(45, 140, 255, 0.2);
+  font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #1766d9;
+  box-shadow: 0 4px 12px rgba(45, 140, 255, 0.3);
+}
+
+button.danger {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  box-shadow: 0 2px 8px rgba(255, 77, 79, 0.2);
+  font-weight: 600;
+}
+
+button.danger:hover:not(:disabled) {
+  background: #dc2c2e;
+  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.3);
+}
+
+/* Settings form layout improvements */
+.settings-section .form-actions {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-section .form-actions button {
+  min-width: 140px;
+  width: auto;
+}
+
+/* Responsive settings layout */
+@media (max-width: 768px) {
+  .settings-section h3 {
+    font-size: 1.3em;
+  }
+  
+  .settings-section .form-actions {
+    flex-direction: column;
+  }
+  
+  .settings-section .form-actions button {
+    width: 100%;
+    min-width: auto;
+  }
+  
+  .settings-section:last-child .form-actions {
+    flex-direction: column;
+  }
+  
+  .settings-section:last-child .form-actions button {
+    width: 100%;
+    min-width: auto;
+  }
+}

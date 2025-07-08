@@ -23,11 +23,12 @@ func NewHTTPServer(
 	port int,
 	campaignHandler *handlers.CampaignsHandler,
 	messagingHandler *handlers.MessagingHandler,
-	settingsHandler *handlers.WhatsgateSettingsHandler,
+	whatsgateSettingsHandler *handlers.WhatsgateSettingsHandler,
+	retailCRMSettingsHandler *handlers.RetailCRMSettingsHandler,
 	healthHandler *handlers.HealthHandler,
 	logger logger.Logger,
 ) *HTTPServer {
-	router := NewRouter(campaignHandler, messagingHandler, settingsHandler, healthHandler)
+	router := NewRouter(campaignHandler, messagingHandler, whatsgateSettingsHandler, retailCRMSettingsHandler, healthHandler)
 
 	return &HTTPServer{
 		router: router,

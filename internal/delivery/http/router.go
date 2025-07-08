@@ -14,24 +14,27 @@ import (
 
 // Router обрабатывает HTTP маршрутизацию и настройку middleware
 type Router struct {
-	campaigns *handlers.CampaignsHandler
-	messaging *handlers.MessagingHandler
-	settings  *handlers.WhatsgateSettingsHandler
-	health    *handlers.HealthHandler
+	campaigns         *handlers.CampaignsHandler
+	messaging         *handlers.MessagingHandler
+	whatsgateSettings *handlers.WhatsgateSettingsHandler
+	retailcrmSettings *handlers.RetailCRMSettingsHandler
+	health            *handlers.HealthHandler
 }
 
 // NewRouter создает новый роутер со всеми обработчиками
 func NewRouter(
 	campaignHandler *handlers.CampaignsHandler,
 	messagingHandler *handlers.MessagingHandler,
-	settingsHandler *handlers.WhatsgateSettingsHandler,
+	whatsgateSettingsHandler *handlers.WhatsgateSettingsHandler,
+	retailcrmSettingsHandler *handlers.RetailCRMSettingsHandler,
 	healthHandler *handlers.HealthHandler,
 ) *Router {
 	return &Router{
-		campaigns: campaignHandler,
-		messaging: messagingHandler,
-		settings:  settingsHandler,
-		health:    healthHandler,
+		campaigns:         campaignHandler,
+		messaging:         messagingHandler,
+		whatsgateSettings: whatsgateSettingsHandler,
+		retailcrmSettings: retailcrmSettingsHandler,
+		health:            healthHandler,
 	}
 }
 
@@ -78,11 +81,18 @@ func (rt *Router) SetupRoutes() http.Handler {
 		// Messaging
 		r.Post("/test-message", rt.messaging.SendTestMessage)
 
-		// WhatsgateSettings
-		r.Route("/settings", func(r chi.Router) {
-			r.Get("/", rt.settings.Get)
-			r.Put("/", rt.settings.Update)
-			r.Delete("/reset", rt.settings.Reset)
+		// Whatsgate Settings
+		r.Route("/whatsgate-settings", func(r chi.Router) {
+			r.Get("/", rt.whatsgateSettings.Get)
+			r.Put("/", rt.whatsgateSettings.Update)
+			r.Delete("/reset", rt.whatsgateSettings.Reset)
+		})
+
+		// RetailCRM Settings
+		r.Route("/retailcrm-settings", func(r chi.Router) {
+			r.Get("/", rt.retailcrmSettings.Get)
+			r.Put("/", rt.retailcrmSettings.Update)
+			r.Delete("/reset", rt.retailcrmSettings.Reset)
 		})
 	})
 

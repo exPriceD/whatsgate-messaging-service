@@ -39,6 +39,7 @@ type Infrastructure struct {
 	Logger                logger.Logger
 	CampaignRepo          ports.CampaignRepository
 	WhatsgateSettingsRepo settingsPorts.WhatsGateSettingsRepository
+	RetailCRMSettingsRepo settingsPorts.RetailCRMSettingsRepository
 	FileParser            ports.FileParser
 	MessageGateway        messagingPorts.MessageGateway
 	GlobalRateLimiter     messagingPorts.GlobalRateLimiter
@@ -50,6 +51,7 @@ type Infrastructure struct {
 type UseCases struct {
 	Campaign          campaignInterfaces.CampaignUseCase
 	WhatsgateSettings settingsInterfaces.WhatsgateSettingsUseCase
+	RetailCRMSettings settingsInterfaces.RetailCRMSettingsUseCase
 	Message           messagingInterfaces.MessageUseCase
 }
 
@@ -57,9 +59,11 @@ type UseCases struct {
 type Adapters struct {
 	CampaignConverter          converter.CampaignConverter
 	WhatsgateSettingsConverter converter.WhatsgateSettingsConverter
+	RetailCRMSettingsConverter converter.RetailCRMSettingsConverter
 	MessagingConverter         converter.MessagingConverter
 	CampaignPresenter          presenters.CampaignPresenterInterface
 	WhatsgateSettingsPresenter presenters.WhatsgateSettingsPresenterInterface
+	RetailCRMSettingsPresenter presenters.RetailCRMSettingsPresenterInterface
 	MessagingPresenter         presenters.MessagingPresenterInterface
 }
 
@@ -67,6 +71,7 @@ type Adapters struct {
 type Handlers struct {
 	Campaign          *handlers.CampaignsHandler
 	WhatsgateSettings *handlers.WhatsgateSettingsHandler
+	RetailCRMSettings *handlers.RetailCRMSettingsHandler
 	Messaging         *handlers.MessagingHandler
 	Health            *handlers.HealthHandler
 }
@@ -97,7 +102,7 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 	// Репозитории
 	var campaignRepo ports.CampaignRepository = campaignRepository.NewPostgresCampaignRepository(pool, sharedLogger)
 	var whatsgateSettingsRepo settingsPorts.WhatsGateSettingsRepository = settingsRepository.NewPostgresWhatsGateSettingsRepository(pool, sharedLogger)
-	var _ settingsPorts.RetailCRMSettingsRepository = settingsRepository.NewPostgresRetailCRMSettingsRepository(pool, sharedLogger)
+	var retailCRMSettingsRepo settingsPorts.RetailCRMSettingsRepository = settingsRepository.NewPostgresRetailCRMSettingsRepository(pool, sharedLogger)
 
 	// Утилитарные сервисы
 	var globalRateLimiter messagingPorts.GlobalRateLimiter = ratelimiter.NewGlobalMemoryRateLimiter()
@@ -111,6 +116,7 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 		Logger:                sharedLogger,
 		CampaignRepo:          campaignRepo,
 		WhatsgateSettingsRepo: whatsgateSettingsRepo,
+		RetailCRMSettingsRepo: retailCRMSettingsRepo,
 		FileParser:            fileParser,
 		MessageGateway:        messageGateway,
 		GlobalRateLimiter:     globalRateLimiter,
@@ -135,6 +141,11 @@ func NewUseCases(infra *Infrastructure) *UseCases {
 		infra.Logger,
 	)
 
+	var retailCRMSettingsUseCase settingsInterfaces.RetailCRMSettingsUseCase = settingsInteractor.NewRetailCRMSettingsInteractor(
+		infra.RetailCRMSettingsRepo,
+		infra.Logger,
+	)
+
 	var testMessageUseCase messagingInterfaces.MessageUseCase = messagingInteractor.NewMessageInteractor(
 		infra.MessageGateway,
 		infra.Logger,
@@ -143,6 +154,7 @@ func NewUseCases(infra *Infrastructure) *UseCases {
 	return &UseCases{
 		Campaign:          campaignUseCase,
 		WhatsgateSettings: whatsgateSettingsUseCase,
+		RetailCRMSettings: retailCRMSettingsUseCase,
 		Message:           testMessageUseCase,
 	}
 }
@@ -152,19 +164,23 @@ func NewAdapters() *Adapters {
 	// Конвертеры
 	var campaignConverter converter.CampaignConverter = converter.NewCampaignConverter()
 	var whatsgateSettingsConverter converter.WhatsgateSettingsConverter = converter.NewWhatsgateSettingsConverter()
+	var retailCRMSettingsConverter converter.RetailCRMSettingsConverter = converter.NewRetailCRMSettingsConverter()
 	var messagingConverter converter.MessagingConverter = converter.NewMessagingConverter()
 
 	// Presenters
 	var campaignPresenter presenters.CampaignPresenterInterface = presenters.NewCampaignPresenter(campaignConverter)
 	var whatsgateSettingsPresenter presenters.WhatsgateSettingsPresenterInterface = presenters.NewWhatsgateSettingsPresenter(whatsgateSettingsConverter)
+	var retailCRMSettingsPresenter presenters.RetailCRMSettingsPresenterInterface = presenters.NewRetailCRMSettingsPresenter(retailCRMSettingsConverter)
 	var messagingPresenter presenters.MessagingPresenterInterface = presenters.NewMessagingPresenter(messagingConverter)
 
 	return &Adapters{
 		CampaignConverter:          campaignConverter,
 		WhatsgateSettingsConverter: whatsgateSettingsConverter,
+		RetailCRMSettingsConverter: retailCRMSettingsConverter,
 		MessagingConverter:         messagingConverter,
 		CampaignPresenter:          campaignPresenter,
 		WhatsgateSettingsPresenter: whatsgateSettingsPresenter,
+		RetailCRMSettingsPresenter: retailCRMSettingsPresenter,
 		MessagingPresenter:         messagingPresenter,
 	}
 }
@@ -186,6 +202,13 @@ func NewHandlers(useCases *UseCases, adapters *Adapters, infra *Infrastructure) 
 		infra.Logger,
 	)
 
+	retailCRMSettingsHandler := handlers.NewRetailCRMSettingsHandler(
+		useCases.RetailCRMSettings,
+		adapters.RetailCRMSettingsPresenter,
+		adapters.RetailCRMSettingsConverter,
+		infra.Logger,
+	)
+
 	messagingHandler := handlers.NewMessagingHandler(
 		useCases.Message,
 		adapters.MessagingPresenter,
@@ -203,6 +226,7 @@ func NewHandlers(useCases *UseCases, adapters *Adapters, infra *Infrastructure) 
 	return &Handlers{
 		Campaign:          campaignHandler,
 		WhatsgateSettings: whatsgateSettingsHandler,
+		RetailCRMSettings: retailCRMSettingsHandler,
 		Messaging:         messagingHandler,
 		Health:            healthHandler,
 	}
@@ -231,6 +255,7 @@ func New(cfg *config.Config) (*App, error) {
 		h.Campaign,
 		h.Messaging,
 		h.WhatsgateSettings,
+		h.RetailCRMSettings,
 		h.Health,
 		infra.Logger,
 	)
@@ -248,6 +273,7 @@ func createHTTPServer(
 	campaignHandler *handlers.CampaignsHandler,
 	messagingHandler *handlers.MessagingHandler,
 	whatsgateSettingsHandler *handlers.WhatsgateSettingsHandler,
+	retailCRMSettingsHandler *handlers.RetailCRMSettingsHandler,
 	healthHandler *handlers.HealthHandler,
 	logger logger.Logger,
 ) *http.HTTPServer {
@@ -256,6 +282,7 @@ func createHTTPServer(
 		campaignHandler,
 		messagingHandler,
 		whatsgateSettingsHandler,
+		retailCRMSettingsHandler,
 		healthHandler,
 		logger,
 	)
@@ -263,14 +290,11 @@ func createHTTPServer(
 
 // Start запускает приложение
 func (a *App) Start(ctx context.Context) error {
-	// Запускаем диспетчер
 	a.infrastructure.Logger.Info("starting dispatcher")
 	a.infrastructure.Dispatcher.Start(ctx)
 
-	// Восстанавливаем "orphaned" кампании при старте
 	if err := a.recoverOrphanedCampaigns(ctx); err != nil {
 		a.infrastructure.Logger.Error("failed to recover orphaned campaigns", "error", err)
-		// Не останавливаем приложение из-за этой ошибки
 	}
 
 	a.infrastructure.Logger.Info("HTTP server starting", "port", a.cfg.HTTP.Port)
@@ -281,12 +305,10 @@ func (a *App) Start(ctx context.Context) error {
 func (a *App) Stop(ctx context.Context) error {
 	a.infrastructure.Logger.Info("stopping application")
 
-	// Graceful shutdown кампаний
 	if err := a.gracefulShutdownCampaigns(ctx); err != nil {
 		a.infrastructure.Logger.Error("failed to gracefully shutdown campaigns", "error", err)
 	}
 
-	// Останавливаем диспетчер
 	a.infrastructure.Logger.Info("stopping dispatcher")
 	if err := a.infrastructure.Dispatcher.Stop(ctx); err != nil {
 		a.infrastructure.Logger.Error("failed to stop dispatcher", "error", err)
@@ -296,7 +318,6 @@ func (a *App) Stop(ctx context.Context) error {
 		return err
 	}
 
-	// Закрываем пул соединений
 	if a.infrastructure.Database != nil {
 		a.infrastructure.Database.Close()
 	}
@@ -309,13 +330,11 @@ func (a *App) Stop(ctx context.Context) error {
 func (a *App) gracefulShutdownCampaigns(ctx context.Context) error {
 	a.infrastructure.Logger.Info("gracefully shutting down campaigns")
 
-	// Получаем все активные кампании
 	activeCampaigns, err := a.infrastructure.CampaignRepo.GetActiveCampaigns(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get active campaigns: %w", err)
 	}
 
-	// Останавливаем каждую кампанию
 	for _, campaign := range activeCampaigns {
 		if err := a.updateCampaignStatusOnShutdown(ctx, campaign.ID()); err != nil {
 			a.infrastructure.Logger.Error("failed to update campaign status on shutdown",
@@ -329,13 +348,11 @@ func (a *App) gracefulShutdownCampaigns(ctx context.Context) error {
 
 // updateCampaignStatusOnShutdown обновляет статус кампании при остановке
 func (a *App) updateCampaignStatusOnShutdown(ctx context.Context, campaignID string) error {
-	// Получаем текущую кампанию
 	campaign, err := a.infrastructure.CampaignRepo.GetByID(ctx, campaignID)
 	if err != nil {
 		return fmt.Errorf("failed to get campaign: %w", err)
 	}
 
-	// Если кампания активна, помечаем ее как остановленную
 	if campaign.Status() == "started" {
 		if err := a.infrastructure.CampaignRepo.UpdateStatus(ctx, campaignID, "stopped"); err != nil {
 			return fmt.Errorf("failed to update campaign status: %w", err)
@@ -350,13 +367,11 @@ func (a *App) updateCampaignStatusOnShutdown(ctx context.Context, campaignID str
 func (a *App) recoverOrphanedCampaigns(ctx context.Context) error {
 	a.infrastructure.Logger.Info("recovering orphaned campaigns")
 
-	// Получаем все кампании со статусом "started"
 	startedCampaigns, err := a.infrastructure.CampaignRepo.ListByStatus(ctx, "started", 100, 0)
 	if err != nil {
 		return fmt.Errorf("failed to get started campaigns: %w", err)
 	}
 
-	// Помечаем их как "stopped" так как приложение перезапускается
 	for _, campaign := range startedCampaigns {
 		if err := a.infrastructure.CampaignRepo.UpdateStatus(ctx, campaign.ID(), "stopped"); err != nil {
 			a.infrastructure.Logger.Error("failed to mark orphaned campaign as stopped",
