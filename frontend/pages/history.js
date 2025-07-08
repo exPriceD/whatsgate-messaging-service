@@ -451,6 +451,16 @@ export function initHistoryPage(showToast) {
             </div>
           </div>
           ` : ''}
+          
+          ${campaign.status === 'started' || campaign.status === 'pending' ? `
+          <div class="detail-section">
+            <div class="cancel-campaign-container">
+              <button class="cancel-campaign-btn" onclick="cancelCampaign('${campaign.id}', '${campaign.name.replace(/'/g, "\\'")}')">
+                🚫 Отменить рассылку
+              </button>
+            </div>
+          </div>
+          ` : ''}
         </div>
       `;
       

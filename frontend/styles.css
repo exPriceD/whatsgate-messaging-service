@@ -1785,3 +1785,66 @@ button[type="button"]:not(#send-test):hover {
     font-size: 0.8em;
   }
 } 
+
+/* Стили для кнопки отмены рассылки */
+.cancel-campaign-container {
+  padding: 20px;
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.cancel-campaign-btn {
+  background: #ff4d4f;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 200px;
+  margin-bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.cancel-campaign-btn:hover {
+  background: #ff7875;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.3);
+}
+
+.cancel-campaign-btn:active {
+  transform: translateY(0);
+  background: #d9363e;
+}
+
+.cancel-warning {
+  margin: 0;
+  color: #8c4a3a;
+  font-size: 14px;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .cancel-campaign-container {
+    padding: 16px;
+  }
+  
+  .cancel-campaign-btn {
+    width: 100%;
+    min-width: auto;
+    font-size: 14px;
+    padding: 10px 20px;
+  }
+  
+  .cancel-warning {
+    font-size: 13px;
+  }
+}
