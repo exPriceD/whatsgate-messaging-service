@@ -7,7 +7,7 @@ import (
 	"whatsapp-service/internal/adapters/converter"
 	httpDTO "whatsapp-service/internal/adapters/dto/settings"
 	"whatsapp-service/internal/adapters/presenters"
-	"whatsapp-service/internal/shared/logger"
+	"whatsapp-service/internal/interfaces"
 	"whatsapp-service/internal/usecases/settings/interfaces"
 )
 
@@ -16,7 +16,7 @@ type RetailCRMSettingsHandler struct {
 	settingsUseCase interfaces.RetailCRMSettingsUseCase
 	presenter       presenters.RetailCRMSettingsPresenterInterface
 	converter       converter.RetailCRMSettingsConverter
-	logger          logger.Logger
+	logger          interfaces.Logger
 }
 
 // NewRetailCRMSettingsHandler создает новый обработчик настроек RetailCRM
@@ -24,7 +24,7 @@ func NewRetailCRMSettingsHandler(
 	settingsUseCase interfaces.RetailCRMSettingsUseCase,
 	presenter presenters.RetailCRMSettingsPresenterInterface,
 	converter converter.RetailCRMSettingsConverter,
-	logger logger.Logger,
+	logger interfaces.Logger,
 ) *RetailCRMSettingsHandler {
 	return &RetailCRMSettingsHandler{
 		settingsUseCase: settingsUseCase,

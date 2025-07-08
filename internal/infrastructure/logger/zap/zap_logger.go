@@ -1,13 +1,12 @@
 package zaplogger
 
 import (
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"os"
 	"strings"
 	"time"
-	"whatsapp-service/internal/shared/logger"
-
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"whatsapp-service/internal/interfaces"
 
 	"whatsapp-service/internal/config"
 )
@@ -22,7 +21,7 @@ var (
 )
 
 // New возвращает обёртку zap над интерфейсом logger.Logger
-func New(cfg config.LoggingConfig) (logger.Logger, error) {
+func New(cfg config.LoggingConfig) (interfaces.Logger, error) {
 	coreLogger, err := buildZap(cfg)
 	if err != nil {
 		return nil, err
@@ -53,7 +52,7 @@ func (l *zapAdapter) Debug(msg string, fields ...any) {
 }
 
 // With returns a child logger with structured context.
-func (l *zapAdapter) With(fields ...any) logger.Logger {
+func (l *zapAdapter) With(fields ...any) interfaces.Logger {
 	return &zapAdapter{sugar: l.sugar.With(l.convertFields(fields)...)}
 }
 

@@ -5,11 +5,11 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strings"
+	"whatsapp-service/internal/interfaces"
 
 	"whatsapp-service/internal/adapters/converter"
 	httpDTO "whatsapp-service/internal/adapters/dto/messaging"
 	"whatsapp-service/internal/adapters/presenters"
-	"whatsapp-service/internal/shared/logger"
 	"whatsapp-service/internal/usecases/messaging/interfaces"
 )
 
@@ -18,7 +18,7 @@ type MessagingHandler struct {
 	messageUseCase interfaces.MessageUseCase
 	presenter      presenters.MessagingPresenterInterface
 	converter      converter.MessagingConverter
-	logger         logger.Logger
+	logger         interfaces.Logger
 }
 
 // NewMessagingHandler создает новый обработчик сообщений
@@ -26,7 +26,7 @@ func NewMessagingHandler(
 	messageUseCase interfaces.MessageUseCase,
 	presenter presenters.MessagingPresenterInterface,
 	converter converter.MessagingConverter,
-	logger logger.Logger,
+	logger interfaces.Logger,
 ) *MessagingHandler {
 	return &MessagingHandler{
 		messageUseCase: messageUseCase,

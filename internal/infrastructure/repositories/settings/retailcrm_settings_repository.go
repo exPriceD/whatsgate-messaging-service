@@ -9,7 +9,7 @@ import (
 	"whatsapp-service/internal/entities/settings/repository"
 	"whatsapp-service/internal/infrastructure/repositories/settings/converter"
 	"whatsapp-service/internal/infrastructure/repositories/settings/models"
-	"whatsapp-service/internal/shared/logger"
+	"whatsapp-service/internal/interfaces"
 )
 
 // Ensure implementation
@@ -17,10 +17,10 @@ var _ repository.RetailCRMSettingsRepository = (*PostgresRetailCRMSettingsReposi
 
 type PostgresRetailCRMSettingsRepository struct {
 	pool   *pgxpool.Pool
-	logger logger.Logger
+	logger interfaces.Logger
 }
 
-func NewPostgresRetailCRMSettingsRepository(pool *pgxpool.Pool, logger logger.Logger) *PostgresRetailCRMSettingsRepository {
+func NewPostgresRetailCRMSettingsRepository(pool *pgxpool.Pool, logger interfaces.Logger) *PostgresRetailCRMSettingsRepository {
 	return &PostgresRetailCRMSettingsRepository{
 		pool:   pool,
 		logger: logger,

@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"whatsapp-service/internal/entities/settings"
 	"whatsapp-service/internal/entities/settings/repository"
-	"whatsapp-service/internal/shared/logger"
+	"whatsapp-service/internal/interfaces"
 	"whatsapp-service/internal/usecases/settings/dto"
 )
 
 type WhatsgateSettingsInteractor struct {
 	repo   repository.WhatsGateSettingsRepository
-	logger logger.Logger
+	logger interfaces.Logger
 }
 
-func NewWhatsgateSettingsInteractor(repo repository.WhatsGateSettingsRepository, logger logger.Logger) *WhatsgateSettingsInteractor {
+func NewWhatsgateSettingsInteractor(repo repository.WhatsGateSettingsRepository, logger interfaces.Logger) *WhatsgateSettingsInteractor {
 	return &WhatsgateSettingsInteractor{
 		repo:   repo,
 		logger: logger,

@@ -7,7 +7,7 @@ import (
 	"whatsapp-service/internal/adapters/converter"
 	httpDTO "whatsapp-service/internal/adapters/dto/settings"
 	"whatsapp-service/internal/adapters/presenters"
-	"whatsapp-service/internal/shared/logger"
+	"whatsapp-service/internal/interfaces"
 	"whatsapp-service/internal/usecases/settings/interfaces"
 )
 
@@ -16,7 +16,7 @@ type WhatsgateSettingsHandler struct {
 	settingsUseCase interfaces.WhatsgateSettingsUseCase
 	presenter       presenters.WhatsgateSettingsPresenterInterface
 	converter       converter.WhatsgateSettingsConverter
-	logger          logger.Logger
+	logger          interfaces.Logger
 }
 
 // NewWhatsgateSettingsHandler создает новый обработчик настроек
@@ -24,7 +24,7 @@ func NewWhatsgateSettingsHandler(
 	settingsUseCase interfaces.WhatsgateSettingsUseCase,
 	presenter presenters.WhatsgateSettingsPresenterInterface,
 	converter converter.WhatsgateSettingsConverter,
-	logger logger.Logger,
+	logger interfaces.Logger,
 ) *WhatsgateSettingsHandler {
 	return &WhatsgateSettingsHandler{
 		settingsUseCase: settingsUseCase,

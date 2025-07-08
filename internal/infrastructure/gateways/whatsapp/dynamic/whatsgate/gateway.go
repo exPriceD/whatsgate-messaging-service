@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 	"whatsapp-service/internal/entities/campaign"
-	settingsPorts "whatsapp-service/internal/entities/settings/repository"
-	"whatsapp-service/internal/infrastructure/dispatcher/messaging/ports"
+	settingsRepository "whatsapp-service/internal/entities/settings/repository"
 	"whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate"
 	"whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate/types"
+	"whatsapp-service/internal/interfaces"
 	"whatsapp-service/internal/usecases/dto"
 )
 
@@ -22,15 +22,15 @@ const (
 // SettingsAwareGateway получает актуальные креды из репозитория в рантайме
 // и кэширует их для повышения производительности.
 type SettingsAwareGateway struct {
-	repo           settingsPorts.WhatsGateSettingsRepository
-	cachedGateway  ports.MessageGateway
+	repo           settingsRepository.WhatsGateSettingsRepository
+	cachedGateway  interfaces.MessageGateway
 	cacheTimestamp time.Time
 	cacheTTL       time.Duration
 	mu             sync.RWMutex
 }
 
 // NewSettingsAwareGateway создаёт ленивый кэширующий шлюз.
-func NewSettingsAwareGateway(repo settingsPorts.WhatsGateSettingsRepository) *SettingsAwareGateway {
+func NewSettingsAwareGateway(repo settingsRepository.WhatsGateSettingsRepository) *SettingsAwareGateway {
 	return &SettingsAwareGateway{
 		repo:     repo,
 		cacheTTL: defaultCacheTTL,
@@ -38,7 +38,7 @@ func NewSettingsAwareGateway(repo settingsPorts.WhatsGateSettingsRepository) *Se
 }
 
 // buildOrGetFromCache получает шлюз из кэша или создает новый, если кэш устарел.
-func (d *SettingsAwareGateway) buildOrGetFromCache(ctx context.Context) (ports.MessageGateway, error) {
+func (d *SettingsAwareGateway) buildOrGetFromCache(ctx context.Context) (interfaces.MessageGateway, error) {
 	d.mu.RLock()
 	if d.cachedGateway != nil && time.Since(d.cacheTimestamp) < d.cacheTTL {
 		defer d.mu.RUnlock()

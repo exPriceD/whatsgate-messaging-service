@@ -11,7 +11,7 @@ import (
 	"whatsapp-service/internal/adapters/converter"
 	httpDTO "whatsapp-service/internal/adapters/dto/campaign"
 	"whatsapp-service/internal/adapters/presenters"
-	"whatsapp-service/internal/shared/logger"
+	"whatsapp-service/internal/interfaces"
 	"whatsapp-service/internal/usecases/campaigns/interfaces"
 )
 
@@ -20,7 +20,7 @@ type CampaignsHandler struct {
 	campaignUseCase interfaces.CampaignUseCase
 	presenter       presenters.CampaignPresenterInterface
 	converter       converter.CampaignConverter
-	logger          logger.Logger
+	logger          interfaces.Logger
 }
 
 // NewCampaignsHandler создает новый обработчик кампаний
@@ -28,7 +28,7 @@ func NewCampaignsHandler(
 	campaignUseCase interfaces.CampaignUseCase,
 	presenter presenters.CampaignPresenterInterface,
 	converter converter.CampaignConverter,
-	logger logger.Logger,
+	logger interfaces.Logger,
 ) *CampaignsHandler {
 	return &CampaignsHandler{
 		campaignUseCase: campaignUseCase,

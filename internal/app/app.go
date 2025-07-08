@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"time"
-	repository2 "whatsapp-service/internal/entities/campaign/repository"
-	"whatsapp-service/internal/entities/settings/repository"
+	campaignRepository "whatsapp-service/internal/entities/campaign/repository"
+	settingsRepository "whatsapp-service/internal/entities/settings/repository"
+	"whatsapp-service/internal/interfaces"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"whatsapp-service/internal/adapters/converter"
@@ -15,15 +16,13 @@ import (
 	"whatsapp-service/internal/delivery/http/handlers"
 	"whatsapp-service/internal/infrastructure/database/postgres"
 	"whatsapp-service/internal/infrastructure/dispatcher/messaging"
-	messagingPorts "whatsapp-service/internal/infrastructure/dispatcher/messaging/ports"
 	"whatsapp-service/internal/infrastructure/gateways/whatsapp/dynamic/whatsgate"
 	zaplogger "whatsapp-service/internal/infrastructure/logger/zap"
 	"whatsapp-service/internal/infrastructure/parsers/excel"
 	"whatsapp-service/internal/infrastructure/registry"
-	campaignRepository "whatsapp-service/internal/infrastructure/repositories/campaign"
-	settingsRepository "whatsapp-service/internal/infrastructure/repositories/settings"
+	campaignRepositoryImpl "whatsapp-service/internal/infrastructure/repositories/campaign"
+	settingsRepositoryImpl "whatsapp-service/internal/infrastructure/repositories/settings"
 	"whatsapp-service/internal/infrastructure/services/ratelimiter"
-	"whatsapp-service/internal/shared/logger"
 	campaignInteractor "whatsapp-service/internal/usecases/campaigns/interactor"
 	campaignInterfaces "whatsapp-service/internal/usecases/campaigns/interfaces"
 	"whatsapp-service/internal/usecases/campaigns/ports"
@@ -36,13 +35,13 @@ import (
 // Infrastructure содержит все инфраструктурные зависимости
 type Infrastructure struct {
 	Database              *pgxpool.Pool
-	Logger                logger.Logger
-	CampaignRepo          repository2.CampaignRepository
-	WhatsgateSettingsRepo repository.WhatsGateSettingsRepository
-	RetailCRMSettingsRepo repository.RetailCRMSettingsRepository
+	Logger                interfaces.Logger
+	CampaignRepo          campaignRepository.CampaignRepository
+	WhatsgateSettingsRepo settingsRepository.WhatsGateSettingsRepository
+	RetailCRMSettingsRepo settingsRepository.RetailCRMSettingsRepository
 	FileParser            ports.FileParser
-	MessageGateway        messagingPorts.MessageGateway
-	GlobalRateLimiter     messagingPorts.GlobalRateLimiter
+	MessageGateway        interfaces.MessageGateway
+	GlobalRateLimiter     messaging.GlobalRateLimiter
 	Dispatcher            ports.Dispatcher
 	CampaignRegistry      ports.CampaignRegistry
 }
@@ -100,14 +99,14 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 	}
 
 	// Репозитории
-	var campaignRepo repository2.CampaignRepository = campaignRepository.NewPostgresCampaignRepository(pool, sharedLogger)
-	var whatsgateSettingsRepo repository.WhatsGateSettingsRepository = settingsRepository.NewPostgresWhatsGateSettingsRepository(pool, sharedLogger)
-	var retailCRMSettingsRepo repository.RetailCRMSettingsRepository = settingsRepository.NewPostgresRetailCRMSettingsRepository(pool, sharedLogger)
+	var campaignRepo campaignRepository.CampaignRepository = campaignRepositoryImpl.NewPostgresCampaignRepository(pool, sharedLogger)
+	var whatsgateSettingsRepo settingsRepository.WhatsGateSettingsRepository = settingsRepositoryImpl.NewPostgresWhatsGateSettingsRepository(pool, sharedLogger)
+	var retailCRMSettingsRepo settingsRepository.RetailCRMSettingsRepository = settingsRepositoryImpl.NewPostgresRetailCRMSettingsRepository(pool, sharedLogger)
 
 	// Утилитарные сервисы
-	var globalRateLimiter messagingPorts.GlobalRateLimiter = ratelimiter.NewGlobalMemoryRateLimiter()
+	var globalRateLimiter messaging.GlobalRateLimiter = ratelimiter.NewGlobalMemoryRateLimiter()
 	var fileParser ports.FileParser = excel.NewExcelParser()
-	var messageGateway messagingPorts.MessageGateway = whatsgate.NewSettingsAwareGateway(whatsgateSettingsRepo)
+	var messageGateway interfaces.MessageGateway = whatsgate.NewSettingsAwareGateway(whatsgateSettingsRepo)
 	var dispatcherSvc ports.Dispatcher = messaging.NewDispatcher(messageGateway, globalRateLimiter, sharedLogger)
 	var campaignRegistry ports.CampaignRegistry = registry.NewInMemoryCampaignRegistry()
 
@@ -275,7 +274,7 @@ func createHTTPServer(
 	whatsgateSettingsHandler *handlers.WhatsgateSettingsHandler,
 	retailCRMSettingsHandler *handlers.RetailCRMSettingsHandler,
 	healthHandler *handlers.HealthHandler,
-	logger logger.Logger,
+	logger interfaces.Logger,
 ) *http.HTTPServer {
 	return http.NewHTTPServer(
 		port,

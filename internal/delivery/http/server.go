@@ -6,16 +6,16 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"whatsapp-service/internal/interfaces"
 
 	"whatsapp-service/internal/delivery/http/handlers"
-	"whatsapp-service/internal/shared/logger"
 )
 
 // HTTPServer представляет HTTP сервер
 type HTTPServer struct {
 	server *http.Server
 	router *Router
-	logger logger.Logger
+	logger interfaces.Logger
 }
 
 // NewHTTPServer создает новый HTTP сервер
@@ -26,7 +26,7 @@ func NewHTTPServer(
 	whatsgateSettingsHandler *handlers.WhatsgateSettingsHandler,
 	retailCRMSettingsHandler *handlers.RetailCRMSettingsHandler,
 	healthHandler *handlers.HealthHandler,
-	logger logger.Logger,
+	logger interfaces.Logger,
 ) *HTTPServer {
 	router := NewRouter(campaignHandler, messagingHandler, whatsgateSettingsHandler, retailCRMSettingsHandler, healthHandler)
 

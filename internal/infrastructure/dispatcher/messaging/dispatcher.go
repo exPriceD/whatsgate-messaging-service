@@ -7,8 +7,7 @@ import (
 	"sync"
 	"time"
 	"whatsapp-service/internal/entities/campaign"
-	"whatsapp-service/internal/infrastructure/dispatcher/messaging/ports"
-	"whatsapp-service/internal/shared/logger"
+	"whatsapp-service/internal/interfaces"
 	"whatsapp-service/internal/usecases/dto"
 
 	"go.uber.org/zap"
@@ -16,14 +15,14 @@ import (
 
 type Dispatcher struct {
 	// Зависимости
-	gateway ports.MessageGateway
-	limiter ports.GlobalRateLimiter
-	logger  logger.Logger
+	gateway interfaces.MessageGateway
+	limiter GlobalRateLimiter
+	logger  interfaces.Logger
 
 	// Внутреннее состояние
 	mu              sync.Mutex
-	activeCampaigns *list.List            // list.Element.Value is campaignID (string)
-	queues          map[string]*list.List // campaignID -> list of *dto.Message
+	activeCampaigns *list.List
+	queues          map[string]*list.List
 	resultsChans    map[string]chan<- *dto.MessageSendResult
 
 	// Управление
@@ -33,7 +32,7 @@ type Dispatcher struct {
 	wg       sync.WaitGroup
 }
 
-func NewDispatcher(gateway ports.MessageGateway, limiter ports.GlobalRateLimiter, logger logger.Logger) *Dispatcher {
+func NewDispatcher(gateway interfaces.MessageGateway, limiter GlobalRateLimiter, logger interfaces.Logger) *Dispatcher {
 	return &Dispatcher{
 		gateway:         gateway,
 		limiter:         limiter,

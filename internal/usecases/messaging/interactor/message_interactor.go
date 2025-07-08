@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"whatsapp-service/internal/interfaces"
 
-	"whatsapp-service/internal/infrastructure/dispatcher/messaging/ports"
-	"whatsapp-service/internal/shared/logger"
 	usecaseDTO "whatsapp-service/internal/usecases/dto"
 	"whatsapp-service/internal/usecases/messaging/dto"
 	"whatsapp-service/internal/usecases/messaging/interfaces"
@@ -15,14 +14,14 @@ import (
 
 // MessageInteractor реализует бизнес-логику отправки тестовых сообщений
 type MessageInteractor struct {
-	messageGateway ports.MessageGateway
-	logger         logger.Logger
+	messageGateway interfaces.MessageGateway
+	logger         interfaces.Logger
 }
 
 // NewMessageInteractor создает новый интерактор для тестовых сообщений
 func NewMessageInteractor(
-	messageGateway ports.MessageGateway,
-	logger logger.Logger,
+	messageGateway interfaces.MessageGateway,
+	logger interfaces.Logger,
 ) interfaces.MessageUseCase {
 	return &MessageInteractor{
 		messageGateway: messageGateway,
