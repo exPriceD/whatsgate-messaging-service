@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"time"
+	repository2 "whatsapp-service/internal/entities/campaign/repository"
+	"whatsapp-service/internal/entities/settings/repository"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"whatsapp-service/internal/adapters/converter"
 	"whatsapp-service/internal/adapters/presenters"
 	"whatsapp-service/internal/config"
@@ -28,18 +31,15 @@ import (
 	messagingInterfaces "whatsapp-service/internal/usecases/messaging/interfaces"
 	settingsInteractor "whatsapp-service/internal/usecases/settings/interactor"
 	settingsInterfaces "whatsapp-service/internal/usecases/settings/interfaces"
-	settingsPorts "whatsapp-service/internal/usecases/settings/ports"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Infrastructure содержит все инфраструктурные зависимости
 type Infrastructure struct {
 	Database              *pgxpool.Pool
 	Logger                logger.Logger
-	CampaignRepo          ports.CampaignRepository
-	WhatsgateSettingsRepo settingsPorts.WhatsGateSettingsRepository
-	RetailCRMSettingsRepo settingsPorts.RetailCRMSettingsRepository
+	CampaignRepo          repository2.CampaignRepository
+	WhatsgateSettingsRepo repository.WhatsGateSettingsRepository
+	RetailCRMSettingsRepo repository.RetailCRMSettingsRepository
 	FileParser            ports.FileParser
 	MessageGateway        messagingPorts.MessageGateway
 	GlobalRateLimiter     messagingPorts.GlobalRateLimiter
@@ -100,9 +100,9 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 	}
 
 	// Репозитории
-	var campaignRepo ports.CampaignRepository = campaignRepository.NewPostgresCampaignRepository(pool, sharedLogger)
-	var whatsgateSettingsRepo settingsPorts.WhatsGateSettingsRepository = settingsRepository.NewPostgresWhatsGateSettingsRepository(pool, sharedLogger)
-	var retailCRMSettingsRepo settingsPorts.RetailCRMSettingsRepository = settingsRepository.NewPostgresRetailCRMSettingsRepository(pool, sharedLogger)
+	var campaignRepo repository2.CampaignRepository = campaignRepository.NewPostgresCampaignRepository(pool, sharedLogger)
+	var whatsgateSettingsRepo repository.WhatsGateSettingsRepository = settingsRepository.NewPostgresWhatsGateSettingsRepository(pool, sharedLogger)
+	var retailCRMSettingsRepo repository.RetailCRMSettingsRepository = settingsRepository.NewPostgresRetailCRMSettingsRepository(pool, sharedLogger)
 
 	// Утилитарные сервисы
 	var globalRateLimiter messagingPorts.GlobalRateLimiter = ratelimiter.NewGlobalMemoryRateLimiter()

@@ -3,18 +3,17 @@ package campaignRepository
 import (
 	"context"
 	"database/sql"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"whatsapp-service/internal/entities/campaign"
+	"whatsapp-service/internal/entities/campaign/repository"
 	"whatsapp-service/internal/infrastructure/repositories/campaign/converter"
 	"whatsapp-service/internal/infrastructure/repositories/campaign/models"
 	"whatsapp-service/internal/shared/logger"
-	"whatsapp-service/internal/usecases/campaigns/ports"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Ensure implementation
-var _ ports.CampaignRepository = (*PostgresCampaignRepository)(nil)
+var _ repository.CampaignRepository = (*PostgresCampaignRepository)(nil)
 
 // PostgresCampaignRepository реализует CampaignRepository для PostgreSQL с новой схемой
 type PostgresCampaignRepository struct {

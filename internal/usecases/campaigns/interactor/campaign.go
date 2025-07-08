@@ -2,6 +2,7 @@ package interactor
 
 import (
 	"context"
+	"whatsapp-service/internal/entities/campaign/repository"
 
 	"whatsapp-service/internal/entities/campaign"
 	"whatsapp-service/internal/shared/logger"
@@ -12,7 +13,7 @@ import (
 
 // CampaignInteractor объединяет все операции с кампаниями
 type CampaignInteractor struct {
-	campaignRepo ports.CampaignRepository
+	campaignRepo repository.CampaignRepository
 	dispatcher   ports.Dispatcher
 	registry     ports.CampaignRegistry
 	fileParser   ports.FileParser
@@ -21,7 +22,7 @@ type CampaignInteractor struct {
 
 // NewCampaignInteractor создает новый экземпляр unified use case
 func NewCampaignInteractor(
-	campaignRepo ports.CampaignRepository,
+	campaignRepo repository.CampaignRepository,
 	dispatcher ports.Dispatcher,
 	registry ports.CampaignRegistry,
 	fileParser ports.FileParser,

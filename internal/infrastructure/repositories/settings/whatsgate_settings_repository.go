@@ -4,17 +4,16 @@ import (
 	"context"
 	"errors"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"whatsapp-service/internal/entities/settings"
+	"whatsapp-service/internal/entities/settings/repository"
 	"whatsapp-service/internal/infrastructure/repositories/settings/converter"
 	"whatsapp-service/internal/infrastructure/repositories/settings/models"
 	"whatsapp-service/internal/shared/logger"
-	"whatsapp-service/internal/usecases/settings/ports"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Ensure implementation
-var _ ports.WhatsGateSettingsRepository = (*PostgresWhatsGateSettingsRepository)(nil)
+var _ repository.WhatsGateSettingsRepository = (*PostgresWhatsGateSettingsRepository)(nil)
 
 type PostgresWhatsGateSettingsRepository struct {
 	pool   *pgxpool.Pool

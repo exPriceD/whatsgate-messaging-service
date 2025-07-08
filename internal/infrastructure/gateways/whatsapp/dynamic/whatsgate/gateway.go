@@ -6,11 +6,10 @@ import (
 	"sync"
 	"time"
 	"whatsapp-service/internal/entities/campaign"
+	settingsPorts "whatsapp-service/internal/entities/settings/repository"
 	"whatsapp-service/internal/infrastructure/dispatcher/messaging/ports"
 	"whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate"
 	"whatsapp-service/internal/infrastructure/gateways/whatsapp/whatsgate/types"
-	settingsPorts "whatsapp-service/internal/usecases/settings/ports"
-
 	"whatsapp-service/internal/usecases/dto"
 )
 

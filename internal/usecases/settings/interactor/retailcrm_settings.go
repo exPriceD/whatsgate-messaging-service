@@ -4,17 +4,17 @@ import (
 	"context"
 	"fmt"
 	"whatsapp-service/internal/entities/settings"
+	"whatsapp-service/internal/entities/settings/repository"
 	"whatsapp-service/internal/shared/logger"
 	"whatsapp-service/internal/usecases/settings/dto"
-	"whatsapp-service/internal/usecases/settings/ports"
 )
 
 type RetailCRMSettingsInteractor struct {
-	repo   ports.RetailCRMSettingsRepository
+	repo   repository.RetailCRMSettingsRepository
 	logger logger.Logger
 }
 
-func NewRetailCRMSettingsInteractor(repo ports.RetailCRMSettingsRepository, logger logger.Logger) *RetailCRMSettingsInteractor {
+func NewRetailCRMSettingsInteractor(repo repository.RetailCRMSettingsRepository, logger logger.Logger) *RetailCRMSettingsInteractor {
 	return &RetailCRMSettingsInteractor{
 		repo:   repo,
 		logger: logger,

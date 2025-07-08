@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"whatsapp-service/internal/entities/campaign/repository"
 
 	"whatsapp-service/internal/delivery/http/response"
 	"whatsapp-service/internal/shared/logger"
@@ -14,7 +15,7 @@ import (
 // HealthHandler обрабатывает проверку состояния сервиса и системные эндпоинты
 type HealthHandler struct {
 	logger       logger.Logger
-	campaignRepo ports.CampaignRepository
+	campaignRepo repository.CampaignRepository
 	dispatcher   ports.Dispatcher
 	startTime    time.Time
 	version      string
@@ -24,7 +25,7 @@ type HealthHandler struct {
 // NewHealthHandler создает новый обработчик состояния сервиса
 func NewHealthHandler(
 	logger logger.Logger,
-	campaignRepo ports.CampaignRepository,
+	campaignRepo repository.CampaignRepository,
 	dispatcher ports.Dispatcher,
 ) *HealthHandler {
 	return &HealthHandler{

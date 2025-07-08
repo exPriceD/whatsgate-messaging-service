@@ -3,18 +3,17 @@ package settingsRepository
 import (
 	"context"
 	"errors"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"whatsapp-service/internal/entities/settings"
+	"whatsapp-service/internal/entities/settings/repository"
 	"whatsapp-service/internal/infrastructure/repositories/settings/converter"
 	"whatsapp-service/internal/infrastructure/repositories/settings/models"
 	"whatsapp-service/internal/shared/logger"
-	"whatsapp-service/internal/usecases/settings/ports"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Ensure implementation
-var _ ports.RetailCRMSettingsRepository = (*PostgresRetailCRMSettingsRepository)(nil)
+var _ repository.RetailCRMSettingsRepository = (*PostgresRetailCRMSettingsRepository)(nil)
 
 type PostgresRetailCRMSettingsRepository struct {
 	pool   *pgxpool.Pool
