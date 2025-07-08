@@ -23,7 +23,7 @@ func NewHTTPServer(
 	port int,
 	campaignHandler *handlers.CampaignsHandler,
 	messagingHandler *handlers.MessagingHandler,
-	settingsHandler *handlers.SettingsHandler,
+	settingsHandler *handlers.WhatsgateSettingsHandler,
 	healthHandler *handlers.HealthHandler,
 	logger logger.Logger,
 ) *HTTPServer {

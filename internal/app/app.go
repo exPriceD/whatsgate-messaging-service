@@ -35,40 +35,40 @@ import (
 
 // Infrastructure содержит все инфраструктурные зависимости
 type Infrastructure struct {
-	Database          *pgxpool.Pool
-	Logger            logger.Logger
-	CampaignRepo      ports.CampaignRepository
-	SettingsRepo      settingsPorts.WhatsGateSettingsRepository
-	FileParser        ports.FileParser
-	MessageGateway    messagingPorts.MessageGateway
-	GlobalRateLimiter messagingPorts.GlobalRateLimiter
-	Dispatcher        ports.Dispatcher
-	CampaignRegistry  ports.CampaignRegistry
+	Database              *pgxpool.Pool
+	Logger                logger.Logger
+	CampaignRepo          ports.CampaignRepository
+	WhatsgateSettingsRepo settingsPorts.WhatsGateSettingsRepository
+	FileParser            ports.FileParser
+	MessageGateway        messagingPorts.MessageGateway
+	GlobalRateLimiter     messagingPorts.GlobalRateLimiter
+	Dispatcher            ports.Dispatcher
+	CampaignRegistry      ports.CampaignRegistry
 }
 
 // UseCases содержит все use case зависимости
 type UseCases struct {
-	Campaign    campaignInterfaces.CampaignUseCase
-	Settings    settingsInterfaces.SettingsUseCase
-	TestMessage messagingInterfaces.MessageUseCase
+	Campaign          campaignInterfaces.CampaignUseCase
+	WhatsgateSettings settingsInterfaces.WhatsgateSettingsUseCase
+	Message           messagingInterfaces.MessageUseCase
 }
 
 // Adapters содержит все адаптеры (конвертеры и презентеры)
 type Adapters struct {
-	CampaignConverter  converter.CampaignConverter
-	SettingsConverter  converter.SettingsConverter
-	MessagingConverter converter.MessagingConverter
-	CampaignPresenter  presenters.CampaignPresenterInterface
-	SettingsPresenter  presenters.SettingsPresenterInterface
-	MessagingPresenter presenters.MessagingPresenterInterface
+	CampaignConverter          converter.CampaignConverter
+	WhatsgateSettingsConverter converter.WhatsgateSettingsConverter
+	MessagingConverter         converter.MessagingConverter
+	CampaignPresenter          presenters.CampaignPresenterInterface
+	WhatsgateSettingsPresenter presenters.WhatsgateSettingsPresenterInterface
+	MessagingPresenter         presenters.MessagingPresenterInterface
 }
 
 // Handlers содержит все HTTP обработчики
 type Handlers struct {
-	Campaign  *handlers.CampaignsHandler
-	Settings  *handlers.SettingsHandler
-	Messaging *handlers.MessagingHandler
-	Health    *handlers.HealthHandler
+	Campaign          *handlers.CampaignsHandler
+	WhatsgateSettings *handlers.WhatsgateSettingsHandler
+	Messaging         *handlers.MessagingHandler
+	Health            *handlers.HealthHandler
 }
 
 // App инкапсулирует все зависимости и умеет запускаться/останавливаться.
@@ -96,26 +96,26 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 
 	// Репозитории
 	var campaignRepo ports.CampaignRepository = campaignRepository.NewPostgresCampaignRepository(pool, sharedLogger)
-	var settingsRepo settingsPorts.WhatsGateSettingsRepository = settingsRepository.NewPostgresWhatsGateSettingsRepository(pool, sharedLogger)
-	var _ = settingsRepository.NewPostgresRetailCRMSettingsRepository(pool, sharedLogger)
+	var whatsgateSettingsRepo settingsPorts.WhatsGateSettingsRepository = settingsRepository.NewPostgresWhatsGateSettingsRepository(pool, sharedLogger)
+	var _ settingsPorts.RetailCRMSettingsRepository = settingsRepository.NewPostgresRetailCRMSettingsRepository(pool, sharedLogger)
 
 	// Утилитарные сервисы
 	var globalRateLimiter messagingPorts.GlobalRateLimiter = ratelimiter.NewGlobalMemoryRateLimiter()
 	var fileParser ports.FileParser = excel.NewExcelParser()
-	var messageGateway messagingPorts.MessageGateway = whatsgate.NewSettingsAwareGateway(settingsRepo)
+	var messageGateway messagingPorts.MessageGateway = whatsgate.NewSettingsAwareGateway(whatsgateSettingsRepo)
 	var dispatcherSvc ports.Dispatcher = messaging.NewDispatcher(messageGateway, globalRateLimiter, sharedLogger)
 	var campaignRegistry ports.CampaignRegistry = registry.NewInMemoryCampaignRegistry()
 
 	return &Infrastructure{
-		Database:          pool,
-		Logger:            sharedLogger,
-		CampaignRepo:      campaignRepo,
-		SettingsRepo:      settingsRepo,
-		FileParser:        fileParser,
-		MessageGateway:    messageGateway,
-		GlobalRateLimiter: globalRateLimiter,
-		Dispatcher:        dispatcherSvc,
-		CampaignRegistry:  campaignRegistry,
+		Database:              pool,
+		Logger:                sharedLogger,
+		CampaignRepo:          campaignRepo,
+		WhatsgateSettingsRepo: whatsgateSettingsRepo,
+		FileParser:            fileParser,
+		MessageGateway:        messageGateway,
+		GlobalRateLimiter:     globalRateLimiter,
+		Dispatcher:            dispatcherSvc,
+		CampaignRegistry:      campaignRegistry,
 	}, nil
 }
 
@@ -130,8 +130,8 @@ func NewUseCases(infra *Infrastructure) *UseCases {
 		infra.Logger,
 	)
 
-	var settingsUseCase settingsInterfaces.SettingsUseCase = settingsInteractor.NewService(
-		infra.SettingsRepo,
+	var whatsgateSettingsUseCase settingsInterfaces.WhatsgateSettingsUseCase = settingsInteractor.NewWhatsgateSettingsInteractor(
+		infra.WhatsgateSettingsRepo,
 		infra.Logger,
 	)
 
@@ -141,9 +141,9 @@ func NewUseCases(infra *Infrastructure) *UseCases {
 	)
 
 	return &UseCases{
-		Campaign:    campaignUseCase,
-		Settings:    settingsUseCase,
-		TestMessage: testMessageUseCase,
+		Campaign:          campaignUseCase,
+		WhatsgateSettings: whatsgateSettingsUseCase,
+		Message:           testMessageUseCase,
 	}
 }
 
@@ -151,21 +151,21 @@ func NewUseCases(infra *Infrastructure) *UseCases {
 func NewAdapters() *Adapters {
 	// Конвертеры
 	var campaignConverter converter.CampaignConverter = converter.NewCampaignConverter()
-	var settingsConverter converter.SettingsConverter = converter.NewSettingsConverter()
+	var whatsgateSettingsConverter converter.WhatsgateSettingsConverter = converter.NewWhatsgateSettingsConverter()
 	var messagingConverter converter.MessagingConverter = converter.NewMessagingConverter()
 
 	// Presenters
 	var campaignPresenter presenters.CampaignPresenterInterface = presenters.NewCampaignPresenter(campaignConverter)
-	var settingsPresenter presenters.SettingsPresenterInterface = presenters.NewSettingsPresenter(settingsConverter)
+	var whatsgateSettingsPresenter presenters.WhatsgateSettingsPresenterInterface = presenters.NewWhatsgateSettingsPresenter(whatsgateSettingsConverter)
 	var messagingPresenter presenters.MessagingPresenterInterface = presenters.NewMessagingPresenter(messagingConverter)
 
 	return &Adapters{
-		CampaignConverter:  campaignConverter,
-		SettingsConverter:  settingsConverter,
-		MessagingConverter: messagingConverter,
-		CampaignPresenter:  campaignPresenter,
-		SettingsPresenter:  settingsPresenter,
-		MessagingPresenter: messagingPresenter,
+		CampaignConverter:          campaignConverter,
+		WhatsgateSettingsConverter: whatsgateSettingsConverter,
+		MessagingConverter:         messagingConverter,
+		CampaignPresenter:          campaignPresenter,
+		WhatsgateSettingsPresenter: whatsgateSettingsPresenter,
+		MessagingPresenter:         messagingPresenter,
 	}
 }
 
@@ -179,15 +179,15 @@ func NewHandlers(useCases *UseCases, adapters *Adapters, infra *Infrastructure) 
 		infra.Logger,
 	)
 
-	settingsHandler := handlers.NewSettingsHandler(
-		useCases.Settings,
-		adapters.SettingsPresenter,
-		adapters.SettingsConverter,
+	whatsgateSettingsHandler := handlers.NewWhatsgateSettingsHandler(
+		useCases.WhatsgateSettings,
+		adapters.WhatsgateSettingsPresenter,
+		adapters.WhatsgateSettingsConverter,
 		infra.Logger,
 	)
 
 	messagingHandler := handlers.NewMessagingHandler(
-		useCases.TestMessage,
+		useCases.Message,
 		adapters.MessagingPresenter,
 		adapters.MessagingConverter,
 		infra.Logger,
@@ -201,10 +201,10 @@ func NewHandlers(useCases *UseCases, adapters *Adapters, infra *Infrastructure) 
 	)
 
 	return &Handlers{
-		Campaign:  campaignHandler,
-		Settings:  settingsHandler,
-		Messaging: messagingHandler,
-		Health:    healthHandler,
+		Campaign:          campaignHandler,
+		WhatsgateSettings: whatsgateSettingsHandler,
+		Messaging:         messagingHandler,
+		Health:            healthHandler,
 	}
 }
 
@@ -230,7 +230,7 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.HTTP.Port,
 		h.Campaign,
 		h.Messaging,
-		h.Settings,
+		h.WhatsgateSettings,
 		h.Health,
 		infra.Logger,
 	)
@@ -247,7 +247,7 @@ func createHTTPServer(
 	port int,
 	campaignHandler *handlers.CampaignsHandler,
 	messagingHandler *handlers.MessagingHandler,
-	settingsHandler *handlers.SettingsHandler,
+	whatsgateSettingsHandler *handlers.WhatsgateSettingsHandler,
 	healthHandler *handlers.HealthHandler,
 	logger logger.Logger,
 ) *http.HTTPServer {
@@ -255,7 +255,7 @@ func createHTTPServer(
 		port,
 		campaignHandler,
 		messagingHandler,
-		settingsHandler,
+		whatsgateSettingsHandler,
 		healthHandler,
 		logger,
 	)

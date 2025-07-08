@@ -45,7 +45,7 @@ func (r *PostgresWhatsGateSettingsRepository) Get(ctx context.Context) (*setting
 		}
 	}
 
-	result := converter.MapSettingsModelToEntity(&model)
+	result := converter.MapWhatsgateSettingsModelToEntity(&model)
 
 	r.logger.Debug("settings repository Get completed successfully",
 		"whatsapp_id", result.WhatsappID(),

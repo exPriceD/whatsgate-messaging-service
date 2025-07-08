@@ -6,7 +6,7 @@ import (
 )
 
 // MapSettingsEntityToModel преобразует сущность WhatsGateSettings в модель для БД
-func MapSettingsEntityToModel(settings *settings.WhatsGateSettings) *models.WhatsGateSettingsModel {
+func MapWhatsgateSettingsEntityToModel(settings *settings.WhatsGateSettings) *models.WhatsGateSettingsModel {
 	return &models.WhatsGateSettingsModel{
 		ID:         settings.ID(),
 		WhatsappID: settings.WhatsappID(),
@@ -17,8 +17,8 @@ func MapSettingsEntityToModel(settings *settings.WhatsGateSettings) *models.What
 	}
 }
 
-// MapSettingsModelToEntity преобразует модель БД в сущность WhatsGateSettings
-func MapSettingsModelToEntity(model *models.WhatsGateSettingsModel) *settings.WhatsGateSettings {
+// MapWhatsgateSettingsModelToEntity преобразует модель БД в сущность WhatsGateSettings
+func MapWhatsgateSettingsModelToEntity(model *models.WhatsGateSettingsModel) *settings.WhatsGateSettings {
 	return settings.RestoreWhatsGateSettings(
 		model.ID,
 		model.WhatsappID,

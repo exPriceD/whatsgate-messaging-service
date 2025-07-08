@@ -2,13 +2,13 @@ package dto
 
 import "time"
 
-type GetSettingsResponse struct {
+type GetWhatsgateSettingsResponse struct {
 	WhatsappID string
 	APIKey     string
 	BaseURL    string
 }
 
-type UpdateSettingsResponse struct {
+type UpdateWhatsgateSettingsResponse struct {
 	WhatsappID string
 	APIKey     string
 	BaseURL    string

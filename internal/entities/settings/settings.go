@@ -32,6 +32,7 @@ func NewWhatsGateSettings(whatsappID, apiKey, baseURL string) (*WhatsGateSetting
 
 	now := time.Now()
 	return &WhatsGateSettings{
+		id:         1,
 		whatsappID: whatsappID,
 		apiKey:     apiKey,
 		baseURL:    baseURL,

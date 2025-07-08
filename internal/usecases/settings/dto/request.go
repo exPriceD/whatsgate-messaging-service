@@ -1,6 +1,6 @@
 package dto
 
-type UpdateSettingsRequest struct {
+type UpdateWhatsgateSettingsRequest struct {
 	WhatsappID string
 	APIKey     string
 	BaseURL    string

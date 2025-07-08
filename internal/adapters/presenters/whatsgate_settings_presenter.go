@@ -8,11 +8,11 @@ import (
 	usecaseDTO "whatsapp-service/internal/usecases/settings/dto"
 )
 
-// SettingsPresenterInterface определяет интерфейс для presenter настроек
-type SettingsPresenterInterface interface {
+// WhatsgateSettingsPresenterInterface определяет интерфейс для presenter настроек
+type WhatsgateSettingsPresenterInterface interface {
 	// UseCase responses
-	PresentSettings(w http.ResponseWriter, ucResponse *usecaseDTO.GetSettingsResponse)
-	PresentUpdateSuccess(w http.ResponseWriter, ucResponse *usecaseDTO.UpdateSettingsResponse)
+	PresentSettings(w http.ResponseWriter, ucResponse *usecaseDTO.GetWhatsgateSettingsResponse)
+	PresentUpdateSuccess(w http.ResponseWriter, ucResponse *usecaseDTO.UpdateWhatsgateSettingsResponse)
 	PresentResetSuccess(w http.ResponseWriter)
 
 	// Error responses
@@ -20,32 +20,32 @@ type SettingsPresenterInterface interface {
 	PresentError(w http.ResponseWriter, statusCode int, message string)
 }
 
-// SettingsPresenter обрабатывает представление данных настроек
-type SettingsPresenter struct {
-	converter converter.SettingsConverter
+// WhatsgateSettingsPresenter обрабатывает представление данных настроек
+type WhatsgateSettingsPresenter struct {
+	converter converter.WhatsgateSettingsConverter
 }
 
-// NewSettingsPresenter создает новый экземпляр presenter
-func NewSettingsPresenter(converter converter.SettingsConverter) *SettingsPresenter {
-	return &SettingsPresenter{
+// NewWhatsgateSettingsPresenter создает новый экземпляр presenter
+func NewWhatsgateSettingsPresenter(converter converter.WhatsgateSettingsConverter) *WhatsgateSettingsPresenter {
+	return &WhatsgateSettingsPresenter{
 		converter: converter,
 	}
 }
 
 // PresentSettings представляет настройки
-func (p *SettingsPresenter) PresentSettings(w http.ResponseWriter, ucResponse *usecaseDTO.GetSettingsResponse) {
+func (p *WhatsgateSettingsPresenter) PresentSettings(w http.ResponseWriter, ucResponse *usecaseDTO.GetWhatsgateSettingsResponse) {
 	responseDTO := p.converter.GetResponseToHTTP(ucResponse)
 	response.WriteJSON(w, http.StatusOK, responseDTO)
 }
 
 // PresentUpdateSuccess представляет успешное обновление настроек
-func (p *SettingsPresenter) PresentUpdateSuccess(w http.ResponseWriter, ucResponse *usecaseDTO.UpdateSettingsResponse) {
+func (p *WhatsgateSettingsPresenter) PresentUpdateSuccess(w http.ResponseWriter, ucResponse *usecaseDTO.UpdateWhatsgateSettingsResponse) {
 	responseDTO := p.converter.UpdateResponseToHTTP(ucResponse)
 	response.WriteJSON(w, http.StatusOK, responseDTO)
 }
 
 // PresentResetSuccess представляет успешный сброс настроек
-func (p *SettingsPresenter) PresentResetSuccess(w http.ResponseWriter) {
+func (p *WhatsgateSettingsPresenter) PresentResetSuccess(w http.ResponseWriter) {
 	responseData := map[string]interface{}{
 		"message": "Настройки успешно сброшены",
 	}
@@ -53,10 +53,8 @@ func (p *SettingsPresenter) PresentResetSuccess(w http.ResponseWriter) {
 }
 
 // PresentValidationError представляет ошибку валидации
-func (p *SettingsPresenter) PresentValidationError(w http.ResponseWriter, err error) {
-	// Проверяем, является ли ошибка нашей кастомной ValidationError
+func (p *WhatsgateSettingsPresenter) PresentValidationError(w http.ResponseWriter, err error) {
 	if validationErr, ok := err.(interface{ Field() string }); ok {
-		// Создаем детальный ответ с информацией о поле
 		errorResponse := httpDTO.ValidationErrorResponse{
 			Message: "Ошибка валидации данных",
 			Errors: []httpDTO.FieldValidationError{
@@ -70,11 +68,10 @@ func (p *SettingsPresenter) PresentValidationError(w http.ResponseWriter, err er
 		return
 	}
 
-	// Обычная ошибка валидации
 	response.WriteError(w, http.StatusBadRequest, err.Error())
 }
 
 // PresentError представляет общую ошибку
-func (p *SettingsPresenter) PresentError(w http.ResponseWriter, statusCode int, message string) {
+func (p *WhatsgateSettingsPresenter) PresentError(w http.ResponseWriter, statusCode int, message string) {
 	response.WriteError(w, statusCode, message)
 }

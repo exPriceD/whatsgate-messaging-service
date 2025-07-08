@@ -16,7 +16,7 @@ import (
 type Router struct {
 	campaigns *handlers.CampaignsHandler
 	messaging *handlers.MessagingHandler
-	settings  *handlers.SettingsHandler
+	settings  *handlers.WhatsgateSettingsHandler
 	health    *handlers.HealthHandler
 }
 
@@ -24,7 +24,7 @@ type Router struct {
 func NewRouter(
 	campaignHandler *handlers.CampaignsHandler,
 	messagingHandler *handlers.MessagingHandler,
-	settingsHandler *handlers.SettingsHandler,
+	settingsHandler *handlers.WhatsgateSettingsHandler,
 	healthHandler *handlers.HealthHandler,
 ) *Router {
 	return &Router{
@@ -78,7 +78,7 @@ func (rt *Router) SetupRoutes() http.Handler {
 		// Messaging
 		r.Post("/test-message", rt.messaging.SendTestMessage)
 
-		// Settings
+		// WhatsgateSettings
 		r.Route("/settings", func(r chi.Router) {
 			r.Get("/", rt.settings.Get)
 			r.Put("/", rt.settings.Update)
