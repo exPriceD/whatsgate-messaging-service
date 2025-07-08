@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 	"whatsapp-service/internal/entities/campaign/repository"
-	ports2 "whatsapp-service/internal/interfaces"
+	"whatsapp-service/internal/interfaces"
 
 	"whatsapp-service/internal/delivery/http/response"
 	"whatsapp-service/internal/usecases/campaigns/ports"
@@ -14,7 +14,7 @@ import (
 
 // HealthHandler обрабатывает проверку состояния сервиса и системные эндпоинты
 type HealthHandler struct {
-	logger       ports2.Logger
+	logger       interfaces.Logger
 	campaignRepo repository.CampaignRepository
 	dispatcher   ports.Dispatcher
 	startTime    time.Time
@@ -24,7 +24,7 @@ type HealthHandler struct {
 
 // NewHealthHandler создает новый обработчик состояния сервиса
 func NewHealthHandler(
-	logger ports2.Logger,
+	logger interfaces.Logger,
 	campaignRepo repository.CampaignRepository,
 	dispatcher ports.Dispatcher,
 ) *HealthHandler {
