@@ -8,12 +8,12 @@ import (
 	httpDTO "whatsapp-service/internal/adapters/dto/settings"
 	"whatsapp-service/internal/adapters/presenters"
 	"whatsapp-service/internal/interfaces"
-	"whatsapp-service/internal/usecases/settings/interfaces"
+	settingsInterfaces "whatsapp-service/internal/usecases/settings/interfaces"
 )
 
 // WhatsgateSettingsHandler обрабатывает все HTTP запросы связанные с настройками
 type WhatsgateSettingsHandler struct {
-	settingsUseCase interfaces.WhatsgateSettingsUseCase
+	settingsUseCase settingsInterfaces.WhatsgateSettingsUseCase
 	presenter       presenters.WhatsgateSettingsPresenterInterface
 	converter       converter.WhatsgateSettingsConverter
 	logger          interfaces.Logger
@@ -21,7 +21,7 @@ type WhatsgateSettingsHandler struct {
 
 // NewWhatsgateSettingsHandler создает новый обработчик настроек
 func NewWhatsgateSettingsHandler(
-	settingsUseCase interfaces.WhatsgateSettingsUseCase,
+	settingsUseCase settingsInterfaces.WhatsgateSettingsUseCase,
 	presenter presenters.WhatsgateSettingsPresenterInterface,
 	converter converter.WhatsgateSettingsConverter,
 	logger interfaces.Logger,

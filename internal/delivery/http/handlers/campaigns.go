@@ -12,12 +12,12 @@ import (
 	httpDTO "whatsapp-service/internal/adapters/dto/campaign"
 	"whatsapp-service/internal/adapters/presenters"
 	"whatsapp-service/internal/interfaces"
-	"whatsapp-service/internal/usecases/campaigns/interfaces"
+	campaignInterfaces "whatsapp-service/internal/usecases/campaigns/interfaces"
 )
 
 // CampaignsHandler обрабатывает все HTTP запросы связанные с кампаниями
 type CampaignsHandler struct {
-	campaignUseCase interfaces.CampaignUseCase
+	campaignUseCase campaignInterfaces.CampaignUseCase
 	presenter       presenters.CampaignPresenterInterface
 	converter       converter.CampaignConverter
 	logger          interfaces.Logger
@@ -25,7 +25,7 @@ type CampaignsHandler struct {
 
 // NewCampaignsHandler создает новый обработчик кампаний
 func NewCampaignsHandler(
-	campaignUseCase interfaces.CampaignUseCase,
+	campaignUseCase campaignInterfaces.CampaignUseCase,
 	presenter presenters.CampaignPresenterInterface,
 	converter converter.CampaignConverter,
 	logger interfaces.Logger,

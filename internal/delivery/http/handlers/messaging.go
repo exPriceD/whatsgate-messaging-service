@@ -10,12 +10,12 @@ import (
 	"whatsapp-service/internal/adapters/converter"
 	httpDTO "whatsapp-service/internal/adapters/dto/messaging"
 	"whatsapp-service/internal/adapters/presenters"
-	"whatsapp-service/internal/usecases/messaging/interfaces"
+	messagignInterfaces "whatsapp-service/internal/usecases/messaging/interfaces"
 )
 
 // MessagingHandler обрабатывает все HTTP запросы связанные с сообщениями
 type MessagingHandler struct {
-	messageUseCase interfaces.MessageUseCase
+	messageUseCase messagignInterfaces.MessageUseCase
 	presenter      presenters.MessagingPresenterInterface
 	converter      converter.MessagingConverter
 	logger         interfaces.Logger
@@ -23,7 +23,7 @@ type MessagingHandler struct {
 
 // NewMessagingHandler создает новый обработчик сообщений
 func NewMessagingHandler(
-	messageUseCase interfaces.MessageUseCase,
+	messageUseCase messagignInterfaces.MessageUseCase,
 	presenter presenters.MessagingPresenterInterface,
 	converter converter.MessagingConverter,
 	logger interfaces.Logger,

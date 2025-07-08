@@ -8,12 +8,12 @@ import (
 	httpDTO "whatsapp-service/internal/adapters/dto/settings"
 	"whatsapp-service/internal/adapters/presenters"
 	"whatsapp-service/internal/interfaces"
-	"whatsapp-service/internal/usecases/settings/interfaces"
+	settingsInterfaces "whatsapp-service/internal/usecases/settings/interfaces"
 )
 
 // RetailCRMSettingsHandler обрабатывает все HTTP запросы связанные с настройками RetailCRM
 type RetailCRMSettingsHandler struct {
-	settingsUseCase interfaces.RetailCRMSettingsUseCase
+	settingsUseCase settingsInterfaces.RetailCRMSettingsUseCase
 	presenter       presenters.RetailCRMSettingsPresenterInterface
 	converter       converter.RetailCRMSettingsConverter
 	logger          interfaces.Logger
@@ -21,7 +21,7 @@ type RetailCRMSettingsHandler struct {
 
 // NewRetailCRMSettingsHandler создает новый обработчик настроек RetailCRM
 func NewRetailCRMSettingsHandler(
-	settingsUseCase interfaces.RetailCRMSettingsUseCase,
+	settingsUseCase settingsInterfaces.RetailCRMSettingsUseCase,
 	presenter presenters.RetailCRMSettingsPresenterInterface,
 	converter converter.RetailCRMSettingsConverter,
 	logger interfaces.Logger,
