@@ -3,11 +3,10 @@ package interactor
 import (
 	"context"
 	"whatsapp-service/internal/entities/campaign/repository"
-	ports2 "whatsapp-service/internal/interfaces"
+	"whatsapp-service/internal/interfaces"
 
 	"whatsapp-service/internal/entities/campaign"
 	"whatsapp-service/internal/usecases/campaigns/dto"
-	"whatsapp-service/internal/usecases/campaigns/interfaces"
 	"whatsapp-service/internal/usecases/campaigns/ports"
 )
 
@@ -17,7 +16,7 @@ type CampaignInteractor struct {
 	dispatcher   ports.Dispatcher
 	registry     ports.CampaignRegistry
 	fileParser   ports.FileParser
-	logger       ports2.Logger
+	logger       interfaces.Logger
 }
 
 // NewCampaignInteractor создает новый экземпляр unified use case
@@ -26,7 +25,7 @@ func NewCampaignInteractor(
 	dispatcher ports.Dispatcher,
 	registry ports.CampaignRegistry,
 	fileParser ports.FileParser,
-	logger ports2.Logger,
+	logger interfaces.Logger,
 ) *CampaignInteractor {
 	return &CampaignInteractor{
 		campaignRepo: campaignRepo,
@@ -197,6 +196,3 @@ func (ci *CampaignInteractor) calculateCampaignMetrics(ctx context.Context, camp
 
 	return processedCount, errorCount
 }
-
-// Ensure interfaces are implemented
-var _ interfaces.CampaignUseCase = (*CampaignInteractor)(nil)

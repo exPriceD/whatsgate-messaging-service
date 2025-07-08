@@ -9,7 +9,6 @@ import (
 
 	usecaseDTO "whatsapp-service/internal/usecases/dto"
 	"whatsapp-service/internal/usecases/messaging/dto"
-	"whatsapp-service/internal/usecases/messaging/interfaces"
 )
 
 // MessageInteractor реализует бизнес-логику отправки тестовых сообщений
@@ -22,7 +21,7 @@ type MessageInteractor struct {
 func NewMessageInteractor(
 	messageGateway interfaces.MessageGateway,
 	logger interfaces.Logger,
-) interfaces.MessageUseCase {
+) *MessageInteractor {
 	return &MessageInteractor{
 		messageGateway: messageGateway,
 		logger:         logger,
