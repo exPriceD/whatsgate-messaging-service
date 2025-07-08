@@ -4,24 +4,24 @@ import (
 	"mime/multipart"
 	httpDTO "whatsapp-service/internal/adapters/dto/campaign"
 	"whatsapp-service/internal/entities/campaign"
-	"whatsapp-service/internal/usecases/campaigns/dto"
+	usecaseDTO "whatsapp-service/internal/usecases/campaigns/dto"
 )
 
 // CampaignConverter интерфейс для конверсий кампаний
 type CampaignConverter interface {
 	// HTTP -> UseCase
-	ToCreateCampaignRequest(httpReq httpDTO.CreateCampaignRequest, phoneFile, mediaFile *multipart.FileHeader) dto.CreateCampaignRequest
-	ToStartCampaignRequest(campaignID string) dto.StartCampaignRequest
-	ToCancelCampaignRequest(campaignID, reason string) dto.CancelCampaignRequest
-	ToGetCampaignByIDRequest(campaignID string) dto.GetCampaignByIDRequest
-	ToListCampaignsRequest(limit, offset int, status string) dto.ListCampaignsRequest
+	ToCreateCampaignRequest(httpReq httpDTO.CreateCampaignRequest, phoneFile, mediaFile *multipart.FileHeader) usecaseDTO.CreateCampaignRequest
+	ToStartCampaignRequest(campaignID string) usecaseDTO.StartCampaignRequest
+	ToCancelCampaignRequest(campaignID, reason string) usecaseDTO.CancelCampaignRequest
+	ToGetCampaignByIDRequest(campaignID string) usecaseDTO.GetCampaignByIDRequest
+	ToListCampaignsRequest(limit, offset int, status string) usecaseDTO.ListCampaignsRequest
 
 	// UseCase -> HTTP
-	ToCreateCampaignResponse(ucResp *dto.CreateCampaignResponse) httpDTO.CreateCampaignResponse
-	ToStartCampaignResponse(ucResp *dto.StartCampaignResponse) httpDTO.StartCampaignResponse
-	ToCancelCampaignResponse(ucResp *dto.CancelCampaignResponse) httpDTO.CancelCampaignResponse
-	ToGetCampaignByIDResponse(ucResp *dto.GetCampaignByIDResponse) httpDTO.GetCampaignByIDResponse
-	ToListCampaignsResponse(ucResp *dto.ListCampaignsResponse) httpDTO.ListCampaignsResponse
+	ToCreateCampaignResponse(ucResp *usecaseDTO.CreateCampaignResponse) httpDTO.CreateCampaignResponse
+	ToStartCampaignResponse(ucResp *usecaseDTO.StartCampaignResponse) httpDTO.StartCampaignResponse
+	ToCancelCampaignResponse(ucResp *usecaseDTO.CancelCampaignResponse) httpDTO.CancelCampaignResponse
+	ToGetCampaignByIDResponse(ucResp *usecaseDTO.GetCampaignByIDResponse) httpDTO.GetCampaignByIDResponse
+	ToListCampaignsResponse(ucResp *usecaseDTO.ListCampaignsResponse) httpDTO.ListCampaignsResponse
 
 	// Entity -> HTTP
 	ToCampaignResponse(entity *campaign.Campaign) httpDTO.CampaignResponse
@@ -41,8 +41,8 @@ func NewCampaignConverter() CampaignConverter {
 }
 
 // ToCreateCampaignRequest преобразует HTTP запрос в UseCase запрос
-func (c *campaignConverter) ToCreateCampaignRequest(httpReq httpDTO.CreateCampaignRequest, phoneFile, mediaFile *multipart.FileHeader) dto.CreateCampaignRequest {
-	return dto.CreateCampaignRequest{
+func (c *campaignConverter) ToCreateCampaignRequest(httpReq httpDTO.CreateCampaignRequest, phoneFile, mediaFile *multipart.FileHeader) usecaseDTO.CreateCampaignRequest {
+	return usecaseDTO.CreateCampaignRequest{
 		Name:              httpReq.Name,
 		Message:           httpReq.Message,
 		PhoneFile:         phoneFile,
@@ -56,30 +56,30 @@ func (c *campaignConverter) ToCreateCampaignRequest(httpReq httpDTO.CreateCampai
 }
 
 // ToStartCampaignRequest преобразует campaignID в UseCase запрос
-func (c *campaignConverter) ToStartCampaignRequest(campaignID string) dto.StartCampaignRequest {
-	return dto.StartCampaignRequest{
+func (c *campaignConverter) ToStartCampaignRequest(campaignID string) usecaseDTO.StartCampaignRequest {
+	return usecaseDTO.StartCampaignRequest{
 		CampaignID: campaignID,
 	}
 }
 
 // ToCancelCampaignRequest преобразует campaignID и reason в UseCase запрос
-func (c *campaignConverter) ToCancelCampaignRequest(campaignID, reason string) dto.CancelCampaignRequest {
-	return dto.CancelCampaignRequest{
+func (c *campaignConverter) ToCancelCampaignRequest(campaignID, reason string) usecaseDTO.CancelCampaignRequest {
+	return usecaseDTO.CancelCampaignRequest{
 		CampaignID: campaignID,
 		Reason:     reason,
 	}
 }
 
 // ToGetCampaignByIDRequest преобразует campaignID в UseCase запрос
-func (c *campaignConverter) ToGetCampaignByIDRequest(campaignID string) dto.GetCampaignByIDRequest {
-	return dto.GetCampaignByIDRequest{
+func (c *campaignConverter) ToGetCampaignByIDRequest(campaignID string) usecaseDTO.GetCampaignByIDRequest {
+	return usecaseDTO.GetCampaignByIDRequest{
 		CampaignID: campaignID,
 	}
 }
 
 // ToListCampaignsRequest преобразует лимит и смещение в UseCase запрос
-func (c *campaignConverter) ToListCampaignsRequest(limit, offset int, status string) dto.ListCampaignsRequest {
-	return dto.ListCampaignsRequest{
+func (c *campaignConverter) ToListCampaignsRequest(limit, offset int, status string) usecaseDTO.ListCampaignsRequest {
+	return usecaseDTO.ListCampaignsRequest{
 		Limit:  limit,
 		Offset: offset,
 		Status: status,
@@ -87,7 +87,7 @@ func (c *campaignConverter) ToListCampaignsRequest(limit, offset int, status str
 }
 
 // ToCreateCampaignResponse преобразует UseCase ответ в HTTP ответ
-func (c *campaignConverter) ToCreateCampaignResponse(ucResp *dto.CreateCampaignResponse) httpDTO.CreateCampaignResponse {
+func (c *campaignConverter) ToCreateCampaignResponse(ucResp *usecaseDTO.CreateCampaignResponse) httpDTO.CreateCampaignResponse {
 	return httpDTO.CreateCampaignResponse{
 		Campaign:      c.ToCampaignResponse(ucResp.Campaign),
 		TotalPhones:   ucResp.TotalNumbers,
@@ -97,7 +97,7 @@ func (c *campaignConverter) ToCreateCampaignResponse(ucResp *dto.CreateCampaignR
 }
 
 // ToStartCampaignResponse преобразует UseCase ответ в HTTP ответ
-func (c *campaignConverter) ToStartCampaignResponse(ucResp *dto.StartCampaignResponse) httpDTO.StartCampaignResponse {
+func (c *campaignConverter) ToStartCampaignResponse(ucResp *usecaseDTO.StartCampaignResponse) httpDTO.StartCampaignResponse {
 	return httpDTO.StartCampaignResponse{
 		Message:             "Campaign started successfully",
 		CampaignID:          ucResp.CampaignID,
@@ -110,7 +110,7 @@ func (c *campaignConverter) ToStartCampaignResponse(ucResp *dto.StartCampaignRes
 }
 
 // ToCancelCampaignResponse преобразует UseCase ответ в HTTP ответ
-func (c *campaignConverter) ToCancelCampaignResponse(ucResp *dto.CancelCampaignResponse) httpDTO.CancelCampaignResponse {
+func (c *campaignConverter) ToCancelCampaignResponse(ucResp *usecaseDTO.CancelCampaignResponse) httpDTO.CancelCampaignResponse {
 	return httpDTO.CancelCampaignResponse{
 		Message:            "Campaign cancelled successfully",
 		CampaignID:         ucResp.CampaignID,
@@ -124,7 +124,7 @@ func (c *campaignConverter) ToCancelCampaignResponse(ucResp *dto.CancelCampaignR
 }
 
 // ToGetCampaignByIDResponse преобразует UseCase ответ в HTTP ответ
-func (c *campaignConverter) ToGetCampaignByIDResponse(ucResp *dto.GetCampaignByIDResponse) httpDTO.GetCampaignByIDResponse {
+func (c *campaignConverter) ToGetCampaignByIDResponse(ucResp *usecaseDTO.GetCampaignByIDResponse) httpDTO.GetCampaignByIDResponse {
 	response := httpDTO.GetCampaignByIDResponse{
 		ID:              ucResp.ID,
 		Name:            ucResp.Name,
@@ -148,7 +148,7 @@ func (c *campaignConverter) ToGetCampaignByIDResponse(ucResp *dto.GetCampaignByI
 }
 
 // convertPhoneNumberStatuses преобразует UseCase PhoneNumberStatus в HTTP DTO
-func (c *campaignConverter) convertPhoneNumberStatuses(ucStatuses []dto.PhoneNumberStatus) []httpDTO.PhoneNumberStatus {
+func (c *campaignConverter) convertPhoneNumberStatuses(ucStatuses []usecaseDTO.PhoneNumberStatus) []httpDTO.PhoneNumberStatus {
 	if ucStatuses == nil {
 		return nil
 	}
@@ -171,7 +171,7 @@ func (c *campaignConverter) convertPhoneNumberStatuses(ucStatuses []dto.PhoneNum
 }
 
 // convertMediaInfo преобразует UseCase MediaInfo в HTTP DTO
-func (c *campaignConverter) convertMediaInfo(ucMedia *dto.MediaInfo) httpDTO.MediaInfo {
+func (c *campaignConverter) convertMediaInfo(ucMedia *usecaseDTO.MediaInfo) httpDTO.MediaInfo {
 	return httpDTO.MediaInfo{
 		ID:          ucMedia.ID,
 		Filename:    ucMedia.Filename,
@@ -185,7 +185,7 @@ func (c *campaignConverter) convertMediaInfo(ucMedia *dto.MediaInfo) httpDTO.Med
 }
 
 // ToListCampaignsResponse преобразует UseCase ответ в HTTP ответ
-func (c *campaignConverter) ToListCampaignsResponse(ucResp *dto.ListCampaignsResponse) httpDTO.ListCampaignsResponse {
+func (c *campaignConverter) ToListCampaignsResponse(ucResp *usecaseDTO.ListCampaignsResponse) httpDTO.ListCampaignsResponse {
 	campaigns := make([]httpDTO.CampaignSummary, len(ucResp.Campaigns))
 	for i, summary := range ucResp.Campaigns {
 		campaigns[i] = httpDTO.CampaignSummary{

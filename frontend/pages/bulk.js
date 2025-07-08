@@ -162,31 +162,22 @@ export function initBulkForm(showToast) {
     setLoading(true, testBtn);
     
     try {
-      // Для тестовой отправки используем дополнительные номера вместо файла
+      // Используем новый эндпоинт для прямой отправки тестового сообщения
       const fd = new FormData();
-      fd.append('name', `Тест от ${new Date().toLocaleString()}`);
+      fd.append('phone_number', testPhone);
       fd.append('message', message);
-      fd.append('messages_per_hour', '60');
-      fd.append('initiator', 'test');
-      
-      // Добавляем тестовый номер как дополнительный номер (файл не обязателен!)
-      fd.append('additional_numbers', testPhone);
       
       // Добавляем медиа если есть
       if (form.media_file.files[0]) {
         fd.append('media', form.media_file.files[0]);
       }
       
-      const response = await apiPost('/api/v1/campaigns', fd, showToast);
+      const response = await apiPost('/api/v1/test-message', fd, showToast);
        
-      // Наш API возвращает данные в формате {campaign: {...}}
-      const campaignId = response.campaign?.id;
-      
-      if (campaignId) {
-        await apiPost(`/api/v1/campaigns/${campaignId}/start`, {}, showToast);
-        showToast('Тестовое сообщение отправлено', 'success');
+      if (response.success) {
+        showToast('Тестовое сообщение отправлено успешно', 'success');
       } else {
-        showToast('Ошибка при создании тестовой кампании', 'danger');
+        showToast(`Ошибка отправки: ${response.error || 'Неизвестная ошибка'}`, 'danger');
       }
     } catch (error) {
       console.error('Error sending test message:', error);

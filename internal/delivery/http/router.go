@@ -15,6 +15,7 @@ import (
 // Router обрабатывает HTTP маршрутизацию и настройку middleware
 type Router struct {
 	campaigns *handlers.CampaignsHandler
+	messaging *handlers.MessagingHandler
 	settings  *handlers.SettingsHandler
 	health    *handlers.HealthHandler
 }
@@ -22,11 +23,13 @@ type Router struct {
 // NewRouter создает новый роутер со всеми обработчиками
 func NewRouter(
 	campaignHandler *handlers.CampaignsHandler,
+	messagingHandler *handlers.MessagingHandler,
 	settingsHandler *handlers.SettingsHandler,
 	healthHandler *handlers.HealthHandler,
 ) *Router {
 	return &Router{
 		campaigns: campaignHandler,
+		messaging: messagingHandler,
 		settings:  settingsHandler,
 		health:    healthHandler,
 	}
@@ -54,7 +57,7 @@ func (rt *Router) SetupRoutes() http.Handler {
 
 	// API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {
-		// Campaigns routes
+		// Campaigns
 		r.Route("/campaigns", func(r chi.Router) {
 			// Список кампаний
 			r.Get("/", rt.campaigns.List)
@@ -72,7 +75,10 @@ func (rt *Router) SetupRoutes() http.Handler {
 			})
 		})
 
-		// Settings routes
+		// Messaging
+		r.Post("/test-message", rt.messaging.SendTestMessage)
+
+		// Settings
 		r.Route("/settings", func(r chi.Router) {
 			r.Get("/", rt.settings.Get)
 			r.Put("/", rt.settings.Update)

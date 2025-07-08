@@ -22,11 +22,12 @@ type HTTPServer struct {
 func NewHTTPServer(
 	port int,
 	campaignHandler *handlers.CampaignsHandler,
+	messagingHandler *handlers.MessagingHandler,
 	settingsHandler *handlers.SettingsHandler,
 	healthHandler *handlers.HealthHandler,
 	logger logger.Logger,
 ) *HTTPServer {
-	router := NewRouter(campaignHandler, settingsHandler, healthHandler)
+	router := NewRouter(campaignHandler, messagingHandler, settingsHandler, healthHandler)
 
 	return &HTTPServer{
 		router: router,

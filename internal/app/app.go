@@ -24,6 +24,8 @@ import (
 	campaignInteractor "whatsapp-service/internal/usecases/campaigns/interactor"
 	campaignInterfaces "whatsapp-service/internal/usecases/campaigns/interfaces"
 	"whatsapp-service/internal/usecases/campaigns/ports"
+	messagingInteractor "whatsapp-service/internal/usecases/messaging/interactor"
+	messagingInterfaces "whatsapp-service/internal/usecases/messaging/interfaces"
 	settingsInteractor "whatsapp-service/internal/usecases/settings/interactor"
 	settingsInterfaces "whatsapp-service/internal/usecases/settings/interfaces"
 	settingsPorts "whatsapp-service/internal/usecases/settings/ports"
@@ -46,23 +48,27 @@ type Infrastructure struct {
 
 // UseCases содержит все use case зависимости
 type UseCases struct {
-	Campaign campaignInterfaces.CampaignUseCase
-	Settings settingsInterfaces.SettingsUseCase
+	Campaign    campaignInterfaces.CampaignUseCase
+	Settings    settingsInterfaces.SettingsUseCase
+	TestMessage messagingInterfaces.MessageUseCase
 }
 
 // Adapters содержит все адаптеры (конвертеры и презентеры)
 type Adapters struct {
-	CampaignConverter converter.CampaignConverter
-	SettingsConverter converter.SettingsConverter
-	CampaignPresenter presenters.CampaignPresenterInterface
-	SettingsPresenter presenters.SettingsPresenterInterface
+	CampaignConverter  converter.CampaignConverter
+	SettingsConverter  converter.SettingsConverter
+	MessagingConverter converter.MessagingConverter
+	CampaignPresenter  presenters.CampaignPresenterInterface
+	SettingsPresenter  presenters.SettingsPresenterInterface
+	MessagingPresenter presenters.MessagingPresenterInterface
 }
 
 // Handlers содержит все HTTP обработчики
 type Handlers struct {
-	Campaign *handlers.CampaignsHandler
-	Settings *handlers.SettingsHandler
-	Health   *handlers.HealthHandler
+	Campaign  *handlers.CampaignsHandler
+	Settings  *handlers.SettingsHandler
+	Messaging *handlers.MessagingHandler
+	Health    *handlers.HealthHandler
 }
 
 // App инкапсулирует все зависимости и умеет запускаться/останавливаться.
@@ -129,9 +135,15 @@ func NewUseCases(infra *Infrastructure) *UseCases {
 		infra.Logger,
 	)
 
+	var testMessageUseCase messagingInterfaces.MessageUseCase = messagingInteractor.NewMessageInteractor(
+		infra.MessageGateway,
+		infra.Logger,
+	)
+
 	return &UseCases{
-		Campaign: campaignUseCase,
-		Settings: settingsUseCase,
+		Campaign:    campaignUseCase,
+		Settings:    settingsUseCase,
+		TestMessage: testMessageUseCase,
 	}
 }
 
@@ -140,16 +152,20 @@ func NewAdapters() *Adapters {
 	// Конвертеры
 	var campaignConverter converter.CampaignConverter = converter.NewCampaignConverter()
 	var settingsConverter converter.SettingsConverter = converter.NewSettingsConverter()
+	var messagingConverter converter.MessagingConverter = converter.NewMessagingConverter()
 
 	// Presenters
 	var campaignPresenter presenters.CampaignPresenterInterface = presenters.NewCampaignPresenter(campaignConverter)
 	var settingsPresenter presenters.SettingsPresenterInterface = presenters.NewSettingsPresenter(settingsConverter)
+	var messagingPresenter presenters.MessagingPresenterInterface = presenters.NewMessagingPresenter(messagingConverter)
 
 	return &Adapters{
-		CampaignConverter: campaignConverter,
-		SettingsConverter: settingsConverter,
-		CampaignPresenter: campaignPresenter,
-		SettingsPresenter: settingsPresenter,
+		CampaignConverter:  campaignConverter,
+		SettingsConverter:  settingsConverter,
+		MessagingConverter: messagingConverter,
+		CampaignPresenter:  campaignPresenter,
+		SettingsPresenter:  settingsPresenter,
+		MessagingPresenter: messagingPresenter,
 	}
 }
 
@@ -170,6 +186,13 @@ func NewHandlers(useCases *UseCases, adapters *Adapters, infra *Infrastructure) 
 		infra.Logger,
 	)
 
+	messagingHandler := handlers.NewMessagingHandler(
+		useCases.TestMessage,
+		adapters.MessagingPresenter,
+		adapters.MessagingConverter,
+		infra.Logger,
+	)
+
 	// Health Handler
 	healthHandler := handlers.NewHealthHandler(
 		infra.Logger,
@@ -178,9 +201,10 @@ func NewHandlers(useCases *UseCases, adapters *Adapters, infra *Infrastructure) 
 	)
 
 	return &Handlers{
-		Campaign: campaignHandler,
-		Settings: settingsHandler,
-		Health:   healthHandler,
+		Campaign:  campaignHandler,
+		Settings:  settingsHandler,
+		Messaging: messagingHandler,
+		Health:    healthHandler,
 	}
 }
 
@@ -199,14 +223,15 @@ func New(cfg *config.Config) (*App, error) {
 	adapters := NewAdapters()
 
 	// Handlers
-	handlers := NewHandlers(useCases, adapters, infra)
+	h := NewHandlers(useCases, adapters, infra)
 
 	// HTTP сервер
 	httpSrv := createHTTPServer(
 		cfg.HTTP.Port,
-		handlers.Campaign,
-		handlers.Settings,
-		handlers.Health,
+		h.Campaign,
+		h.Messaging,
+		h.Settings,
+		h.Health,
 		infra.Logger,
 	)
 
@@ -221,6 +246,7 @@ func New(cfg *config.Config) (*App, error) {
 func createHTTPServer(
 	port int,
 	campaignHandler *handlers.CampaignsHandler,
+	messagingHandler *handlers.MessagingHandler,
 	settingsHandler *handlers.SettingsHandler,
 	healthHandler *handlers.HealthHandler,
 	logger logger.Logger,
@@ -228,6 +254,7 @@ func createHTTPServer(
 	return http.NewHTTPServer(
 		port,
 		campaignHandler,
+		messagingHandler,
 		settingsHandler,
 		healthHandler,
 		logger,

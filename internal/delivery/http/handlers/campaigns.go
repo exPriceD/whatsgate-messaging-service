@@ -3,18 +3,16 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"github.com/go-chi/chi/v5"
 	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
-
 	"whatsapp-service/internal/adapters/converter"
 	httpDTO "whatsapp-service/internal/adapters/dto/campaign"
 	"whatsapp-service/internal/adapters/presenters"
 	"whatsapp-service/internal/shared/logger"
 	"whatsapp-service/internal/usecases/campaigns/interfaces"
-
-	"github.com/go-chi/chi/v5"
 )
 
 // CampaignsHandler обрабатывает все HTTP запросы связанные с кампаниями
