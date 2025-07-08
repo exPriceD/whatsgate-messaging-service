@@ -2,115 +2,89 @@ package interactor
 
 import (
 	"context"
-	"fmt"
+
 	"whatsapp-service/internal/entities/campaign"
 	"whatsapp-service/internal/shared/logger"
 	"whatsapp-service/internal/usecases/campaigns/dto"
+	"whatsapp-service/internal/usecases/campaigns/interfaces"
 	"whatsapp-service/internal/usecases/campaigns/ports"
 )
 
 // CampaignInteractor объединяет все операции с кампаниями
 type CampaignInteractor struct {
-	campaignRepo       ports.CampaignRepository
-	campaignStatusRepo ports.CampaignStatusRepository
-	dispatcher         ports.Dispatcher
-	registry           ports.CampaignRegistry
-	fileParser         ports.FileParser
-	logger             logger.Logger
+	campaignRepo ports.CampaignRepository
+	dispatcher   ports.Dispatcher
+	registry     ports.CampaignRegistry
+	fileParser   ports.FileParser
+	logger       logger.Logger
 }
 
 // NewCampaignInteractor создает новый экземпляр unified use case
 func NewCampaignInteractor(
 	campaignRepo ports.CampaignRepository,
-	campaignStatusRepo ports.CampaignStatusRepository,
 	dispatcher ports.Dispatcher,
 	registry ports.CampaignRegistry,
 	fileParser ports.FileParser,
 	logger logger.Logger,
 ) *CampaignInteractor {
 	return &CampaignInteractor{
-		campaignRepo:       campaignRepo,
-		campaignStatusRepo: campaignStatusRepo,
-		dispatcher:         dispatcher,
-		registry:           registry,
-		fileParser:         fileParser,
-		logger:             logger,
+		campaignRepo: campaignRepo,
+		dispatcher:   dispatcher,
+		registry:     registry,
+		fileParser:   fileParser,
+		logger:       logger,
 	}
 }
 
+// GetByID получает информацию о кампании по ID
 func (ci *CampaignInteractor) GetByID(ctx context.Context, req dto.GetCampaignByIDRequest) (*dto.GetCampaignByIDResponse, error) {
-	ci.logger.Debug("get campaign by ID usecase started",
-		"campaign_id", req.CampaignID,
-	)
+	ci.logger.Debug("campaign interactor GetByID started", "campaign_id", req.CampaignID)
 
+	// Получаем кампанию
 	campaignEntity, err := ci.campaignRepo.GetByID(ctx, req.CampaignID)
 	if err != nil {
-		ci.logger.Error("failed to get campaign by ID",
-			"campaign_id", req.CampaignID,
-			"error", err,
-		)
-		return nil, fmt.Errorf("failed to get campaign by ID: %w", err)
+		ci.logger.Error("campaign interactor GetByID: failed to get campaign", "error", err)
+		return nil, err
 	}
 
-	ci.logger.Debug("campaign entity retrieved",
-		"campaign_id", campaignEntity.ID(),
-		"campaign_name", campaignEntity.Name(),
-		"campaign_status", campaignEntity.Status(),
-		"total_count", campaignEntity.Metrics().Total,
-	)
-
-	campaignStatuses, err := ci.campaignStatusRepo.ListByCampaignID(ctx, req.CampaignID)
+	// Получаем статусы номеров телефонов
+	campaignStatuses, err := ci.campaignRepo.ListPhoneStatusesByCampaignID(ctx, req.CampaignID)
 	if err != nil {
 		ci.logger.Error("failed to get campaign statuses",
-			"campaign_id", req.CampaignID,
-			"error", err)
-		campaignStatuses = nil
-	} else {
-		ci.logger.Debug("campaign statuses retrieved",
-			"campaign_id", req.CampaignID,
-			"statuses_count", len(campaignStatuses),
-		)
+			"campaign_id", req.CampaignID, "error", err)
+		return nil, err
 	}
 
-	processedCount := 0
-	errorCount := 0
-	var sentNumbers []dto.PhoneNumberStatus
-	var failedNumbers []dto.PhoneNumberStatus
+	// Разделяем статусы на отправленные и неудачные
+	var sentNumbers, failedNumbers []dto.PhoneNumberStatus
+	for _, status := range campaignStatuses {
+		phoneStatus := dto.PhoneNumberStatus{
+			ID:                status.ID(),
+			PhoneNumber:       status.PhoneNumber(),
+			Status:            string(status.Status()),
+			Error:             status.ErrorMessage(),
+			WhatsappMessageID: status.WhatsappMessageID(),
+			CreatedAt:         status.CreatedAt().Format("2006-01-02 15:04:05"),
+		}
 
-	if campaignStatuses != nil {
-		for _, phoneNumber := range campaignStatuses {
-			switch phoneNumber.Status() {
-			case campaign.CampaignStatusTypeSent:
-				processedCount++
-				phoneStatus := dto.PhoneNumberStatus{
-					PhoneNumber: phoneNumber.PhoneNumber(),
-					Status:      string(phoneNumber.Status()),
-				}
-				if phoneNumber.SentAt() != nil {
-					phoneStatus.SentAt = phoneNumber.SentAt().Format("2006-01-02T15:04:05Z07:00")
-				}
-				sentNumbers = append(sentNumbers, phoneStatus)
+		if status.SentAt() != nil {
+			phoneStatus.SentAt = status.SentAt().Format("2006-01-02 15:04:05")
+		}
+		if status.DeliveredAt() != nil {
+			phoneStatus.DeliveredAt = status.DeliveredAt().Format("2006-01-02 15:04:05")
+		}
+		if status.ReadAt() != nil {
+			phoneStatus.ReadAt = status.ReadAt().Format("2006-01-02 15:04:05")
+		}
 
-			case campaign.CampaignStatusTypeFailed:
-				errorCount++
-				phoneStatus := dto.PhoneNumberStatus{
-					PhoneNumber: phoneNumber.PhoneNumber(),
-					Status:      string(phoneNumber.Status()),
-					Error:       phoneNumber.Error(),
-				}
-				failedNumbers = append(failedNumbers, phoneStatus)
-			}
+		if status.Status() == campaign.CampaignStatusTypeSent {
+			sentNumbers = append(sentNumbers, phoneStatus)
+		} else if status.Status() == campaign.CampaignStatusTypeFailed {
+			failedNumbers = append(failedNumbers, phoneStatus)
 		}
 	}
 
-	ci.logger.Debug("campaign statistics calculated",
-		"campaign_id", req.CampaignID,
-		"processed_count", processedCount,
-		"error_count", errorCount,
-		"sent_numbers_count", len(sentNumbers),
-		"failed_numbers_count", len(failedNumbers),
-	)
-
+	// Информация о медиафайле
 	var mediaInfo *dto.MediaInfo
 	if campaignEntity.Media() != nil {
 		media := campaignEntity.Media()
@@ -118,14 +92,9 @@ func (ci *CampaignInteractor) GetByID(ctx context.Context, req dto.GetCampaignBy
 			Filename:    media.Filename(),
 			MimeType:    media.MimeType(),
 			MessageType: string(media.MessageType()),
-			Size:        media.Size(),
+			Size:        int64(len(media.Data())),
+			CreatedAt:   campaignEntity.CreatedAt().Format("2006-01-02 15:04:05"),
 		}
-		ci.logger.Debug("media information included",
-			"campaign_id", req.CampaignID,
-			"media_filename", mediaInfo.Filename,
-			"media_type", mediaInfo.MessageType,
-			"media_size", mediaInfo.Size,
-		)
 	}
 
 	response := &dto.GetCampaignByIDResponse{
@@ -134,190 +103,99 @@ func (ci *CampaignInteractor) GetByID(ctx context.Context, req dto.GetCampaignBy
 		Message:         campaignEntity.Message(),
 		Status:          campaignEntity.Status(),
 		TotalCount:      campaignEntity.Metrics().Total,
-		ProcessedCount:  processedCount,
-		ErrorCount:      errorCount,
+		ProcessedCount:  campaignEntity.Metrics().Processed,
+		ErrorCount:      campaignEntity.Metrics().Errors,
 		MessagesPerHour: campaignEntity.MessagesPerHour(),
-		CreatedAt:       campaignEntity.CreatedAt().Format("2006-01-02T15:04:05Z07:00"),
+		CreatedAt:       campaignEntity.CreatedAt().Format("2006-01-02 15:04:05"),
 		SentNumbers:     sentNumbers,
 		FailedNumbers:   failedNumbers,
 		Media:           mediaInfo,
 	}
 
-	ci.logger.Info("get campaign by ID usecase completed",
-		"campaign_id", req.CampaignID,
-		"campaign_name", response.Name,
-		"campaign_status", response.Status,
-		"total_count", response.TotalCount,
-		"processed_count", response.ProcessedCount,
-		"error_count", response.ErrorCount,
-	)
-
+	ci.logger.Debug("campaign interactor GetByID completed successfully", "campaign_id", req.CampaignID)
 	return response, nil
-}
-
-// calculateCampaignMetrics рассчитывает актуальные метрики кампании из статусов
-func (ci *CampaignInteractor) calculateCampaignMetrics(ctx context.Context, campaignID string) (processedCount int, errorCount int) {
-	// Получаем все статусы для кампании
-	statuses, err := ci.campaignStatusRepo.ListByCampaignID(ctx, campaignID)
-	if err != nil {
-		ci.logger.Error("failed to get campaign statuses for metrics calculation",
-			"campaign_id", campaignID,
-			"error", err,
-		)
-		return 0, 0
-	}
-
-	// Подсчитываем метрики
-	for _, status := range statuses {
-		switch status.Status() {
-		case campaign.CampaignStatusTypeSent:
-			processedCount++
-		case campaign.CampaignStatusTypeFailed:
-			processedCount++
-			errorCount++
-		}
-	}
-
-	ci.logger.Debug("campaign metrics calculated",
-		"campaign_id", campaignID,
-		"total_statuses", len(statuses),
-		"processed_count", processedCount,
-		"error_count", errorCount,
-	)
-
-	return processedCount, errorCount
 }
 
 // List получает список всех кампаний с возможностью фильтрации и пагинации
 func (ci *CampaignInteractor) List(ctx context.Context, req dto.ListCampaignsRequest) (*dto.ListCampaignsResponse, error) {
-	ci.logger.Debug("list campaigns usecase started",
-		"request_limit", req.Limit,
-		"request_offset", req.Offset,
-		"request_status", req.Status,
-	)
-
-	limit := req.Limit
-	if limit <= 0 {
-		limit = 500
-	}
-	offset := req.Offset
-	if offset < 0 {
-		offset = 0
-	}
-
-	ci.logger.Debug("list campaigns parameters normalized",
-		"normalized_limit", limit,
-		"normalized_offset", offset,
-		"status_filter", req.Status,
-	)
+	ci.logger.Debug("campaign interactor List started", "limit", req.Limit, "offset", req.Offset, "status", req.Status)
 
 	var campaigns []*campaign.Campaign
 	var total int
 	var err error
 
+	// Если указан фильтр по статусу
 	if req.Status != "" {
-		ci.logger.Debug("fetching campaigns by status",
-			"status", req.Status,
-			"limit", limit,
-			"offset", offset,
-		)
-
-		campaigns, err = ci.campaignRepo.ListByStatus(ctx, req.Status, limit, offset)
+		campaigns, err = ci.campaignRepo.ListByStatus(ctx, req.Status, req.Limit, req.Offset)
 		if err != nil {
-			ci.logger.Error("failed to get campaigns by status",
-				"status", req.Status,
-				"limit", limit,
-				"offset", offset,
-				"error", err,
-			)
-			return nil, fmt.Errorf("failed to get campaigns by status: %w", err)
+			ci.logger.Error("campaign interactor List: failed to get campaigns by status", "status", req.Status, "error", err)
+			return nil, err
 		}
-
-		ci.logger.Debug("campaigns fetched by status",
-			"status", req.Status,
-			"campaigns_count", len(campaigns),
-		)
-
 		total, err = ci.campaignRepo.CountByStatus(ctx, req.Status)
 		if err != nil {
-			ci.logger.Error("failed to count campaigns by status",
-				"status", req.Status,
-				"error", err)
-			total = len(campaigns)
+			ci.logger.Error("campaign interactor List: failed to count campaigns by status", "status", req.Status, "error", err)
+			return nil, err
 		}
 	} else {
-		ci.logger.Debug("fetching all campaigns",
-			"limit", limit,
-			"offset", offset,
-		)
-
-		campaigns, err = ci.campaignRepo.List(ctx, limit, offset)
+		campaigns, err = ci.campaignRepo.List(ctx, req.Limit, req.Offset)
 		if err != nil {
-			ci.logger.Error("failed to get campaigns",
-				"limit", limit,
-				"offset", offset,
-				"error", err,
-			)
-			return nil, fmt.Errorf("failed to get campaigns: %w", err)
+			ci.logger.Error("campaign interactor List: failed to get campaigns", "error", err)
+			return nil, err
 		}
-
-		ci.logger.Debug("campaigns fetched",
-			"campaigns_count", len(campaigns),
-		)
-
 		total, err = ci.campaignRepo.Count(ctx)
 		if err != nil {
-			ci.logger.Error("failed to count campaigns", "error", err)
-			total = len(campaigns)
+			ci.logger.Error("campaign interactor List: failed to count campaigns", "error", err)
+			return nil, err
 		}
 	}
 
-	ci.logger.Debug("campaigns and total count obtained",
-		"campaigns_count", len(campaigns),
-		"total_count", total,
-	)
-
-	campaignSummaries := make([]dto.CampaignSummary, 0, len(campaigns))
-
-	for i, campaignEntity := range campaigns {
-		ci.logger.Debug("processing campaign for summary",
-			"campaign_id", campaignEntity.ID(),
-			"campaign_name", campaignEntity.Name(),
-			"campaign_status", campaignEntity.Status(),
-			"index", i,
-		)
-
-		// Получаем актуальную статистику для кампании
-		processedCount, errorCount := ci.calculateCampaignMetrics(ctx, campaignEntity.ID())
-
-		summary := dto.CampaignSummary{
-			ID:              campaignEntity.ID(),
-			Name:            campaignEntity.Name(),
-			Status:          campaignEntity.Status(),
-			TotalCount:      campaignEntity.Metrics().Total,
-			ProcessedCount:  processedCount,
-			ErrorCount:      errorCount,
-			MessagesPerHour: campaignEntity.MessagesPerHour(),
-			CreatedAt:       campaignEntity.CreatedAt().Format("2006-01-02T15:04:05Z07:00"),
+	// Преобразуем в DTO
+	summaries := make([]dto.CampaignSummary, len(campaigns))
+	for i, camp := range campaigns {
+		summaries[i] = dto.CampaignSummary{
+			ID:              camp.ID(),
+			Name:            camp.Name(),
+			Status:          camp.Status(),
+			TotalCount:      camp.Metrics().Total,
+			ProcessedCount:  camp.Metrics().Processed,
+			ErrorCount:      camp.Metrics().Errors,
+			MessagesPerHour: camp.MessagesPerHour(),
+			CreatedAt:       camp.CreatedAt().Format("2006-01-02 15:04:05"),
 		}
-
-		campaignSummaries = append(campaignSummaries, summary)
 	}
-
-	ci.logger.Info("list campaigns usecase completed",
-		"total_campaigns", total,
-		"returned_campaigns", len(campaignSummaries),
-		"limit", limit,
-		"offset", offset,
-		"status_filter", req.Status,
-	)
 
 	response := &dto.ListCampaignsResponse{
-		Campaigns: campaignSummaries,
+		Campaigns: summaries,
 		Total:     total,
-		Limit:     limit,
-		Offset:    offset,
+		Limit:     req.Limit,
+		Offset:    req.Offset,
 	}
 
+	ci.logger.Debug("campaign interactor List completed successfully", "count", len(campaigns), "total", total)
 	return response, nil
 }
+
+// calculateCampaignMetrics вычисляет метрики кампании на основе статусов
+func (ci *CampaignInteractor) calculateCampaignMetrics(ctx context.Context, campaignID string) (processedCount int, errorCount int) {
+	// Получаем все статусы для кампании
+	statuses, err := ci.campaignRepo.ListPhoneStatusesByCampaignID(ctx, campaignID)
+	if err != nil {
+		ci.logger.Error("failed to get campaign statuses for metrics calculation",
+			"campaign_id", campaignID, "error", err)
+		return 0, 0
+	}
+
+	for _, status := range statuses {
+		if status.IsProcessed() {
+			processedCount++
+		}
+		if status.IsFailed() {
+			errorCount++
+		}
+	}
+
+	return processedCount, errorCount
+}
+
+// Ensure interfaces are implemented
+var _ interfaces.CampaignUseCase = (*CampaignInteractor)(nil)

@@ -54,3 +54,34 @@ func (r *InMemoryCampaignRegistry) Cancel(campaignID string) error {
 
 	return nil
 }
+
+// GetActiveCampaigns возвращает список ID всех активных кампаний.
+func (r *InMemoryCampaignRegistry) GetActiveCampaigns() []string {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	campaigns := make([]string, 0, len(r.activeCampaigns))
+	for campaignID := range r.activeCampaigns {
+		campaigns = append(campaigns, campaignID)
+	}
+	return campaigns
+}
+
+// CancelAll отменяет все активные кампании и очищает реестр.
+func (r *InMemoryCampaignRegistry) CancelAll() []string {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	cancelledCampaigns := make([]string, 0, len(r.activeCampaigns))
+
+	// Отменяем все активные кампании
+	for campaignID, cancel := range r.activeCampaigns {
+		cancel() // Вызываем функцию отмены контекста
+		cancelledCampaigns = append(cancelledCampaigns, campaignID)
+	}
+
+	// Очищаем реестр
+	r.activeCampaigns = make(map[string]context.CancelFunc)
+
+	return cancelledCampaigns
+}

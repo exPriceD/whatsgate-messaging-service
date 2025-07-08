@@ -34,18 +34,27 @@ type StartCampaignResponse struct {
 
 // PhoneNumberStatus представляет информацию о номере телефона и его статусе
 type PhoneNumberStatus struct {
-	PhoneNumber string
-	Status      string
-	Error       string
-	SentAt      string
+	ID                string
+	PhoneNumber       string
+	Status            string
+	Error             string
+	WhatsappMessageID string
+	SentAt            string
+	DeliveredAt       string
+	ReadAt            string
+	CreatedAt         string
 }
 
 // MediaInfo представляет информацию о медиафайле в кампании
 type MediaInfo struct {
+	ID          string
 	Filename    string
 	MimeType    string
 	MessageType string
-	Size        int
+	Size        int64
+	StoragePath string
+	ChecksumMD5 string
+	CreatedAt   string
 }
 
 type GetCampaignByIDResponse struct {

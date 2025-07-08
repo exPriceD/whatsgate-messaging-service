@@ -69,8 +69,8 @@ func (m *Media) Data() []byte {
 }
 
 // Size возвращает размер файла в байтах
-func (m *Media) Size() int {
-	return len(m.data)
+func (m *Media) Size() int64 {
+	return int64(len(m.data))
 }
 
 // IsValid проверяет валидность медиа-файла

@@ -50,7 +50,7 @@ func (ci *CampaignInteractor) Cancel(ctx context.Context, req dto.CancelCampaign
 		return nil, err
 	}
 
-	ci.logger.Info("Campaign cancelled successfully", map[string]interface{}{
+	ci.logger.Info("Campaign cancel operation completed", map[string]interface{}{
 		"campaignID": req.CampaignID,
 		"status":     string(campaignEntity.Status()),
 		"reason":     req.Reason,
@@ -95,20 +95,40 @@ func (ci *CampaignInteractor) validateCancellation(campaignEntity *campaign.Camp
 	return nil
 }
 
-// cancelViaRegistry отменяет кампанию через registry
+// cancelViaRegistry отменяет кампанию через registry (если она там есть)
 func (ci *CampaignInteractor) cancelViaRegistry(campaignID string) error {
 	if err := ci.registry.Cancel(campaignID); err != nil {
-		ci.logger.Error("Failed to cancel campaign via registry", map[string]interface{}{
-			"error":      err.Error(),
+		// Если кампания не найдена в реестре, возможно она уже завершилась
+		// Это нормальная ситуация - диспетчер мог завершить кампанию быстрее чем пользователь нажал отмену
+		ci.logger.Warn("Campaign not found in registry, probably already completed", map[string]interface{}{
 			"campaignID": campaignID,
+			"error":      err.Error(),
 		})
-		return fmt.Errorf("%w: %s", ErrRegistryCancel, err.Error())
+		// Не возвращаем ошибку - продолжаем обновление статуса в БД
+		return nil
 	}
 	return nil
 }
 
 // updateCancelCampaignStatus обновляет статус кампании
 func (ci *CampaignInteractor) updateCancelCampaignStatus(ctx context.Context, campaignEntity *campaign.Campaign, campaignID string) error {
+	// Повторно проверяем статус из БД перед обновлением, так как кампания могла завершиться
+	currentCampaign, err := ci.campaignRepo.GetByID(ctx, campaignID)
+	if err != nil {
+		return fmt.Errorf("failed to re-check campaign status: %w", err)
+	}
+
+	// Если кампания уже завершилась, не нужно ее отменять
+	if !currentCampaign.CanBeCancelled() {
+		ci.logger.Info("Campaign already completed, no need to cancel", map[string]interface{}{
+			"campaignID": campaignID,
+			"status":     string(currentCampaign.Status()),
+		})
+		// Обновляем локальную entity для корректного ответа
+		*campaignEntity = *currentCampaign
+		return nil
+	}
+
 	if err := campaignEntity.Cancel(); err != nil {
 		return fmt.Errorf("failed to transition campaign to cancelled state: %w", err)
 	}
@@ -127,7 +147,7 @@ func (ci *CampaignInteractor) updateCancelCampaignStatus(ctx context.Context, ca
 
 // buildCancelResponse строит ответ на отмену кампании
 func (ci *CampaignInteractor) buildCancelResponse(ctx context.Context, campaignEntity *campaign.Campaign, reason string) (*dto.CancelCampaignResponse, error) {
-	statuses, err := ci.campaignStatusRepo.ListByCampaignID(ctx, campaignEntity.ID())
+	statuses, err := ci.campaignRepo.ListPhoneStatusesByCampaignID(ctx, campaignEntity.ID())
 	if err != nil {
 		ci.logger.Error("Failed to get campaign statuses for response", map[string]interface{}{
 			"error":      err.Error(),

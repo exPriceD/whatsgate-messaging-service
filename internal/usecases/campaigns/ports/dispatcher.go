@@ -8,8 +8,9 @@ import (
 // DispatcherJob представляет собой задание для диспетчера —
 // набор сообщений для одной конкретной кампании.
 type DispatcherJob struct {
-	CampaignID string
-	Messages   []dto.Message
+	CampaignID      string
+	MessagesPerHour int
+	Messages        []dto.Message
 }
 
 // Dispatcher отвечает за оркестрацию отправки сообщений из нескольких кампаний,

@@ -33,16 +33,15 @@ import (
 
 // Infrastructure содержит все инфраструктурные зависимости
 type Infrastructure struct {
-	Database           *pgxpool.Pool
-	Logger             logger.Logger
-	CampaignRepo       ports.CampaignRepository
-	CampaignStatusRepo ports.CampaignStatusRepository
-	SettingsRepo       settingsPorts.WhatsGateSettingsRepository
-	FileParser         ports.FileParser
-	MessageGateway     messagingPorts.MessageGateway
-	GlobalRateLimiter  messagingPorts.GlobalRateLimiter
-	Dispatcher         ports.Dispatcher
-	CampaignRegistry   ports.CampaignRegistry
+	Database          *pgxpool.Pool
+	Logger            logger.Logger
+	CampaignRepo      ports.CampaignRepository
+	SettingsRepo      settingsPorts.WhatsGateSettingsRepository
+	FileParser        ports.FileParser
+	MessageGateway    messagingPorts.MessageGateway
+	GlobalRateLimiter messagingPorts.GlobalRateLimiter
+	Dispatcher        ports.Dispatcher
+	CampaignRegistry  ports.CampaignRegistry
 }
 
 // UseCases содержит все use case зависимости
@@ -91,8 +90,8 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 
 	// Репозитории
 	var campaignRepo ports.CampaignRepository = campaignRepository.NewPostgresCampaignRepository(pool, sharedLogger)
-	var campaignStatusRepo ports.CampaignStatusRepository = campaignRepository.NewPostgresCampaignStatusRepository(pool, sharedLogger)
 	var settingsRepo settingsPorts.WhatsGateSettingsRepository = settingsRepository.NewPostgresWhatsGateSettingsRepository(pool, sharedLogger)
+	var _ = settingsRepository.NewPostgresRetailCRMSettingsRepository(pool, sharedLogger)
 
 	// Утилитарные сервисы
 	var globalRateLimiter messagingPorts.GlobalRateLimiter = ratelimiter.NewGlobalMemoryRateLimiter()
@@ -102,16 +101,15 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 	var campaignRegistry ports.CampaignRegistry = registry.NewInMemoryCampaignRegistry()
 
 	return &Infrastructure{
-		Database:           pool,
-		Logger:             sharedLogger,
-		CampaignRepo:       campaignRepo,
-		CampaignStatusRepo: campaignStatusRepo,
-		SettingsRepo:       settingsRepo,
-		FileParser:         fileParser,
-		MessageGateway:     messageGateway,
-		GlobalRateLimiter:  globalRateLimiter,
-		Dispatcher:         dispatcherSvc,
-		CampaignRegistry:   campaignRegistry,
+		Database:          pool,
+		Logger:            sharedLogger,
+		CampaignRepo:      campaignRepo,
+		SettingsRepo:      settingsRepo,
+		FileParser:        fileParser,
+		MessageGateway:    messageGateway,
+		GlobalRateLimiter: globalRateLimiter,
+		Dispatcher:        dispatcherSvc,
+		CampaignRegistry:  campaignRegistry,
 	}, nil
 }
 
@@ -120,7 +118,6 @@ func NewUseCases(infra *Infrastructure) *UseCases {
 	// Use Cases
 	var campaignUseCase campaignInterfaces.CampaignUseCase = campaignInteractor.NewCampaignInteractor(
 		infra.CampaignRepo,
-		infra.CampaignStatusRepo,
 		infra.Dispatcher,
 		infra.CampaignRegistry,
 		infra.FileParser,
@@ -195,17 +192,23 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("failed to initialize infrastructure: %w", err)
 	}
 
-	// Use cases
+	// Use Cases
 	useCases := NewUseCases(infra)
 
-	// Адаптеры
+	// Adapters
 	adapters := NewAdapters()
 
 	// Handlers
-	handlerSet := NewHandlers(useCases, adapters, infra)
+	handlers := NewHandlers(useCases, adapters, infra)
 
-	// HTTP Server
-	httpSrv := createHTTPServer(cfg.HTTP.Port, handlerSet.Campaign, handlerSet.Settings, handlerSet.Health, infra.Logger)
+	// HTTP сервер
+	httpSrv := createHTTPServer(
+		cfg.HTTP.Port,
+		handlers.Campaign,
+		handlers.Settings,
+		handlers.Health,
+		infra.Logger,
+	)
 
 	return &App{
 		cfg:            cfg,
@@ -214,7 +217,7 @@ func New(cfg *config.Config) (*App, error) {
 	}, nil
 }
 
-// createHTTPServer создает HTTP сервер с новыми handlers
+// createHTTPServer создает HTTP сервер
 func createHTTPServer(
 	port int,
 	campaignHandler *handlers.CampaignsHandler,
@@ -231,32 +234,111 @@ func createHTTPServer(
 	)
 }
 
-// Start запускает HTTP сервер и фоновые процессы.
+// Start запускает приложение
 func (a *App) Start(ctx context.Context) error {
+	// Запускаем диспетчер
+	a.infrastructure.Logger.Info("starting dispatcher")
 	a.infrastructure.Dispatcher.Start(ctx)
-	a.infrastructure.Logger.Info("Dispatcher started")
+
+	// Восстанавливаем "orphaned" кампании при старте
+	if err := a.recoverOrphanedCampaigns(ctx); err != nil {
+		a.infrastructure.Logger.Error("failed to recover orphaned campaigns", "error", err)
+		// Не останавливаем приложение из-за этой ошибки
+	}
 
 	a.infrastructure.Logger.Info("HTTP server starting", "port", a.cfg.HTTP.Port)
 	return a.server.Start()
 }
 
-// Stop останавливает HTTP сервер и закрывает ресурсы.
+// Stop останавливает приложение
 func (a *App) Stop(ctx context.Context) error {
-	a.infrastructure.Logger.Info("Stopping application...")
+	a.infrastructure.Logger.Info("stopping application")
 
+	// Graceful shutdown кампаний
+	if err := a.gracefulShutdownCampaigns(ctx); err != nil {
+		a.infrastructure.Logger.Error("failed to gracefully shutdown campaigns", "error", err)
+	}
+
+	// Останавливаем диспетчер
+	a.infrastructure.Logger.Info("stopping dispatcher")
 	if err := a.infrastructure.Dispatcher.Stop(ctx); err != nil {
-		a.infrastructure.Logger.Error("failed to stop dispatcher gracefully", "error", err)
-	} else {
-		a.infrastructure.Logger.Info("Dispatcher stopped")
+		a.infrastructure.Logger.Error("failed to stop dispatcher", "error", err)
 	}
 
 	if err := a.server.Stop(ctx); err != nil {
 		return err
 	}
-	a.infrastructure.Logger.Info("HTTP server stopped")
 
-	postgres.Close(a.infrastructure.Database)
-	a.infrastructure.Logger.Info("Database pool closed")
+	// Закрываем пул соединений
+	if a.infrastructure.Database != nil {
+		a.infrastructure.Database.Close()
+	}
 
+	a.infrastructure.Logger.Info("application stopped")
+	return nil
+}
+
+// gracefulShutdownCampaigns останавливает активные кампании
+func (a *App) gracefulShutdownCampaigns(ctx context.Context) error {
+	a.infrastructure.Logger.Info("gracefully shutting down campaigns")
+
+	// Получаем все активные кампании
+	activeCampaigns, err := a.infrastructure.CampaignRepo.GetActiveCampaigns(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get active campaigns: %w", err)
+	}
+
+	// Останавливаем каждую кампанию
+	for _, campaign := range activeCampaigns {
+		if err := a.updateCampaignStatusOnShutdown(ctx, campaign.ID()); err != nil {
+			a.infrastructure.Logger.Error("failed to update campaign status on shutdown",
+				"campaign_id", campaign.ID(), "error", err)
+		}
+	}
+
+	a.infrastructure.Logger.Info("campaigns shutdown completed", "count", len(activeCampaigns))
+	return nil
+}
+
+// updateCampaignStatusOnShutdown обновляет статус кампании при остановке
+func (a *App) updateCampaignStatusOnShutdown(ctx context.Context, campaignID string) error {
+	// Получаем текущую кампанию
+	campaign, err := a.infrastructure.CampaignRepo.GetByID(ctx, campaignID)
+	if err != nil {
+		return fmt.Errorf("failed to get campaign: %w", err)
+	}
+
+	// Если кампания активна, помечаем ее как остановленную
+	if campaign.Status() == "started" {
+		if err := a.infrastructure.CampaignRepo.UpdateStatus(ctx, campaignID, "stopped"); err != nil {
+			return fmt.Errorf("failed to update campaign status: %w", err)
+		}
+		a.infrastructure.Logger.Info("campaign marked as stopped", "campaign_id", campaignID)
+	}
+
+	return nil
+}
+
+// recoverOrphanedCampaigns восстанавливает "orphaned" кампании
+func (a *App) recoverOrphanedCampaigns(ctx context.Context) error {
+	a.infrastructure.Logger.Info("recovering orphaned campaigns")
+
+	// Получаем все кампании со статусом "started"
+	startedCampaigns, err := a.infrastructure.CampaignRepo.ListByStatus(ctx, "started", 100, 0)
+	if err != nil {
+		return fmt.Errorf("failed to get started campaigns: %w", err)
+	}
+
+	// Помечаем их как "stopped" так как приложение перезапускается
+	for _, campaign := range startedCampaigns {
+		if err := a.infrastructure.CampaignRepo.UpdateStatus(ctx, campaign.ID(), "stopped"); err != nil {
+			a.infrastructure.Logger.Error("failed to mark orphaned campaign as stopped",
+				"campaign_id", campaign.ID(), "error", err)
+		} else {
+			a.infrastructure.Logger.Info("orphaned campaign marked as stopped", "campaign_id", campaign.ID())
+		}
+	}
+
+	a.infrastructure.Logger.Info("orphaned campaigns recovery completed", "count", len(startedCampaigns))
 	return nil
 }

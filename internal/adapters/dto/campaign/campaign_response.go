@@ -2,18 +2,27 @@ package campaign
 
 // PhoneNumberStatus представляет информацию о номере телефона и его статусе для HTTP ответа
 type PhoneNumberStatus struct {
-	PhoneNumber string `json:"phone_number"`
-	Status      string `json:"status"`
-	Error       string `json:"error"`
-	SentAt      string `json:"sent_at"`
+	ID                string `json:"id"`
+	PhoneNumber       string `json:"phone_number"`
+	Status            string `json:"status"`
+	Error             string `json:"error,omitempty"`
+	WhatsappMessageID string `json:"whatsapp_message_id,omitempty"`
+	SentAt            string `json:"sent_at,omitempty"`
+	DeliveredAt       string `json:"delivered_at,omitempty"`
+	ReadAt            string `json:"read_at,omitempty"`
+	CreatedAt         string `json:"created_at"`
 }
 
 // MediaInfo представляет информацию о медиафайле в кампании для HTTP ответа
 type MediaInfo struct {
+	ID          string `json:"id"`
 	Filename    string `json:"filename"`
 	MimeType    string `json:"mime_type"`
 	MessageType string `json:"message_type"`
-	Size        int    `json:"size"`
+	Size        int64  `json:"size"`
+	StoragePath string `json:"storage_path,omitempty"`
+	ChecksumMD5 string `json:"checksum_md5,omitempty"`
+	CreatedAt   string `json:"created_at"`
 }
 
 type BriefCampaignResponse struct {

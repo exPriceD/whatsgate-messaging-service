@@ -101,21 +101,71 @@ func SetLevel(level string) {
 	}
 }
 
-// buildZap создаёт zap.Logger согласно конфигурации
-func buildZap(cfg config.LoggingConfig) (*zap.Logger, error) {
-	encoderCfg := zap.NewProductionEncoderConfig()
-	encoderCfg.TimeKey = "ts"
-	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+// isDevelopment проверяет является ли окружение разработческим
+func isDevelopment(env string) bool {
+	devEnvs := []string{"dev", "development", "local", "debug"}
+	envLower := strings.ToLower(env)
+	for _, devEnv := range devEnvs {
+		if envLower == devEnv {
+			return true
+		}
+	}
+	return false
+}
 
+// buildDevelopmentConfig создает конфигурацию для разработки с красивым форматированием
+func buildDevelopmentConfig() zapcore.EncoderConfig {
+	config := zap.NewDevelopmentEncoderConfig()
+	config.EncodeLevel = zapcore.CapitalColorLevelEncoder           // Цветные уровни логов
+	config.EncodeTime = zapcore.TimeEncoderOfLayout("15:04:05.000") // Короткое время
+	config.EncodeCaller = zapcore.ShortCallerEncoder                // Короткий путь к файлу
+	config.ConsoleSeparator = " | "
+	return config
+}
+
+// buildProductionConfig создает конфигурацию для продакшена
+func buildProductionConfig() zapcore.EncoderConfig {
+	config := zap.NewProductionEncoderConfig()
+	config.TimeKey = "timestamp"
+	config.EncodeTime = zapcore.RFC3339TimeEncoder
+	config.MessageKey = "message"
+	config.LevelKey = "level"
+	config.CallerKey = "caller"
+	config.StacktraceKey = "stacktrace"
+	return config
+}
+
+// buildZap создаёт zap.Logger согласно конфигурации с учетом окружения
+func buildZap(cfg config.LoggingConfig) (*zap.Logger, error) {
+	var encoderCfg zapcore.EncoderConfig
 	var encoder zapcore.Encoder
-	switch strings.ToLower(cfg.Format) {
-	case "console":
-		encoder = zapcore.NewConsoleEncoder(encoderCfg)
-	default:
+
+	isDev := isDevelopment(cfg.Env)
+
+	if isDev {
+		// Development окружение - красивые цветные логи
+		encoderCfg = buildDevelopmentConfig()
+		if cfg.Format == "json" {
+			encoder = zapcore.NewJSONEncoder(encoderCfg)
+		} else {
+			encoder = zapcore.NewConsoleEncoder(encoderCfg)
+		}
+	} else {
+		// Production окружение - структурированные JSON логи
+		encoderCfg = buildProductionConfig()
 		encoder = zapcore.NewJSONEncoder(encoderCfg)
 	}
 
 	atomicLevel = zap.NewAtomicLevel()
+
+	// Автоматическая настройка уровня логирования по окружению
+	if cfg.Level == "" {
+		if isDev {
+			cfg.Level = "debug"
+		} else {
+			cfg.Level = "info"
+		}
+	}
 	SetLevel(cfg.Level)
 
 	var syncer zapcore.WriteSyncer
@@ -135,16 +185,29 @@ func buildZap(cfg config.LoggingConfig) (*zap.Logger, error) {
 	syncer = zapcore.Lock(syncer)
 
 	core := zapcore.NewCore(encoder, syncer, atomicLevel)
-	core = zapcore.NewSamplerWithOptions(core, time.Second, 100, 100)
+
+	// Для продакшена добавляем сэмплинг для высоконагруженных приложений
+	if !isDev {
+		core = zapcore.NewSamplerWithOptions(core, time.Second, 100, 100)
+	}
 
 	options := []zap.Option{
 		zap.AddCaller(),
-		zap.AddStacktrace(zapcore.ErrorLevel),
-		zap.ErrorOutput(syncer),
 	}
+
+	// Стэктрейсы только для Error+ в продакшене, для всех уровней в dev
+	if isDev {
+		options = append(options, zap.AddStacktrace(zapcore.WarnLevel))
+		options = append(options, zap.Development())
+	} else {
+		options = append(options, zap.AddStacktrace(zapcore.ErrorLevel))
+	}
+
+	options = append(options, zap.ErrorOutput(syncer))
 
 	coreLogger := zap.New(core, options...)
 
+	// Добавляем контекстные поля
 	if cfg.Service != "" {
 		coreLogger = coreLogger.With(zap.String("service", cfg.Service))
 	}

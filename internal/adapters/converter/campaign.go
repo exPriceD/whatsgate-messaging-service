@@ -156,10 +156,15 @@ func (c *campaignConverter) convertPhoneNumberStatuses(ucStatuses []dto.PhoneNum
 	httpStatuses := make([]httpDTO.PhoneNumberStatus, len(ucStatuses))
 	for i, ucStatus := range ucStatuses {
 		httpStatuses[i] = httpDTO.PhoneNumberStatus{
-			PhoneNumber: ucStatus.PhoneNumber,
-			Status:      ucStatus.Status,
-			Error:       ucStatus.Error,
-			SentAt:      ucStatus.SentAt,
+			ID:                ucStatus.ID,
+			PhoneNumber:       ucStatus.PhoneNumber,
+			Status:            ucStatus.Status,
+			Error:             ucStatus.Error,
+			WhatsappMessageID: ucStatus.WhatsappMessageID,
+			SentAt:            ucStatus.SentAt,
+			DeliveredAt:       ucStatus.DeliveredAt,
+			ReadAt:            ucStatus.ReadAt,
+			CreatedAt:         ucStatus.CreatedAt,
 		}
 	}
 	return httpStatuses
@@ -168,10 +173,14 @@ func (c *campaignConverter) convertPhoneNumberStatuses(ucStatuses []dto.PhoneNum
 // convertMediaInfo преобразует UseCase MediaInfo в HTTP DTO
 func (c *campaignConverter) convertMediaInfo(ucMedia *dto.MediaInfo) httpDTO.MediaInfo {
 	return httpDTO.MediaInfo{
+		ID:          ucMedia.ID,
 		Filename:    ucMedia.Filename,
 		MimeType:    ucMedia.MimeType,
 		MessageType: ucMedia.MessageType,
 		Size:        ucMedia.Size,
+		StoragePath: ucMedia.StoragePath,
+		ChecksumMD5: ucMedia.ChecksumMD5,
+		CreatedAt:   ucMedia.CreatedAt,
 	}
 }
 

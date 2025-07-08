@@ -12,4 +12,9 @@ type CampaignRegistry interface {
 	// Cancel находит кампанию, вызывает ее функцию отмены и удаляет ее из реестра.
 	// Возвращает ошибку, если кампания не найдена.
 	Cancel(campaignID string) error
+	// GetActiveCampaigns возвращает список ID всех активных кампаний.
+	GetActiveCampaigns() []string
+	// CancelAll отменяет все активные кампании и очищает реестр.
+	// Возвращает список ID отмененных кампаний.
+	CancelAll() []string
 }

@@ -132,7 +132,7 @@ func (ci *CampaignInteractor) updateStartCampaignStatus(ctx context.Context, c *
 
 // getStartCampaignStatuses получает статусы кампании для отправки
 func (ci *CampaignInteractor) getStartCampaignStatuses(ctx context.Context, campaignID string) ([]*campaign.CampaignPhoneStatus, error) {
-	statuses, err := ci.campaignStatusRepo.ListByCampaignID(ctx, campaignID)
+	statuses, err := ci.campaignRepo.ListPhoneStatusesByCampaignID(ctx, campaignID)
 	if err != nil {
 		ci.logger.Error("Failed to get campaign statuses", map[string]interface{}{
 			"error":      err.Error(),
@@ -174,8 +174,9 @@ func (ci *CampaignInteractor) submitStartJob(workerCtx context.Context, cancel c
 	messages := ci.prepareStartMessages(c, statuses, mediaInfo)
 
 	job := &infraDTO.DispatcherJob{
-		CampaignID: c.ID(),
-		Messages:   messages,
+		CampaignID:      c.ID(),
+		MessagesPerHour: c.MessagesPerHour(),
+		Messages:        messages,
 	}
 
 	resultsCh, err := ci.dispatcher.Submit(workerCtx, job)
@@ -294,7 +295,7 @@ func (ci *CampaignInteractor) processStartMessageResult(campaignID string, resul
 	}
 
 	// Обновляем статус конкретного номера
-	err := ci.campaignStatusRepo.UpdateByPhoneNumber(
+	err := ci.campaignRepo.UpdatePhoneStatusByNumber(
 		ctx,
 		campaignID,
 		result.PhoneNumber,
@@ -357,7 +358,7 @@ func (ci *CampaignInteractor) finalizeStartCampaignStatus(campaignID string, was
 	}
 
 	// Получаем статистику обработанных сообщений
-	statuses, err := ci.campaignStatusRepo.ListByCampaignID(ctx, campaignID)
+	statuses, err := ci.campaignRepo.ListPhoneStatusesByCampaignID(ctx, campaignID)
 	if err != nil {
 		ci.logger.Error("Failed to get campaign statuses for final update", map[string]interface{}{
 			"error":      err.Error(),

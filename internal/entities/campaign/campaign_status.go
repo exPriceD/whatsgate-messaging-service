@@ -17,13 +17,16 @@ const (
 // CampaignPhoneStatus представляет статус отправки сообщения на конкретный номер
 // Value Object — не изменяется извне, а пересоздается
 type CampaignPhoneStatus struct {
-	id          string
-	campaignID  string
-	phoneNumber string
-	status      CampaignStatusType
-	error       string
-	sentAt      *time.Time
-	createdAt   time.Time
+	id                string
+	campaignID        string
+	phoneNumber       string
+	status            CampaignStatusType
+	error             string
+	whatsappMessageID string
+	sentAt            *time.Time
+	deliveredAt       *time.Time
+	readAt            *time.Time
+	createdAt         time.Time
 }
 
 // NewCampaignStatus создает новый статус кампании для номера
@@ -47,6 +50,22 @@ func RestoreCampaignStatus(id, campaignID, phoneNumber string, status CampaignSt
 		error:       errorMsg,
 		sentAt:      sentAt,
 		createdAt:   createdAt,
+	}
+}
+
+// RestoreCampaignStatusExtended восстанавливает расширенный статус из БД с дополнительными полями
+func RestoreCampaignStatusExtended(id, campaignID, phoneNumber string, status CampaignStatusType, errorMsg, whatsappMessageID string, sentAt, deliveredAt, readAt *time.Time, createdAt time.Time) *CampaignPhoneStatus {
+	return &CampaignPhoneStatus{
+		id:                id,
+		campaignID:        campaignID,
+		phoneNumber:       phoneNumber,
+		status:            status,
+		error:             errorMsg,
+		whatsappMessageID: whatsappMessageID,
+		sentAt:            sentAt,
+		deliveredAt:       deliveredAt,
+		readAt:            readAt,
+		createdAt:         createdAt,
 	}
 }
 
@@ -75,9 +94,29 @@ func (cs *CampaignPhoneStatus) Error() string {
 	return cs.error
 }
 
+// ErrorMessage возвращает сообщение об ошибке (алиас для Error для совместимости)
+func (cs *CampaignPhoneStatus) ErrorMessage() string {
+	return cs.error
+}
+
+// WhatsappMessageID возвращает ID сообщения в WhatsApp
+func (cs *CampaignPhoneStatus) WhatsappMessageID() string {
+	return cs.whatsappMessageID
+}
+
 // SentAt возвращает время отправки сообщения
 func (cs *CampaignPhoneStatus) SentAt() *time.Time {
 	return cs.sentAt
+}
+
+// DeliveredAt возвращает время доставки сообщения
+func (cs *CampaignPhoneStatus) DeliveredAt() *time.Time {
+	return cs.deliveredAt
+}
+
+// ReadAt возвращает время прочтения сообщения
+func (cs *CampaignPhoneStatus) ReadAt() *time.Time {
+	return cs.readAt
 }
 
 // CreatedAt возвращает время создания статуса

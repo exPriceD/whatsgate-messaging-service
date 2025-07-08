@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"container/list"
 	"context"
-	"go.uber.org/zap"
 	"sync"
 	"time"
 	"whatsapp-service/internal/entities/campaign"
 	"whatsapp-service/internal/infrastructure/dispatcher/messaging/ports"
 	"whatsapp-service/internal/shared/logger"
 	"whatsapp-service/internal/usecases/dto"
+
+	"go.uber.org/zap"
 )
 
 type Dispatcher struct {
@@ -46,6 +47,7 @@ func NewDispatcher(gateway ports.MessageGateway, limiter ports.GlobalRateLimiter
 }
 
 func (d *Dispatcher) Start(ctx context.Context) {
+	d.logger.Info("Dispatcher starting")
 	d.wg.Add(1)
 	go d.run(ctx)
 }
@@ -102,15 +104,18 @@ func (d *Dispatcher) Submit(ctx context.Context, newJob *dto.DispatcherJob) (<-c
 
 func (d *Dispatcher) run(ctx context.Context) {
 	defer d.wg.Done()
+	d.logger.Info("Dispatcher run loop started")
 	ticker := time.NewTicker(100 * time.Millisecond) // Тикер для проверки очередей
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-d.stopChan:
+			d.logger.Info("Dispatcher received stop signal")
 			d.handleShutdown()
 			return
 		case req := <-d.jobsChan:
+			d.logger.Debug("Dispatcher received job request", zap.String("campaignID", req.job.CampaignID))
 			d.addJob(req)
 			req.errChan <- nil // Сигнализируем, что работа принята
 		case <-ticker.C:
@@ -129,11 +134,17 @@ func (d *Dispatcher) addJob(req dispatcherJobRequest) {
 		d.queues[id] = list.New()
 		d.activeCampaigns.PushBack(id)
 		d.resultsChans[id] = req.resultsChan
+
+		// Устанавливаем лимит для кампании
+		d.limiter.SetRateForCampaign(id, req.job.MessagesPerHour)
+		d.logger.Info("Set rate limit for campaign", zap.String("campaignID", id), zap.Int("messagesPerHour", req.job.MessagesPerHour))
 	}
 	// Добавляем сообщения в очередь
 	for i := range req.job.Messages {
 		d.queues[id].PushBack(&req.job.Messages[i])
 	}
+
+	d.logger.Info("Job added to queue", zap.String("campaignID", id), zap.Int("messagesInQueue", d.queues[id].Len()), zap.Int("activeCampaigns", d.activeCampaigns.Len()))
 }
 
 func (d *Dispatcher) processNextMessage(ctx context.Context) {
@@ -155,6 +166,7 @@ func (d *Dispatcher) processNextMessage(ctx context.Context) {
 			delete(d.resultsChans, campaignID)
 		}
 		delete(d.queues, campaignID)
+		d.logger.Info("Campaign completed, queue empty", zap.String("campaignID", campaignID))
 		d.mu.Unlock()
 		return
 	}
@@ -163,9 +175,11 @@ func (d *Dispatcher) processNextMessage(ctx context.Context) {
 	message := queue.Remove(msgElement).(*dto.Message)
 	d.mu.Unlock()
 
+	d.logger.Debug("Processing message", zap.String("campaignID", campaignID), zap.String("phoneNumber", message.PhoneNumber), zap.Int("remainingInQueue", queue.Len()))
+
 	// --- Длительные операции ---
-	if err := d.limiter.Wait(ctx); err != nil {
-		d.logger.Error("Rate limiter wait error", zap.Error(err), zap.String("campaignID", campaignID))
+	if err := d.limiter.WaitForCampaign(ctx, campaignID); err != nil {
+		d.logger.Error("Campaign rate limiter wait error", zap.Error(err), zap.String("campaignID", campaignID))
 		return
 	}
 
@@ -179,6 +193,9 @@ func (d *Dispatcher) processNextMessage(ctx context.Context) {
 
 	if resultsChan, ok := d.resultsChans[campaignID]; ok {
 		resultsChan <- result
+		d.logger.Debug("Result sent to channel", zap.String("campaignID", campaignID), zap.String("phoneNumber", result.PhoneNumber), zap.Bool("success", result.Success))
+	} else {
+		d.logger.Warn("No results channel found for campaign", zap.String("campaignID", campaignID))
 	}
 
 	// Перемещаем кампанию в конец, чтобы обеспечить round-robin

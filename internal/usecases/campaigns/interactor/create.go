@@ -233,7 +233,7 @@ func (ci *CampaignInteractor) saveCampaignStatuses(ctx context.Context, statuses
 			}
 		}
 
-		if err := ci.campaignStatusRepo.Save(ctx, status); err != nil {
+		if err := ci.campaignRepo.SavePhoneStatus(ctx, status); err != nil {
 			ci.logger.Error("Failed to save campaign status", map[string]interface{}{
 				"error":      err.Error(),
 				"campaignID": status.CampaignID(),

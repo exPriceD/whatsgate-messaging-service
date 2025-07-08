@@ -64,13 +64,13 @@ type LoggingConfig struct {
 
 // LoadConfig читает файл YAML, применяет дефолтные значения, перекрывает часть
 // настроек переменными окружения и валидирует итоговую структуру.
-// Если path пустой, пытается взять CONFIG_PATH, иначе "config.yaml".
+// Если path пустой, пытается взять CONFIG_PATH, иначе "config.dev.yaml".
 func LoadConfig(path string) (*Config, error) {
 	if path == "" {
 		if env := os.Getenv("CONFIG_PATH"); env != "" {
 			path = env
 		} else {
-			path = "config.yaml"
+			path = "config.dev.yaml"
 		}
 	}
 
@@ -129,8 +129,28 @@ func overrideWithEnv(cfg *Config) {
 	if v := os.Getenv("DATABASE_PASSWORD"); v != "" {
 		cfg.Database.Password = v
 	}
+
+	// Настройки логгера
 	if v := os.Getenv("LOG_LEVEL"); v != "" {
 		cfg.Logging.Level = strings.ToLower(v)
+	}
+	if v := os.Getenv("LOG_FORMAT"); v != "" {
+		cfg.Logging.Format = strings.ToLower(v)
+	}
+	if v := os.Getenv("LOG_OUTPUT"); v != "" {
+		cfg.Logging.OutputPath = v
+	}
+	if v := os.Getenv("LOG_SERVICE"); v != "" {
+		cfg.Logging.Service = v
+	}
+
+	// Автоматическое определение окружения
+	if v := os.Getenv("ENV"); v != "" {
+		cfg.Logging.Env = strings.ToLower(v)
+	} else if v := os.Getenv("ENVIRONMENT"); v != "" {
+		cfg.Logging.Env = strings.ToLower(v)
+	} else if v := os.Getenv("APP_ENV"); v != "" {
+		cfg.Logging.Env = strings.ToLower(v)
 	}
 }
 
