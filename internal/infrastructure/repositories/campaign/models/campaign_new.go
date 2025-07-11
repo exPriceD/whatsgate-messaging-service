@@ -14,6 +14,7 @@ type CampaignNewModel struct {
 	ErrorCount      int        `db:"error_count"`
 	SuccessCount    int        `db:"success_count"`
 	Initiator       *string    `db:"initiator"`
+	CategoryName    *string    `db:"category_name"`
 	StartedAt       *time.Time `db:"started_at"`
 	CompletedAt     *time.Time `db:"completed_at"`
 	CreatedAt       time.Time  `db:"created_at"`

@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"whatsapp-service/internal/entities/campaign"
 	"whatsapp-service/internal/usecases/campaigns/dto"
+	retailcrmDTO "whatsapp-service/internal/usecases/retailcrm/dto"
 )
 
 // Константы для create операций
@@ -38,7 +39,7 @@ func (ci *CampaignInteractor) Create(ctx context.Context, req dto.CreateCampaign
 		return nil, err
 	}
 
-	campaignEntity := campaign.NewCampaign(req.Name, req.Message, req.MessagesPerHour)
+	campaignEntity := campaign.NewCampaign(req.Name, req.Message, req.MessagesPerHour, req.SelectedCategoryName)
 	if req.Initiator != "" {
 		campaignEntity.SetInitiator(req.Initiator)
 	}
@@ -46,6 +47,13 @@ func (ci *CampaignInteractor) Create(ctx context.Context, req dto.CreateCampaign
 	phoneProcessingResult, err := ci.processPhoneNumbers(req)
 	if err != nil {
 		return nil, err
+	}
+
+	// Фильтрация по категории, если указана
+	if req.SelectedCategoryName != "" {
+		if err := ci.filterByCategory(ctx, phoneProcessingResult, req.SelectedCategoryName); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := ci.addNumbersToCampaign(campaignEntity, phoneProcessingResult); err != nil {
@@ -61,6 +69,100 @@ func (ci *CampaignInteractor) Create(ctx context.Context, req dto.CreateCampaign
 	}
 
 	return ci.buildCreateResponse(campaignEntity, phoneProcessingResult), nil
+}
+
+// filterByCategory фильтрует номера по выбранной категории
+func (ci *CampaignInteractor) filterByCategory(ctx context.Context, result *PhoneProcessingResult, categoryName string) error {
+	ci.logger.Info("campaign interactor: filtering phone numbers by category",
+		"category_name", categoryName,
+		"total_numbers", len(result.FilePhones)+len(result.AdditionalPhones),
+	)
+
+	// Собираем все номера для фильтрации
+	allPhones := make([]string, 0, len(result.FilePhones)+len(result.AdditionalPhones))
+
+	// Добавляем номера из файла
+	for _, phone := range result.FilePhones {
+		allPhones = append(allPhones, phone.Value())
+	}
+
+	// Добавляем дополнительные номера
+	for _, phone := range result.AdditionalPhones {
+		allPhones = append(allPhones, phone.Value())
+	}
+
+	if len(allPhones) == 0 {
+		ci.logger.Warn("campaign interactor: no phone numbers to filter")
+		return nil
+	}
+
+	// Фильтруем номера по категории
+	filterRequest := retailcrmDTO.FilterCustomersByCategoryRequest{
+		PhoneNumbers:         allPhones,
+		SelectedCategoryName: categoryName,
+	}
+
+	filterResponse, err := ci.retailCRMUseCase.FilterCustomersByCategory(ctx, filterRequest)
+	if err != nil {
+		ci.logger.Error("campaign interactor: failed to filter customers by category",
+			"error", err,
+			"category_name", categoryName,
+		)
+		return fmt.Errorf("failed to filter customers by category: %w", err)
+	}
+
+	// Подсчитываем статистику фильтрации
+	shouldSendCount := filterResponse.ShouldSendCount
+	totalMatches := filterResponse.TotalMatches
+	filterResults := filterResponse.Results
+
+	ci.logger.Info("campaign interactor: category filtering completed",
+		"category_name", categoryName,
+		"total_numbers", len(allPhones),
+		"should_send_count", shouldSendCount,
+		"total_matches", totalMatches,
+	)
+
+	// Создаем новые списки отфильтрованных номеров
+	filteredFilePhones := make([]*campaign.PhoneNumber, 0)
+	filteredAdditionalPhones := make([]*campaign.PhoneNumber, 0)
+
+	// Создаем map для быстрого поиска отфильтрованных номеров
+	filteredPhonesMap := make(map[string]bool)
+	for _, filterResult := range filterResults {
+		if filterResult.ShouldSend {
+			filteredPhonesMap[filterResult.PhoneNumber] = true
+		}
+	}
+
+	// Фильтруем номера из файла
+	for _, phone := range result.FilePhones {
+		if filteredPhonesMap[phone.Value()] {
+			filteredFilePhones = append(filteredFilePhones, phone)
+		}
+	}
+
+	// Фильтруем дополнительные номера
+	for _, phone := range result.AdditionalPhones {
+		if filteredPhonesMap[phone.Value()] {
+			filteredAdditionalPhones = append(filteredAdditionalPhones, phone)
+		}
+	}
+
+	// Обновляем результат
+	result.FilePhones = filteredFilePhones
+	result.AdditionalPhones = filteredAdditionalPhones
+	result.TotalTargets = len(filteredFilePhones) + len(filteredAdditionalPhones)
+
+	ci.logger.Info("campaign interactor: phone numbers filtered by category",
+		"category_name", categoryName,
+		"original_total", len(allPhones),
+		"filtered_total", result.TotalTargets,
+		"filtered_file_phones", len(filteredFilePhones),
+		"filtered_additional_phones", len(filteredAdditionalPhones),
+	)
+
+	return nil
 }
 
 // checkActiveCampaigns проверяет наличие активных кампаний

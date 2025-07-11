@@ -3,13 +3,14 @@ package campaignRepository
 import (
 	"context"
 	"database/sql"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"whatsapp-service/internal/entities/campaign"
 	"whatsapp-service/internal/entities/campaign/repository"
 	"whatsapp-service/internal/infrastructure/repositories/campaign/converter"
 	"whatsapp-service/internal/infrastructure/repositories/campaign/models"
 	"whatsapp-service/internal/interfaces"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Ensure implementation
@@ -71,13 +72,13 @@ func (r *PostgresCampaignRepository) Save(ctx context.Context, campaign *campaig
 	_, err = tx.Exec(ctx, `
 		INSERT INTO campaigns (
 			id, name, message, status, total_count, processed_count, error_count, 
-			messages_per_hour, media_file_id, initiator, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+			messages_per_hour, media_file_id, initiator, category_name, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
 	`,
 		campaignModel.ID, campaignModel.Name, campaignModel.Message, campaignModel.Status,
 		campaignModel.TotalCount, campaignModel.ProcessedCount, campaignModel.ErrorCount,
 		campaignModel.MessagesPerHour, campaignModel.MediaFileID, campaignModel.Initiator,
-		campaignModel.CreatedAt,
+		campaignModel.CategoryName, campaignModel.CreatedAt,
 	)
 
 	if err != nil {
@@ -108,15 +109,16 @@ func (r *PostgresCampaignRepository) GetByID(ctx context.Context, id string) (*c
 	var campaignModel models.CampaignNewModel
 	var mediaFileID sql.NullString
 	var initiator sql.NullString
+	var categoryName sql.NullString
 
 	err := r.pool.QueryRow(ctx, `
 		SELECT id, name, message, status, total_count, processed_count, error_count,
-		       messages_per_hour, media_file_id, initiator, created_at, updated_at
+		       messages_per_hour, media_file_id, initiator, category_name, created_at, updated_at
 		FROM campaigns WHERE id = $1
 	`, id).Scan(
 		&campaignModel.ID, &campaignModel.Name, &campaignModel.Message, &campaignModel.Status,
 		&campaignModel.TotalCount, &campaignModel.ProcessedCount, &campaignModel.ErrorCount,
-		&campaignModel.MessagesPerHour, &mediaFileID, &initiator,
+		&campaignModel.MessagesPerHour, &mediaFileID, &initiator, &categoryName,
 		&campaignModel.CreatedAt, &campaignModel.UpdatedAt,
 	)
 
@@ -135,6 +137,9 @@ func (r *PostgresCampaignRepository) GetByID(ctx context.Context, id string) (*c
 	}
 	if initiator.Valid {
 		campaignModel.Initiator = &initiator.String
+	}
+	if categoryName.Valid {
+		campaignModel.CategoryName = &categoryName.String
 	}
 
 	// Загружаем медиафайл, если есть

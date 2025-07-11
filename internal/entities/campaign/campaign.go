@@ -128,19 +128,21 @@ type Campaign struct {
 	media           *Media
 	messagesPerHour int
 	initiator       string
+	categoryName    string
 	createdAt       time.Time
 	audience        *TargetAudience
 	metrics         *CampaignMetrics
 	delivery        *DeliveryStatus
 }
 
-func NewCampaign(name, message string, messagesPerHour int) *Campaign {
+func NewCampaign(name, message string, messagesPerHour int, categoryName string) *Campaign {
 	return &Campaign{
 		id:              generateID(),
 		name:            name,
 		message:         message,
 		status:          CampaignStatusPending,
 		messagesPerHour: messagesPerHour,
+		categoryName:    categoryName,
 		createdAt:       time.Now(),
 		initiator:       "",
 		audience:        &TargetAudience{},
@@ -154,6 +156,7 @@ func RestoreCampaign(
 	status CampaignStatus,
 	media *Media,
 	messagesPerHour int,
+	categoryName string,
 	createdAt time.Time,
 	audience *TargetAudience,
 	metrics *CampaignMetrics,
@@ -166,6 +169,7 @@ func RestoreCampaign(
 		status:          status,
 		media:           media,
 		messagesPerHour: messagesPerHour,
+		categoryName:    categoryName,
 		createdAt:       createdAt,
 		initiator:       initiator,
 		audience:        audience,
@@ -182,6 +186,7 @@ func (c *Campaign) CreatedAt() time.Time   { return c.createdAt }
 func (c *Campaign) Initiator() string      { return c.initiator }
 func (c *Campaign) Media() *Media          { return c.media }
 func (c *Campaign) MessagesPerHour() int   { return c.messagesPerHour }
+func (c *Campaign) CategoryName() string   { return c.categoryName }
 
 func (c *Campaign) Audience() *TargetAudience { return c.audience }
 func (c *Campaign) Metrics() *CampaignMetrics { return c.metrics }

@@ -4,15 +4,16 @@ import "mime/multipart"
 
 // CreateCampaignRequest представляет запрос на создание кампании
 type CreateCampaignRequest struct {
-	Name              string                // Название кампании
-	Message           string                // Текст сообщения
-	PhoneFile         *multipart.FileHeader // Excel файл с номерами
-	MediaFile         *multipart.FileHeader // Медиа-файл (опционально)
-	AdditionalNumbers []string              // Дополнительные номера
-	ExcludeNumbers    []string              // Номера для исключения
-	MessagesPerHour   int                   // Лимит сообщений в час
-	Initiator         string                // Инициатор кампании
-	Async             bool                  // Асинхронное выполнение
+	Name                 string                // Название кампании
+	Message              string                // Текст сообщения
+	PhoneFile            *multipart.FileHeader // Excel файл с номерами
+	MediaFile            *multipart.FileHeader // Медиа-файл (опционально)
+	AdditionalNumbers    []string              // Дополнительные номера
+	ExcludeNumbers       []string              // Номера для исключения
+	MessagesPerHour      int                   // Лимит сообщений в час
+	Initiator            string                // Инициатор кампании
+	Async                bool                  // Асинхронное выполнение
+	SelectedCategoryName string                // Название выбранной категории для фильтрации (пустая строка = без фильтрации)
 }
 
 // StartCampaignRequest представляет запрос на запуск кампании

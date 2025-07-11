@@ -1927,6 +1927,50 @@ button.danger:hover:not(:disabled) {
   
   .settings-section:last-child .form-actions button {
     width: 100%;
-    min-width: auto;
+  }
+}
+
+/* Стили для категорий */
+.category-hint {
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 4px;
+  font-weight: normal;
+}
+
+.campaign-category {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.category-tag {
+  display: inline-block;
+  background: #e6f7ff;
+  color: #1890ff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.85em;
+  font-weight: 500;
+  border: 1px solid #91d5ff;
+  white-space: nowrap;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.no-category {
+  color: #999;
+  font-style: italic;
+}
+
+/* Адаптивность для категорий */
+@media (max-width: 768px) {
+  .campaign-category {
+    display: none;
+  }
+  
+  .history-table th:nth-child(5),
+  .history-table td:nth-child(5) {
+    display: none;
   }
 }

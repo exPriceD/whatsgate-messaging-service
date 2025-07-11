@@ -1,4 +1,4 @@
-import { apiPost } from '../ui/api.js';
+import { apiPost, apiGet } from '../ui/api.js';
 
 // Страница массовой рассылки
 const fileIcon = `<svg fill="none" viewBox="0 0 20 20"><rect width="16" height="18" x="2" y="1" fill="#fff" stroke="#2d8cff" stroke-width="1.5" rx="4"/><path stroke="#2d8cff" stroke-width="1.5" d="M6 6h8M6 10h8M6 14h5"/></svg>`;
@@ -19,6 +19,14 @@ export function renderBulkPage() {
           </span>
         </label>
         <label>Сообщений в час <input type="number" name="messages_per_hour" min="1" value="20" required placeholder="Например: 25"></label>
+        <label>
+          Категория товаров
+          <select name="selected_category_name" id="category-select">
+            <option value="">Без фильтрации по категории</option>
+            <option value="loading" disabled>Загрузка категорий...</option>
+          </select>
+          <div class="category-hint">💡 Выберите категорию для фильтрации клиентов по их покупкам</div>
+        </label>
         <label>Сообщение <textarea name="message" required placeholder="Введите текст сообщения..."></textarea></label>
         <label class="file-label">
           Медиа файл
@@ -88,6 +96,9 @@ export function renderBulkPage() {
 
 export function initBulkForm(showToast) {
   const form = document.getElementById('bulk-form');
+  
+  // Загружаем категории при инициализации
+  loadCategories(showToast);
   
   // Кастомные file input'ы
   const fileInput = form.querySelector('input[name="numbers_file"]');
@@ -305,35 +316,54 @@ export function initBulkForm(showToast) {
 
   // Функция для обновления сводки номеров
   function updateNumbersSummary() {
-    const additionalTextarea = document.querySelector('textarea[name="additional_numbers"]');
-    const excludeTextarea = document.querySelector('textarea[name="exclude_numbers"]');
+    const fileCount = parseInt(document.getElementById('file-count').textContent) || 0;
+    const addCount = countNumbers(form.additional_numbers.value);
+    const excludeCount = countNumbers(form.exclude_numbers.value);
+    const total = Math.max(0, fileCount + addCount - excludeCount);
     
-    const additionalText = additionalTextarea ? additionalTextarea.value : '';
-    const excludeText = excludeTextarea ? excludeTextarea.value : '';
-    
-    const additionalCount = countNumbers(additionalText);
-    const excludeCount = countNumbers(excludeText);
-    
-    // Получаем количество из файла
-    const fileCountElement = document.getElementById('file-count');
-    const fileCountText = fileCountElement ? fileCountElement.textContent : '0';
-    const fileCount = fileCountText === '~' ? 0 : parseInt(fileCountText) || 0;
-    
-    const totalCount = Math.max(0, fileCount + additionalCount - excludeCount);
-    
-    document.getElementById('add-count').textContent = additionalCount;
+    document.getElementById('add-count').textContent = addCount;
     document.getElementById('exclude-count').textContent = excludeCount;
-    document.getElementById('total-count').textContent = totalCount;
+    document.getElementById('total-count').textContent = total;
   }
+}
 
-  // Обработчики для текстовых полей
-  const additionalTextarea = document.querySelector('textarea[name="additional_numbers"]');
-  const excludeTextarea = document.querySelector('textarea[name="exclude_numbers"]');
+// Функция загрузки категорий из RetailCRM
+async function loadCategories(showToast) {
+  const categorySelect = document.getElementById('category-select');
   
-  if (additionalTextarea) {
-    additionalTextarea.addEventListener('input', updateNumbersSummary);
+  try {
+    const response = await apiGet('/api/v1/retailcrm/categories', showToast);
+    
+    if (response.success && response.categories) {
+      // Очищаем опцию "Загрузка..."
+      categorySelect.innerHTML = '<option value="">Без фильтрации по категории</option>';
+      
+      // Добавляем категории
+      response.categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category.name;
+        option.textContent = category.name;
+        categorySelect.appendChild(option);
+      });
+      
+      console.log(`Loaded ${response.categories.length} categories`);
+    } else {
+      console.error('Failed to load categories:', response);
+      categorySelect.innerHTML = '<option value="">Ошибка загрузки категорий</option>';
+    }
+  } catch (error) {
+    console.error('Error loading categories:', error);
+    categorySelect.innerHTML = '<option value="">Ошибка загрузки категорий</option>';
   }
-  if (excludeTextarea) {
-    excludeTextarea.addEventListener('input', updateNumbersSummary);
-  }
+}
+
+// Обработчики для текстовых полей
+const additionalTextarea = document.querySelector('textarea[name="additional_numbers"]');
+const excludeTextarea = document.querySelector('textarea[name="exclude_numbers"]');
+
+if (additionalTextarea) {
+  additionalTextarea.addEventListener('input', updateNumbersSummary);
+}
+if (excludeTextarea) {
+  excludeTextarea.addEventListener('input', updateNumbersSummary);
 } 

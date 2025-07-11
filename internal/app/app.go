@@ -8,7 +8,6 @@ import (
 	settingsRepository "whatsapp-service/internal/entities/settings/repository"
 	"whatsapp-service/internal/interfaces"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"whatsapp-service/internal/adapters/converter"
 	"whatsapp-service/internal/adapters/presenters"
 	"whatsapp-service/internal/config"
@@ -16,6 +15,9 @@ import (
 	"whatsapp-service/internal/delivery/http/handlers"
 	"whatsapp-service/internal/infrastructure/database/postgres"
 	"whatsapp-service/internal/infrastructure/dispatcher/messaging"
+	"whatsapp-service/internal/infrastructure/gateways/retailcrm/client"
+	retailcrmPorts "whatsapp-service/internal/infrastructure/gateways/retailcrm/ports"
+	retailcrmService "whatsapp-service/internal/infrastructure/gateways/retailcrm/service"
 	"whatsapp-service/internal/infrastructure/gateways/whatsapp/dynamic/whatsgate"
 	zaplogger "whatsapp-service/internal/infrastructure/logger/zap"
 	"whatsapp-service/internal/infrastructure/parsers/excel"
@@ -25,11 +27,15 @@ import (
 	"whatsapp-service/internal/infrastructure/services/ratelimiter"
 	campaignInteractor "whatsapp-service/internal/usecases/campaigns/interactor"
 	campaignInterfaces "whatsapp-service/internal/usecases/campaigns/interfaces"
-	"whatsapp-service/internal/usecases/campaigns/ports"
+	campaignPorts "whatsapp-service/internal/usecases/campaigns/ports"
 	messagingInteractor "whatsapp-service/internal/usecases/messaging/interactor"
 	messagingInterfaces "whatsapp-service/internal/usecases/messaging/interfaces"
+	retailcrmInteractor "whatsapp-service/internal/usecases/retailcrm/interactor"
+	retailcrmInterfaces "whatsapp-service/internal/usecases/retailcrm/interfaces"
 	settingsInteractor "whatsapp-service/internal/usecases/settings/interactor"
 	settingsInterfaces "whatsapp-service/internal/usecases/settings/interfaces"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Infrastructure содержит все инфраструктурные зависимости
@@ -39,11 +45,12 @@ type Infrastructure struct {
 	CampaignRepo          campaignRepository.CampaignRepository
 	WhatsgateSettingsRepo settingsRepository.WhatsGateSettingsRepository
 	RetailCRMSettingsRepo settingsRepository.RetailCRMSettingsRepository
-	FileParser            ports.FileParser
+	FileParser            campaignPorts.FileParser
 	MessageGateway        interfaces.MessageGateway
 	GlobalRateLimiter     messaging.GlobalRateLimiter
-	Dispatcher            ports.Dispatcher
-	CampaignRegistry      ports.CampaignRegistry
+	Dispatcher            campaignPorts.Dispatcher
+	CampaignRegistry      campaignPorts.CampaignRegistry
+	RetailCRMGateway      retailcrmPorts.RetailCRMGateway
 }
 
 // UseCases содержит все use case зависимости
@@ -52,6 +59,7 @@ type UseCases struct {
 	WhatsgateSettings settingsInterfaces.WhatsgateSettingsUseCase
 	RetailCRMSettings settingsInterfaces.RetailCRMSettingsUseCase
 	Message           messagingInterfaces.MessageUseCase
+	RetailCRM         retailcrmInterfaces.RetailCRMUseCase
 }
 
 // Adapters содержит все адаптеры (конвертеры и презентеры)
@@ -60,10 +68,12 @@ type Adapters struct {
 	WhatsgateSettingsConverter converter.WhatsgateSettingsConverter
 	RetailCRMSettingsConverter converter.RetailCRMSettingsConverter
 	MessagingConverter         converter.MessagingConverter
+	RetailCRMConverter         converter.RetailCRMConverter
 	CampaignPresenter          presenters.CampaignPresenterInterface
 	WhatsgateSettingsPresenter presenters.WhatsgateSettingsPresenterInterface
 	RetailCRMSettingsPresenter presenters.RetailCRMSettingsPresenterInterface
 	MessagingPresenter         presenters.MessagingPresenterInterface
+	RetailCRMPresenter         presenters.RetailCRMPresenterInterface
 }
 
 // Handlers содержит все HTTP обработчики
@@ -73,6 +83,7 @@ type Handlers struct {
 	RetailCRMSettings *handlers.RetailCRMSettingsHandler
 	Messaging         *handlers.MessagingHandler
 	Health            *handlers.HealthHandler
+	RetailCRM         *handlers.RetailCRMHandler
 }
 
 // App инкапсулирует все зависимости и умеет запускаться/останавливаться.
@@ -105,10 +116,14 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 
 	// Утилитарные сервисы
 	var globalRateLimiter messaging.GlobalRateLimiter = ratelimiter.NewGlobalMemoryRateLimiter()
-	var fileParser ports.FileParser = excel.NewExcelParser()
+	var fileParser campaignPorts.FileParser = excel.NewExcelParser()
 	var messageGateway interfaces.MessageGateway = whatsgate.NewSettingsAwareGateway(whatsgateSettingsRepo)
-	var dispatcherSvc ports.Dispatcher = messaging.NewDispatcher(messageGateway, globalRateLimiter, sharedLogger)
-	var campaignRegistry ports.CampaignRegistry = registry.NewInMemoryCampaignRegistry()
+	var dispatcherSvc campaignPorts.Dispatcher = messaging.NewDispatcher(messageGateway, globalRateLimiter, sharedLogger)
+	var campaignRegistry campaignPorts.CampaignRegistry = registry.NewInMemoryCampaignRegistry()
+
+	// RetailCRM сервис
+	var retailCRMClient client.RetailCRMClientInterface = client.NewSettingsAwareRetailCRMClient(retailCRMSettingsRepo, sharedLogger)
+	var retailCRMGateway retailcrmPorts.RetailCRMGateway = retailcrmService.NewRetailCRMService(retailCRMClient, sharedLogger)
 
 	return &Infrastructure{
 		Database:              pool,
@@ -121,17 +136,25 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 		GlobalRateLimiter:     globalRateLimiter,
 		Dispatcher:            dispatcherSvc,
 		CampaignRegistry:      campaignRegistry,
+		RetailCRMGateway:      retailCRMGateway,
 	}, nil
 }
 
 // NewUseCases создает все use case зависимости
 func NewUseCases(infra *Infrastructure) *UseCases {
+	// Сначала создаем RetailCRM usecase
+	var retailCRMUseCase retailcrmInterfaces.RetailCRMUseCase = retailcrmInteractor.NewRetailCRMInteractor(
+		infra.RetailCRMGateway,
+		infra.Logger,
+	)
+
 	// Use Cases
 	var campaignUseCase campaignInterfaces.CampaignUseCase = campaignInteractor.NewCampaignInteractor(
 		infra.CampaignRepo,
 		infra.Dispatcher,
 		infra.CampaignRegistry,
 		infra.FileParser,
+		retailCRMUseCase, // Используем RetailCRM usecase
 		infra.Logger,
 	)
 
@@ -155,6 +178,7 @@ func NewUseCases(infra *Infrastructure) *UseCases {
 		WhatsgateSettings: whatsgateSettingsUseCase,
 		RetailCRMSettings: retailCRMSettingsUseCase,
 		Message:           testMessageUseCase,
+		RetailCRM:         retailCRMUseCase,
 	}
 }
 
@@ -165,22 +189,26 @@ func NewAdapters() *Adapters {
 	var whatsgateSettingsConverter converter.WhatsgateSettingsConverter = converter.NewWhatsgateSettingsConverter()
 	var retailCRMSettingsConverter converter.RetailCRMSettingsConverter = converter.NewRetailCRMSettingsConverter()
 	var messagingConverter converter.MessagingConverter = converter.NewMessagingConverter()
+	var retailCRMConverter converter.RetailCRMConverter = converter.NewRetailCRMConverter()
 
 	// Presenters
 	var campaignPresenter presenters.CampaignPresenterInterface = presenters.NewCampaignPresenter(campaignConverter)
 	var whatsgateSettingsPresenter presenters.WhatsgateSettingsPresenterInterface = presenters.NewWhatsgateSettingsPresenter(whatsgateSettingsConverter)
 	var retailCRMSettingsPresenter presenters.RetailCRMSettingsPresenterInterface = presenters.NewRetailCRMSettingsPresenter(retailCRMSettingsConverter)
 	var messagingPresenter presenters.MessagingPresenterInterface = presenters.NewMessagingPresenter(messagingConverter)
+	var retailCRMPresenter presenters.RetailCRMPresenterInterface = presenters.NewRetailCRMPresenter(retailCRMConverter)
 
 	return &Adapters{
 		CampaignConverter:          campaignConverter,
 		WhatsgateSettingsConverter: whatsgateSettingsConverter,
 		RetailCRMSettingsConverter: retailCRMSettingsConverter,
 		MessagingConverter:         messagingConverter,
+		RetailCRMConverter:         retailCRMConverter,
 		CampaignPresenter:          campaignPresenter,
 		WhatsgateSettingsPresenter: whatsgateSettingsPresenter,
 		RetailCRMSettingsPresenter: retailCRMSettingsPresenter,
 		MessagingPresenter:         messagingPresenter,
+		RetailCRMPresenter:         retailCRMPresenter,
 	}
 }
 
@@ -215,6 +243,13 @@ func NewHandlers(useCases *UseCases, adapters *Adapters, infra *Infrastructure) 
 		infra.Logger,
 	)
 
+	retailCRMHandler := handlers.NewRetailCRMHandler(
+		useCases.RetailCRM,
+		adapters.RetailCRMConverter,
+		adapters.RetailCRMPresenter,
+		infra.Logger,
+	)
+
 	// Health Handler
 	healthHandler := handlers.NewHealthHandler(
 		infra.Logger,
@@ -227,6 +262,7 @@ func NewHandlers(useCases *UseCases, adapters *Adapters, infra *Infrastructure) 
 		WhatsgateSettings: whatsgateSettingsHandler,
 		RetailCRMSettings: retailCRMSettingsHandler,
 		Messaging:         messagingHandler,
+		RetailCRM:         retailCRMHandler,
 		Health:            healthHandler,
 	}
 }
@@ -255,6 +291,7 @@ func New(cfg *config.Config) (*App, error) {
 		h.Messaging,
 		h.WhatsgateSettings,
 		h.RetailCRMSettings,
+		h.RetailCRM,
 		h.Health,
 		infra.Logger,
 	)
@@ -273,6 +310,7 @@ func createHTTPServer(
 	messagingHandler *handlers.MessagingHandler,
 	whatsgateSettingsHandler *handlers.WhatsgateSettingsHandler,
 	retailCRMSettingsHandler *handlers.RetailCRMSettingsHandler,
+	retailCRMHandler *handlers.RetailCRMHandler,
 	healthHandler *handlers.HealthHandler,
 	logger interfaces.Logger,
 ) *http.HTTPServer {
@@ -282,6 +320,7 @@ func createHTTPServer(
 		messagingHandler,
 		whatsgateSettingsHandler,
 		retailCRMSettingsHandler,
+		retailCRMHandler,
 		healthHandler,
 		logger,
 	)

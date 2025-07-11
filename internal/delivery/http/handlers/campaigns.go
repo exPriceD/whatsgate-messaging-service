@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"github.com/go-chi/chi/v5"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -13,6 +12,8 @@ import (
 	"whatsapp-service/internal/adapters/presenters"
 	"whatsapp-service/internal/interfaces"
 	campaignInterfaces "whatsapp-service/internal/usecases/campaigns/interfaces"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // CampaignsHandler обрабатывает все HTTP запросы связанные с кампаниями
@@ -216,14 +217,16 @@ func (h *CampaignsHandler) List(w http.ResponseWriter, r *http.Request) {
 // parseCreateRequest парсит HTTP запрос на создание кампании
 func (h *CampaignsHandler) parseCreateRequest(r *http.Request) (httpDTO.CreateCampaignRequest, error) {
 	messagesPerHour := parseIntDefault(r.FormValue("messages_per_hour"), 60)
+	selectedCategoryName := r.FormValue("selected_category_name")
 
 	return httpDTO.CreateCampaignRequest{
-		Name:             r.FormValue("name"),
-		Message:          r.FormValue("message"),
-		AdditionalPhones: parseArrayParam(r, "additional_numbers"),
-		ExcludePhones:    parseArrayParam(r, "exclude_numbers"),
-		MessagesPerHour:  messagesPerHour,
-		Initiator:        r.FormValue("initiator"),
+		Name:                 r.FormValue("name"),
+		Message:              r.FormValue("message"),
+		AdditionalPhones:     parseArrayParam(r, "additional_numbers"),
+		ExcludePhones:        parseArrayParam(r, "exclude_numbers"),
+		MessagesPerHour:      messagesPerHour,
+		Initiator:            r.FormValue("initiator"),
+		SelectedCategoryName: selectedCategoryName,
 	}, nil
 }
 

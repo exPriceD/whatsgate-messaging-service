@@ -43,15 +43,16 @@ func NewCampaignConverter() CampaignConverter {
 // ToCreateCampaignRequest преобразует HTTP запрос в UseCase запрос
 func (c *campaignConverter) ToCreateCampaignRequest(httpReq httpDTO.CreateCampaignRequest, phoneFile, mediaFile *multipart.FileHeader) usecaseDTO.CreateCampaignRequest {
 	return usecaseDTO.CreateCampaignRequest{
-		Name:              httpReq.Name,
-		Message:           httpReq.Message,
-		PhoneFile:         phoneFile,
-		MediaFile:         mediaFile,
-		AdditionalNumbers: httpReq.AdditionalPhones,
-		ExcludeNumbers:    httpReq.ExcludePhones,
-		MessagesPerHour:   httpReq.MessagesPerHour,
-		Initiator:         httpReq.Initiator,
-		Async:             false, // По умолчанию синхронно
+		Name:                 httpReq.Name,
+		Message:              httpReq.Message,
+		PhoneFile:            phoneFile,
+		MediaFile:            mediaFile,
+		AdditionalNumbers:    httpReq.AdditionalPhones,
+		ExcludeNumbers:       httpReq.ExcludePhones,
+		MessagesPerHour:      httpReq.MessagesPerHour,
+		Initiator:            httpReq.Initiator,
+		Async:                false, // По умолчанию синхронно
+		SelectedCategoryName: httpReq.SelectedCategoryName,
 	}
 }
 

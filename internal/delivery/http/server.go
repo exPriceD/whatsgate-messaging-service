@@ -25,10 +25,11 @@ func NewHTTPServer(
 	messagingHandler *handlers.MessagingHandler,
 	whatsgateSettingsHandler *handlers.WhatsgateSettingsHandler,
 	retailCRMSettingsHandler *handlers.RetailCRMSettingsHandler,
+	retailCRMHandler *handlers.RetailCRMHandler,
 	healthHandler *handlers.HealthHandler,
 	logger interfaces.Logger,
 ) *HTTPServer {
-	router := NewRouter(campaignHandler, messagingHandler, whatsgateSettingsHandler, retailCRMSettingsHandler, healthHandler)
+	router := NewRouter(campaignHandler, messagingHandler, whatsgateSettingsHandler, retailCRMSettingsHandler, healthHandler, retailCRMHandler)
 
 	return &HTTPServer{
 		router: router,

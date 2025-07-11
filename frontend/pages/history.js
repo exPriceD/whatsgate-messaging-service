@@ -67,6 +67,7 @@ export function renderHistoryPage() {
               <th>📊 Статус</th>
               <th>📈 Прогресс</th>
               <th>⏱️ Сообщ./час</th>
+              <th>🏷️ Категория</th>
               <th>❗ Ошибки</th>
               <th>📅 Дата</th>
               <th>🔧 Действия</th>
@@ -74,7 +75,7 @@ export function renderHistoryPage() {
           </thead>
           <tbody id="history-tbody">
             <tr>
-              <td colspan="6" class="loading">
+              <td colspan="8" class="loading">
                 <div class="loading-spinner"></div>
                 <span>Загрузка истории...</span>
               </td>
@@ -128,7 +129,7 @@ export function initHistoryPage(showToast) {
     const tbody = document.getElementById('history-tbody');
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" class="loading">
+        <td colspan="8" class="loading">
           <div class="loading-spinner"></div>
           <span>Загрузка истории...</span>
         </td>
@@ -241,6 +242,9 @@ export function initHistoryPage(showToast) {
           <span class="speed-number">${campaign.messages_per_hour || 0}</span>
           <span class="speed-label">/час</span>
         </td>
+        <td class="campaign-category">
+          ${campaign.category_name ? `<span class="category-tag">${campaign.category_name}</span>` : '<span class="no-category">—</span>'}
+        </td>
         <td class="campaign-errors">
           <span class="error-count">${campaign.error_count || 0}</span>
         </td>
@@ -272,7 +276,7 @@ export function initHistoryPage(showToast) {
     const tbody = document.getElementById('history-tbody');
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" class="empty">
+        <td colspan="8" class="empty">
           <div class="empty-state">
             <div class="empty-icon">📭</div>
             <div class="empty-text">История рассылок пуста</div>
@@ -287,7 +291,7 @@ export function initHistoryPage(showToast) {
     const tbody = document.getElementById('history-tbody');
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" class="error">
+        <td colspan="8" class="error">
           <div class="error-state">
             <div class="error-icon">❌</div>
             <div class="error-text">Ошибка загрузки истории</div>
@@ -328,6 +332,10 @@ export function initHistoryPage(showToast) {
               <div class="detail-item">
                 <label>Дата создания:</label>
                 <span class="detail-value">${formatDate(campaign.created_at)}</span>
+              </div>
+              <div class="detail-item">
+                <label>Категория:</label>
+                <span class="detail-value">${campaign.category_name ? `<span class="category-tag">${campaign.category_name}</span>` : 'Без фильтрации'}</span>
               </div>
             </div>
           </div>

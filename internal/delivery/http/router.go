@@ -19,6 +19,7 @@ type Router struct {
 	whatsgateSettings *handlers.WhatsgateSettingsHandler
 	retailcrmSettings *handlers.RetailCRMSettingsHandler
 	health            *handlers.HealthHandler
+	retailcrm         *handlers.RetailCRMHandler
 }
 
 // NewRouter создает новый роутер со всеми обработчиками
@@ -28,6 +29,7 @@ func NewRouter(
 	whatsgateSettingsHandler *handlers.WhatsgateSettingsHandler,
 	retailcrmSettingsHandler *handlers.RetailCRMSettingsHandler,
 	healthHandler *handlers.HealthHandler,
+	retailcrmHandler *handlers.RetailCRMHandler,
 ) *Router {
 	return &Router{
 		campaigns:         campaignHandler,
@@ -35,6 +37,7 @@ func NewRouter(
 		whatsgateSettings: whatsgateSettingsHandler,
 		retailcrmSettings: retailcrmSettingsHandler,
 		health:            healthHandler,
+		retailcrm:         retailcrmHandler,
 	}
 }
 
@@ -93,6 +96,13 @@ func (rt *Router) SetupRoutes() http.Handler {
 			r.Get("/", rt.retailcrmSettings.Get)
 			r.Put("/", rt.retailcrmSettings.Update)
 			r.Delete("/reset", rt.retailcrmSettings.Reset)
+		})
+
+		// RetailCRM
+		r.Route("/retailcrm", func(r chi.Router) {
+			r.Get("/categories", rt.retailcrm.GetAvailableCategories)
+			r.Post("/filter-customers", rt.retailcrm.FilterCustomersByCategory)
+			r.Get("/test-connection", rt.retailcrm.TestConnection)
 		})
 	})
 

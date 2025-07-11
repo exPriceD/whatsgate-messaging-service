@@ -22,6 +22,13 @@ func MapCampaignEntityToNewModel(c *campaign.Campaign) *models2.CampaignNewModel
 		initiator = &init
 	}
 
+	// CategoryName будет установлен из use case при создании кампании
+	var categoryName *string
+	if c.CategoryName() != "" {
+		categoryNameValue := c.CategoryName()
+		categoryName = &categoryNameValue
+	}
+
 	return &models2.CampaignNewModel{
 		ID:              c.ID(),
 		Name:            c.Name(),
@@ -33,6 +40,7 @@ func MapCampaignEntityToNewModel(c *campaign.Campaign) *models2.CampaignNewModel
 		MessagesPerHour: c.MessagesPerHour(),
 		MediaFileID:     mediaFileID,
 		Initiator:       initiator,
+		CategoryName:    categoryName,
 		CreatedAt:       c.CreatedAt(),
 	}
 }
@@ -119,6 +127,12 @@ func MapCampaignNewModelToEntity(
 		delivery.Add(status)
 	}
 
+	// Получаем categoryName из модели
+	categoryName := ""
+	if dbCampaign.CategoryName != nil {
+		categoryName = *dbCampaign.CategoryName
+	}
+
 	return campaign.RestoreCampaign(
 		dbCampaign.ID,
 		dbCampaign.Name,
@@ -127,6 +141,7 @@ func MapCampaignNewModelToEntity(
 		campaign.CampaignStatus(dbCampaign.Status),
 		media,
 		dbCampaign.MessagesPerHour,
+		categoryName,
 		dbCampaign.CreatedAt,
 		audience,
 		&campaign.CampaignMetrics{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"whatsapp-service/internal/entities/campaign/repository"
 	"whatsapp-service/internal/interfaces"
+	retailcrmInterfaces "whatsapp-service/internal/usecases/retailcrm/interfaces"
 
 	"whatsapp-service/internal/entities/campaign"
 	"whatsapp-service/internal/usecases/campaigns/dto"
@@ -12,11 +13,12 @@ import (
 
 // CampaignInteractor объединяет все операции с кампаниями
 type CampaignInteractor struct {
-	campaignRepo repository.CampaignRepository
-	dispatcher   ports.Dispatcher
-	registry     ports.CampaignRegistry
-	fileParser   ports.FileParser
-	logger       interfaces.Logger
+	campaignRepo     repository.CampaignRepository
+	dispatcher       ports.Dispatcher
+	registry         ports.CampaignRegistry
+	fileParser       ports.FileParser
+	retailCRMUseCase retailcrmInterfaces.RetailCRMUseCase
+	logger           interfaces.Logger
 }
 
 // NewCampaignInteractor создает новый экземпляр unified use case
@@ -25,14 +27,16 @@ func NewCampaignInteractor(
 	dispatcher ports.Dispatcher,
 	registry ports.CampaignRegistry,
 	fileParser ports.FileParser,
+	retailCRMUseCase retailcrmInterfaces.RetailCRMUseCase,
 	logger interfaces.Logger,
 ) *CampaignInteractor {
 	return &CampaignInteractor{
-		campaignRepo: campaignRepo,
-		dispatcher:   dispatcher,
-		registry:     registry,
-		fileParser:   fileParser,
-		logger:       logger,
+		campaignRepo:     campaignRepo,
+		dispatcher:       dispatcher,
+		registry:         registry,
+		fileParser:       fileParser,
+		retailCRMUseCase: retailCRMUseCase,
+		logger:           logger,
 	}
 }
 
