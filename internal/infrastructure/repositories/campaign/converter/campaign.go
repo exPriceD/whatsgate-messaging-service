@@ -4,14 +4,13 @@ import (
 	"encoding/base64"
 	"time"
 	"whatsapp-service/internal/entities/campaign"
-	models2 "whatsapp-service/internal/infrastructure/repositories/campaign/models"
+	"whatsapp-service/internal/infrastructure/repositories/campaign/models"
 )
 
 // MapCampaignEntityToNewModel преобразует сущность Campaign в новую модель для БД
-func MapCampaignEntityToNewModel(c *campaign.Campaign) *models2.CampaignNewModel {
+func MapCampaignEntityToNewModel(c *campaign.Campaign) *models.CampaignNewModel {
 	var mediaFileID *string
 	if c.Media() != nil {
-		// MediaFileID будет установлен при сохранении медиафайла отдельно
 		id := ""
 		mediaFileID = &id
 	}
@@ -22,14 +21,13 @@ func MapCampaignEntityToNewModel(c *campaign.Campaign) *models2.CampaignNewModel
 		initiator = &init
 	}
 
-	// CategoryName будет установлен из use case при создании кампании
 	var categoryName *string
 	if c.CategoryName() != "" {
 		categoryNameValue := c.CategoryName()
 		categoryName = &categoryNameValue
 	}
 
-	return &models2.CampaignNewModel{
+	return &models.CampaignNewModel{
 		ID:              c.ID(),
 		Name:            c.Name(),
 		Message:         c.Message(),
@@ -46,7 +44,7 @@ func MapCampaignEntityToNewModel(c *campaign.Campaign) *models2.CampaignNewModel
 }
 
 // MapMediaToModel преобразует медиа в модель для БД
-func MapMediaToModel(media *campaign.Media) *models2.MediaFileModel {
+func MapMediaToModel(media *campaign.Media) *models.MediaFileModel {
 	if media == nil {
 		return nil
 	}
@@ -54,7 +52,7 @@ func MapMediaToModel(media *campaign.Media) *models2.MediaFileModel {
 	// Кодируем данные в Base64 для хранения в БД
 	fileData := base64.StdEncoding.EncodeToString(media.Data())
 
-	return &models2.MediaFileModel{
+	return &models.MediaFileModel{
 		Filename:    media.Filename(),
 		MimeType:    media.MimeType(),
 		MessageType: string(media.MessageType()),
@@ -64,11 +62,11 @@ func MapMediaToModel(media *campaign.Media) *models2.MediaFileModel {
 }
 
 // MapPhoneNumbersToModel преобразует номера телефонов в модели для БД
-func MapPhoneNumbersToModel(campaignID string, phoneNumbers []*campaign.PhoneNumber) []*models2.CampaignPhoneNumberModel {
-	var phoneModels []*models2.CampaignPhoneNumberModel
+func MapPhoneNumbersToModel(campaignID string, phoneNumbers []*campaign.PhoneNumber) []*models.CampaignPhoneNumberModel {
+	var phoneModels []*models.CampaignPhoneNumberModel
 
 	for _, phone := range phoneNumbers {
-		phoneModels = append(phoneModels, &models2.CampaignPhoneNumberModel{
+		phoneModels = append(phoneModels, &models.CampaignPhoneNumberModel{
 			CampaignID:  campaignID,
 			PhoneNumber: phone.Value(),
 			Status:      "pending", // начальный статус
@@ -80,9 +78,9 @@ func MapPhoneNumbersToModel(campaignID string, phoneNumbers []*campaign.PhoneNum
 
 // MapCampaignNewModelToEntity преобразует новую модель БД в сущность Campaign
 func MapCampaignNewModelToEntity(
-	dbCampaign *models2.CampaignNewModel,
-	mediaFile *models2.MediaFileModel,
-	phoneNumbers []*models2.CampaignPhoneNumberModel,
+	dbCampaign *models.CampaignNewModel,
+	mediaFile *models.MediaFileModel,
+	phoneNumbers []*models.CampaignPhoneNumberModel,
 ) *campaign.Campaign {
 	var media *campaign.Media
 	if mediaFile != nil && mediaFile.FileData != nil {
@@ -154,8 +152,8 @@ func MapCampaignNewModelToEntity(
 }
 
 // MapPhoneStatusesToModel преобразует статусы телефонов в модели для БД
-func MapPhoneStatusesToModel(statuses []*campaign.CampaignPhoneStatus) []*models2.CampaignPhoneNumberModel {
-	var phoneModels []*models2.CampaignPhoneNumberModel
+func MapPhoneStatusesToModel(statuses []*campaign.CampaignPhoneStatus) []*models.CampaignPhoneNumberModel {
+	var phoneModels []*models.CampaignPhoneNumberModel
 
 	for _, status := range statuses {
 		var sentAt, deliveredAt, readAt *time.Time
@@ -181,7 +179,7 @@ func MapPhoneStatusesToModel(statuses []*campaign.CampaignPhoneStatus) []*models
 			whatsappMessageID = &msgID
 		}
 
-		phoneModels = append(phoneModels, &models2.CampaignPhoneNumberModel{
+		phoneModels = append(phoneModels, &models.CampaignPhoneNumberModel{
 			ID:                status.ID(),
 			CampaignID:        status.CampaignID(),
 			PhoneNumber:       status.PhoneNumber(),
@@ -199,7 +197,7 @@ func MapPhoneStatusesToModel(statuses []*campaign.CampaignPhoneStatus) []*models
 }
 
 // MapPhoneNumberModelToEntity преобразует модель номера телефона в сущность
-func MapPhoneNumberModelToEntity(model *models2.CampaignPhoneNumberModel) *campaign.CampaignPhoneStatus {
+func MapPhoneNumberModelToEntity(model *models.CampaignPhoneNumberModel) *campaign.CampaignPhoneStatus {
 	var whatsappMessageID string
 	if model.WhatsappMessageID != nil {
 		whatsappMessageID = *model.WhatsappMessageID

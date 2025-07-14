@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"whatsapp-service/internal/config"
 	"whatsapp-service/internal/infrastructure/gateways/retailcrm/client"
 	"whatsapp-service/internal/infrastructure/gateways/retailcrm/ports"
 	"whatsapp-service/internal/infrastructure/gateways/retailcrm/types"
@@ -21,10 +22,11 @@ type RetailCRMService struct {
 func NewRetailCRMService(
 	client client.RetailCRMClientInterface,
 	logger interfaces.Logger,
+	cfg *config.RetailCRMConfig,
 ) *RetailCRMService {
 	productService := NewProductService(client, logger)
 	orderService := NewOrderService(client, logger)
-	categoryService := NewCategoryService(productService, orderService, logger)
+	categoryService := NewCategoryService(productService, orderService, logger, cfg)
 
 	return &RetailCRMService{
 		productService:  productService,

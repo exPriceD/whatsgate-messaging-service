@@ -110,6 +110,7 @@ func (ci *CampaignInteractor) GetByID(ctx context.Context, req dto.GetCampaignBy
 		ProcessedCount:  campaignEntity.Metrics().Processed,
 		ErrorCount:      campaignEntity.Metrics().Errors,
 		MessagesPerHour: campaignEntity.MessagesPerHour(),
+		CategoryName:    campaignEntity.CategoryName(),
 		CreatedAt:       campaignEntity.CreatedAt().Format("2006-01-02 15:04:05"),
 		SentNumbers:     sentNumbers,
 		FailedNumbers:   failedNumbers,
@@ -164,6 +165,7 @@ func (ci *CampaignInteractor) List(ctx context.Context, req dto.ListCampaignsReq
 			ProcessedCount:  camp.Metrics().Processed,
 			ErrorCount:      camp.Metrics().Errors,
 			MessagesPerHour: camp.MessagesPerHour(),
+			CategoryName:    camp.CategoryName(),
 			CreatedAt:       camp.CreatedAt().Format("2006-01-02 15:04:05"),
 		}
 	}

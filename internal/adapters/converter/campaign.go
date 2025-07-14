@@ -53,6 +53,7 @@ func (c *campaignConverter) ToCreateCampaignRequest(httpReq httpDTO.CreateCampai
 		Initiator:            httpReq.Initiator,
 		Async:                false, // По умолчанию синхронно
 		SelectedCategoryName: httpReq.SelectedCategoryName,
+		AutoStartAfterFilter: httpReq.AutoStartAfterFilter,
 	}
 }
 
@@ -135,6 +136,7 @@ func (c *campaignConverter) ToGetCampaignByIDResponse(ucResp *usecaseDTO.GetCamp
 		ProcessedCount:  ucResp.ProcessedCount,
 		ErrorCount:      ucResp.ErrorCount,
 		MessagesPerHour: ucResp.MessagesPerHour,
+		CategoryName:    ucResp.CategoryName,
 		CreatedAt:       ucResp.CreatedAt,
 		SentNumbers:     c.convertPhoneNumberStatuses(ucResp.SentNumbers),
 		FailedNumbers:   c.convertPhoneNumberStatuses(ucResp.FailedNumbers),
@@ -197,6 +199,7 @@ func (c *campaignConverter) ToListCampaignsResponse(ucResp *usecaseDTO.ListCampa
 			ProcessedCount:  summary.ProcessedCount,
 			ErrorCount:      summary.ErrorCount,
 			MessagesPerHour: summary.MessagesPerHour,
+			CategoryName:    summary.CategoryName,
 			CreatedAt:       summary.CreatedAt,
 		}
 	}
@@ -220,6 +223,7 @@ func (c *campaignConverter) ToCampaignResponse(entity *campaign.Campaign) httpDT
 		ProcessedCount:  entity.Metrics().Processed,
 		ErrorCount:      entity.Metrics().Errors,
 		MessagesPerHour: entity.MessagesPerHour(),
+		CategoryName:    entity.CategoryName(),
 		CreatedAt:       entity.CreatedAt().Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
@@ -234,6 +238,7 @@ func (c *campaignConverter) ToBriefCampaignResponse(entity *campaign.Campaign) h
 		ProcessedCount:  entity.Metrics().Processed,
 		ErrorCount:      entity.Metrics().Errors,
 		MessagesPerHour: entity.MessagesPerHour(),
+		CategoryName:    entity.CategoryName(),
 		CreatedAt:       entity.CreatedAt().Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
@@ -248,6 +253,7 @@ func (c *campaignConverter) ToCampaignSummary(entity *campaign.Campaign) httpDTO
 		ProcessedCount:  entity.Metrics().Processed,
 		ErrorCount:      entity.Metrics().Errors,
 		MessagesPerHour: entity.MessagesPerHour(),
+		CategoryName:    entity.CategoryName(),
 		CreatedAt:       entity.CreatedAt().Format("2006-01-02T15:04:05Z07:00"),
 	}
 }

@@ -37,6 +37,10 @@ export function renderBulkPage() {
             <span class="file-name" id="file-name-media">Файл не выбран</span>
           </span>
         </label>
+        <label>
+          <input type="checkbox" name="auto_start_after_filter" id="auto-start-checkbox">
+          <span>Автоматически запустить после фильтрации</span>
+        </label>
         <div class="form-actions">
           <input name="testPhone" placeholder="Номер для теста" autocomplete="off" disabled>
           <button type="button" id="send-test" disabled>Отправить тест</button>
@@ -235,6 +239,18 @@ export function initBulkForm(showToast) {
     if (form.media_file.files[0]) fd.append('media', form.media_file.files[0]);
     fd.append('initiator', 'frontend');
     
+    // Добавляем выбранную категорию
+    const selectedCategory = form.selected_category_name.value;
+    if (selectedCategory) {
+      fd.append('selected_category_name', selectedCategory);
+    }
+    
+    // Добавляем поле автозапуска
+    const autoStartCheckbox = document.getElementById('auto-start-checkbox');
+    if (autoStartCheckbox && autoStartCheckbox.checked) {
+      fd.append('auto_start_after_filter', 'on');
+    }
+    
     // Добавляем дополнительные и исключаемые номера
     const additionalTextarea = document.querySelector('textarea[name="additional_numbers"]');
     const excludeTextarea = document.querySelector('textarea[name="exclude_numbers"]');
@@ -254,11 +270,16 @@ export function initBulkForm(showToast) {
       
       // Наш API возвращает данные в формате {campaign: {...}}
       const campaignId = response.campaign?.id;
+      const campaignStatus = response.campaign?.status;
       
       if (campaignId) {
-        // Автоматически запускаем кампанию
-        await apiPost(`/api/v1/campaigns/${campaignId}/start`, {}, showToast);
-        showToast('Рассылка создана и запущена', 'success');
+        if (campaignStatus === 'filtering') {
+          showToast('Рассылка создана. Фильтрация выполняется в фоне. Проверьте статус в разделе "История".', 'success');
+        } else {
+          // Автоматически запускаем кампанию только если она не в статусе filtering
+          await apiPost(`/api/v1/campaigns/${campaignId}/start`, {}, showToast);
+          showToast('Рассылка создана и запущена', 'success');
+        }
         
         // Очищаем форму
         form.reset();

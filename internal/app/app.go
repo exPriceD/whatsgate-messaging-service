@@ -123,7 +123,7 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 
 	// RetailCRM сервис
 	var retailCRMClient client.RetailCRMClientInterface = client.NewSettingsAwareRetailCRMClient(retailCRMSettingsRepo, sharedLogger)
-	var retailCRMGateway retailcrmPorts.RetailCRMGateway = retailcrmService.NewRetailCRMService(retailCRMClient, sharedLogger)
+	var retailCRMGateway retailcrmPorts.RetailCRMGateway = retailcrmService.NewRetailCRMService(retailCRMClient, sharedLogger, &cfg.RetailCRM)
 
 	return &Infrastructure{
 		Database:              pool,

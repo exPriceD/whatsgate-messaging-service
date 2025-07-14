@@ -13,9 +13,10 @@ import (
 )
 
 type Config struct {
-	HTTP     HTTPConfig     `yaml:"http" validate:"required"`
-	Database DatabaseConfig `yaml:"database" validate:"required"`
-	Logging  LoggingConfig  `yaml:"logging" validate:"required"`
+	HTTP      HTTPConfig      `yaml:"http" validate:"required"`
+	Database  DatabaseConfig  `yaml:"database" validate:"required"`
+	Logging   LoggingConfig   `yaml:"logging" validate:"required"`
+	RetailCRM RetailCRMConfig `yaml:"retailcrm"`
 }
 
 type HTTPConfig struct {
@@ -60,6 +61,13 @@ type LoggingConfig struct {
 	OutputPath string `yaml:"output_path" validate:"required"`
 	Service    string `yaml:"service,omitempty"`
 	Env        string `yaml:"env,omitempty"`
+}
+
+type RetailCRMConfig struct {
+	BatchSize             int           `yaml:"batch_size" validate:"gte=1"`
+	MaxConcurrentRequests int           `yaml:"max_concurrent_requests" validate:"gte=1"`
+	RequestDelay          time.Duration `yaml:"request_delay" validate:"gte=0"`
+	RequestTimeout        time.Duration `yaml:"request_timeout" validate:"gt=0"`
 }
 
 // LoadConfig читает файл YAML, применяет дефолтные значения, перекрывает часть
@@ -198,8 +206,22 @@ func (c *Config) setDefaults() {
 	if c.Database.HealthCheckPeriod == 0 {
 		c.Database.HealthCheckPeriod = 30 * time.Second
 	}
-	if c.Logging.Service == "" {
-		c.Logging.Service = "whatsapp-service"
+	if c.Database.MaxAttemptConnection == 0 {
+		c.Database.MaxAttemptConnection = 3
+	}
+
+	// RetailCRM дефолты
+	if c.RetailCRM.BatchSize == 0 {
+		c.RetailCRM.BatchSize = 50
+	}
+	if c.RetailCRM.MaxConcurrentRequests == 0 {
+		c.RetailCRM.MaxConcurrentRequests = 5
+	}
+	if c.RetailCRM.RequestDelay == 0 {
+		c.RetailCRM.RequestDelay = 200 * time.Millisecond
+	}
+	if c.RetailCRM.RequestTimeout == 0 {
+		c.RetailCRM.RequestTimeout = 60 * time.Second
 	}
 }
 

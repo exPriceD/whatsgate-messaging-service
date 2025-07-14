@@ -15,6 +15,7 @@ type CampaignStatus string
 
 const (
 	CampaignStatusPending   CampaignStatus = "pending"
+	CampaignStatusFiltering CampaignStatus = "filtering"
 	CampaignStatusStarted   CampaignStatus = "started"
 	CampaignStatusFinished  CampaignStatus = "finished"
 	CampaignStatusFailed    CampaignStatus = "failed"
@@ -218,12 +219,17 @@ func (c *Campaign) SetMedia(media *Media) {
 	c.media = media
 }
 
+// SetStatus устанавливает статус кампании
+func (c *Campaign) SetStatus(status CampaignStatus) {
+	c.status = status
+}
+
 func (c *Campaign) CanBeCancelled() bool {
-	return c.status == CampaignStatusPending || c.status == CampaignStatusStarted
+	return c.status == CampaignStatusPending || c.status == CampaignStatusStarted || c.status == CampaignStatusFiltering
 }
 
 func (c *Campaign) CanBeStarted() bool {
-	return c.status == CampaignStatusPending && c.metrics.Total > 0
+	return (c.status == CampaignStatusPending || c.status == CampaignStatusFiltering) && c.metrics.Total > 0
 }
 
 func (c *Campaign) CanBeModified() bool {
@@ -262,5 +268,5 @@ func (c *Campaign) MarkError()        { c.metrics.MarkError() }
 func (c *Campaign) Progress() float64 { return c.metrics.Progress() }
 func (c *Campaign) IsCompleted() bool { return c.metrics.IsCompleted() }
 func (c *Campaign) IsActive() bool {
-	return c.status == CampaignStatusPending || c.status == CampaignStatusStarted
+	return c.status == CampaignStatusPending || c.status == CampaignStatusStarted || c.status == CampaignStatusFiltering
 }

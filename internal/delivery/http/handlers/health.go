@@ -84,7 +84,6 @@ func (h *HealthHandler) Check(w http.ResponseWriter, r *http.Request) {
 
 	overallStatus := h.calculateOverallStatus(components)
 
-	// Формируем ответ
 	healthResp := HealthResponse{
 		Status:     overallStatus,
 		Service:    h.serviceName,

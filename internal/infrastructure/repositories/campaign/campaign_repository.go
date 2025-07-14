@@ -46,10 +46,8 @@ func (r *PostgresCampaignRepository) Save(ctx context.Context, campaign *campaig
 	}
 	defer tx.Rollback(ctx)
 
-	// Конвертируем кампанию
 	campaignModel := converter.MapCampaignEntityToNewModel(campaign)
 
-	// Сохраняем медиафайл, если есть
 	var mediaFileID *string
 	if campaign.Media() != nil {
 		mediaModel := converter.MapMediaToModel(campaign.Media())
@@ -86,8 +84,6 @@ func (r *PostgresCampaignRepository) Save(ctx context.Context, campaign *campaig
 		return err
 	}
 
-	// Номера телефонов больше не сохраняются здесь - они сохраняются отдельно как статусы в saveCampaignWithStatuses
-
 	if err = tx.Commit(ctx); err != nil {
 		r.logger.Error("campaign repository Save: failed to commit transaction", "error", err)
 		return err
@@ -105,7 +101,6 @@ func (r *PostgresCampaignRepository) Save(ctx context.Context, campaign *campaig
 func (r *PostgresCampaignRepository) GetByID(ctx context.Context, id string) (*campaign.Campaign, error) {
 	r.logger.Debug("campaign repository GetByID started", "campaign_id", id)
 
-	// Загружаем основную информацию о кампании
 	var campaignModel models.CampaignNewModel
 	var mediaFileID sql.NullString
 	var initiator sql.NullString
@@ -142,7 +137,6 @@ func (r *PostgresCampaignRepository) GetByID(ctx context.Context, id string) (*c
 		campaignModel.CategoryName = &categoryName.String
 	}
 
-	// Загружаем медиафайл, если есть
 	var mediaModel *models.MediaFileModel
 	if campaignModel.MediaFileID != nil {
 		mediaModel = &models.MediaFileModel{}
@@ -163,7 +157,6 @@ func (r *PostgresCampaignRepository) GetByID(ctx context.Context, id string) (*c
 		}
 	}
 
-	// Загружаем номера телефонов
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, campaign_id, phone_number, status, error_message, whatsapp_message_id,
 		       sent_at, delivered_at, read_at, created_at, updated_at
@@ -194,7 +187,6 @@ func (r *PostgresCampaignRepository) GetByID(ctx context.Context, id string) (*c
 		phoneModels = append(phoneModels, phoneModel)
 	}
 
-	// Конвертируем в entity
 	result := converter.MapCampaignNewModelToEntity(&campaignModel, mediaModel, phoneModels)
 
 	r.logger.Debug("campaign repository GetByID completed successfully",
@@ -244,7 +236,6 @@ func (r *PostgresCampaignRepository) Delete(ctx context.Context, id string) erro
 	}
 	defer tx.Rollback(ctx)
 
-	// Удаляем номера телефонов
 	_, err = tx.Exec(ctx, "DELETE FROM campaign_phone_numbers WHERE campaign_id = $1", id)
 	if err != nil {
 		r.logger.Error("campaign repository Delete: failed to delete phone numbers",
@@ -252,7 +243,6 @@ func (r *PostgresCampaignRepository) Delete(ctx context.Context, id string) erro
 		return err
 	}
 
-	// Получаем ID медиафайла перед удалением кампании
 	var mediaFileID sql.NullString
 	err = tx.QueryRow(ctx, "SELECT media_file_id FROM campaigns WHERE id = $1", id).Scan(&mediaFileID)
 	if err != nil && err != pgx.ErrNoRows {
@@ -261,7 +251,6 @@ func (r *PostgresCampaignRepository) Delete(ctx context.Context, id string) erro
 		return err
 	}
 
-	// Удаляем кампанию
 	_, err = tx.Exec(ctx, "DELETE FROM campaigns WHERE id = $1", id)
 	if err != nil {
 		r.logger.Error("campaign repository Delete: failed to delete campaign",
@@ -269,13 +258,11 @@ func (r *PostgresCampaignRepository) Delete(ctx context.Context, id string) erro
 		return err
 	}
 
-	// Удаляем медиафайл, если был
 	if mediaFileID.Valid {
 		_, err = tx.Exec(ctx, "DELETE FROM media_files WHERE id = $1", mediaFileID.String)
 		if err != nil {
 			r.logger.Warn("campaign repository Delete: failed to delete media file",
 				"campaign_id", id, "media_file_id", mediaFileID.String, "error", err)
-			// Не возвращаем ошибку, так как главное - кампания удалена
 		}
 	}
 
@@ -294,7 +281,7 @@ func (r *PostgresCampaignRepository) List(ctx context.Context, limit, offset int
 
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, name, message, status, total_count, processed_count, error_count,
-		       messages_per_hour, media_file_id, initiator, created_at, updated_at
+		       messages_per_hour, media_file_id, initiator, category_name, created_at, updated_at
 		FROM campaigns 
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -309,12 +296,12 @@ func (r *PostgresCampaignRepository) List(ctx context.Context, limit, offset int
 	var campaigns []*campaign.Campaign
 	for rows.Next() {
 		var campaignModel models.CampaignNewModel
-		var mediaFileID, initiator sql.NullString
+		var mediaFileID, initiator, categoryName sql.NullString
 
 		err = rows.Scan(
 			&campaignModel.ID, &campaignModel.Name, &campaignModel.Message, &campaignModel.Status,
 			&campaignModel.TotalCount, &campaignModel.ProcessedCount, &campaignModel.ErrorCount,
-			&campaignModel.MessagesPerHour, &mediaFileID, &initiator,
+			&campaignModel.MessagesPerHour, &mediaFileID, &initiator, &categoryName,
 			&campaignModel.CreatedAt, &campaignModel.UpdatedAt,
 		)
 		if err != nil {
@@ -329,9 +316,10 @@ func (r *PostgresCampaignRepository) List(ctx context.Context, limit, offset int
 		if initiator.Valid {
 			campaignModel.Initiator = &initiator.String
 		}
+		if categoryName.Valid {
+			campaignModel.CategoryName = &categoryName.String
+		}
 
-		// Для списка не загружаем медиафайлы и номера телефонов для производительности
-		// Конвертируем с минимальными данными
 		c := converter.MapCampaignNewModelToEntity(&campaignModel, nil, nil)
 		campaigns = append(campaigns, c)
 	}
@@ -445,7 +433,7 @@ func (r *PostgresCampaignRepository) getCampaignsByStatus(ctx context.Context, s
 
 	query := `
 		SELECT id, name, message, status, total_count, processed_count, error_count,
-		       messages_per_hour, media_file_id, initiator, created_at, updated_at
+		       messages_per_hour, media_file_id, initiator, category_name, created_at, updated_at
 		FROM campaigns 
 		WHERE status IN (` + placeholders + `)
 		ORDER BY created_at DESC
@@ -462,12 +450,12 @@ func (r *PostgresCampaignRepository) getCampaignsByStatus(ctx context.Context, s
 	var campaigns []*campaign.Campaign
 	for rows.Next() {
 		var campaignModel models.CampaignNewModel
-		var mediaFileID, initiator sql.NullString
+		var mediaFileID, initiator, categoryName sql.NullString
 
 		err = rows.Scan(
 			&campaignModel.ID, &campaignModel.Name, &campaignModel.Message, &campaignModel.Status,
 			&campaignModel.TotalCount, &campaignModel.ProcessedCount, &campaignModel.ErrorCount,
-			&campaignModel.MessagesPerHour, &mediaFileID, &initiator,
+			&campaignModel.MessagesPerHour, &mediaFileID, &initiator, &categoryName,
 			&campaignModel.CreatedAt, &campaignModel.UpdatedAt,
 		)
 		if err != nil {
@@ -481,6 +469,9 @@ func (r *PostgresCampaignRepository) getCampaignsByStatus(ctx context.Context, s
 		}
 		if initiator.Valid {
 			campaignModel.Initiator = &initiator.String
+		}
+		if categoryName.Valid {
+			campaignModel.CategoryName = &categoryName.String
 		}
 
 		// Для списка активных кампаний не загружаем детали

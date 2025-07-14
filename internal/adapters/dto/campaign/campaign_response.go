@@ -33,6 +33,7 @@ type BriefCampaignResponse struct {
 	ProcessedCount  int    `json:"processed_count"`
 	ErrorCount      int    `json:"error_count"`
 	MessagesPerHour int    `json:"messages_per_hour"`
+	CategoryName    string `json:"category_name,omitempty"`
 	CreatedAt       string `json:"created_at"`
 }
 
@@ -46,6 +47,7 @@ type CampaignResponse struct {
 	ProcessedCount  int    `json:"processed_count"`
 	ErrorCount      int    `json:"error_count"`
 	MessagesPerHour int    `json:"messages_per_hour"`
+	CategoryName    string `json:"category_name,omitempty"`
 	CreatedAt       string `json:"created_at"`
 }
 
@@ -90,6 +92,7 @@ type GetCampaignByIDResponse struct {
 	ProcessedCount  int                 `json:"processed_count"`
 	ErrorCount      int                 `json:"error_count"`
 	MessagesPerHour int                 `json:"messages_per_hour"`
+	CategoryName    string              `json:"category_name,omitempty"`
 	CreatedAt       string              `json:"created_at"`
 	SentNumbers     []PhoneNumberStatus `json:"sent_numbers"`
 	FailedNumbers   []PhoneNumberStatus `json:"failed_numbers"`
@@ -105,6 +108,7 @@ type CampaignSummary struct {
 	ProcessedCount  int    `json:"processed_count"`
 	ErrorCount      int    `json:"error_count"`
 	MessagesPerHour int    `json:"messages_per_hour"`
+	CategoryName    string `json:"category_name,omitempty"`
 	CreatedAt       string `json:"created_at"`
 }
 

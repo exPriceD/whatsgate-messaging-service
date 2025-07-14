@@ -64,21 +64,27 @@ func (r *RetailCRMInteractor) FilterCustomersByCategory(ctx context.Context, req
 		return nil, fmt.Errorf("failed to filter customers by category: %w", err)
 	}
 
+	r.logger.Debug("retailcrm interactor: got results from gateway",
+		"results_count", len(results),
+		"phone_numbers", req.PhoneNumbers,
+	)
+
 	// Подсчитываем статистику
 	sendCount := 0
-	totalMatches := 0
 	for _, result := range results {
+		r.logger.Debug("retailcrm interactor: processing result",
+			"phone_number", result.PhoneNumber,
+			"should_send", result.ShouldSend,
+		)
 		if result.ShouldSend {
 			sendCount++
 		}
-		totalMatches += result.MatchCount
 	}
 
 	r.logger.Info("retailcrm interactor: successfully filtered customers by category",
 		"total_customers", len(req.PhoneNumbers),
 		"results_count", len(results),
 		"send_count", sendCount,
-		"total_matches", totalMatches,
 		"category_name", req.SelectedCategoryName,
 	)
 
@@ -87,7 +93,7 @@ func (r *RetailCRMInteractor) FilterCustomersByCategory(ctx context.Context, req
 		TotalCustomers:   len(req.PhoneNumbers),
 		ResultsCount:     len(results),
 		ShouldSendCount:  sendCount,
-		TotalMatches:     totalMatches,
+		TotalMatches:     0, // Больше не подсчитываем детальные совпадения
 		SelectedCategory: req.SelectedCategoryName,
 	}, nil
 }

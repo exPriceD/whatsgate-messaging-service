@@ -9,4 +9,5 @@ type CreateCampaignRequest struct {
 	MessagesPerHour      int      `json:"messages_per_hour" form:"messages_per_hour"`
 	Initiator            string   `json:"initiator" form:"initiator"`
 	SelectedCategoryName string   `json:"selected_category_name" form:"selected_category_name"`
+	AutoStartAfterFilter bool     `json:"auto_start_after_filter" form:"auto_start_after_filter"`
 }

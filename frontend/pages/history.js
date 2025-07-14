@@ -51,6 +51,7 @@ export function renderHistoryPage() {
             <option value="finished">Завершена</option>
             <option value="failed">Ошибка</option>
             <option value="pending">Ожидает</option>
+            <option value="filtering">Фильтрация</option>
           </select>
           <button id="refresh-history" class="refresh-btn">
             <span class="refresh-icon">🔄</span>
@@ -227,15 +228,33 @@ export function initHistoryPage(showToast) {
         </td>
         <td class="campaign-progress">
           <div class="progress-info">
-            <div class="progress-numbers">
-              <span class="processed-number">${campaign.processed_count || 0}</span>
-              <span class="separator">/</span>
-              <span class="total-number">${campaign.total_count || 0}</span>
-            </div>
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: ${getProgressPercentage(campaign.processed_count || 0, campaign.total_count || 0)}%"></div>
-            </div>
-            <div class="progress-percentage">${getProgressPercentage(campaign.processed_count || 0, campaign.total_count || 0)}%</div>
+            ${campaign.status === 'filtering' ? `
+              <div class="progress-numbers">
+                <span class="filtering-text">Фильтрация</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill filtering" style="width: 100%"></div>
+              </div>
+              <div class="progress-percentage">Выполняется...</div>
+            ` : campaign.status === 'failed' && campaign.total_count === 0 ? `
+              <div class="progress-numbers">
+                <span class="filtering-text">Нет номеров</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+              </div>
+              <div class="progress-percentage">0%</div>
+            ` : `
+              <div class="progress-numbers">
+                <span class="processed-number">${campaign.processed_count || 0}</span>
+                <span class="separator">/</span>
+                <span class="total-number">${campaign.total_count || 0}</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${getProgressPercentage(campaign.processed_count || 0, campaign.total_count || 0)}%"></div>
+              </div>
+              <div class="progress-percentage">${getProgressPercentage(campaign.processed_count || 0, campaign.total_count || 0)}%</div>
+            `}
           </div>
         </td>
         <td class="campaign-speed">
@@ -246,7 +265,7 @@ export function initHistoryPage(showToast) {
           ${campaign.category_name ? `<span class="category-tag">${campaign.category_name}</span>` : '<span class="no-category">—</span>'}
         </td>
         <td class="campaign-errors">
-          <span class="error-count">${campaign.error_count || 0}</span>
+          <span class="${campaign.error_count > 0 ? 'error-count': 'error-count-zero'}">${campaign.error_count || 0}</span>
         </td>
         <td class="campaign-date">
           <div class="date-content">
@@ -343,32 +362,63 @@ export function initHistoryPage(showToast) {
           <div class="detail-section">
             <h4>📊 Статистика отправки</h4>
             <div class="detail-grid">
-              <div class="detail-item">
-                <label>Корректных отправок:</label>
-                <div class="progress-detail">
-                  <div class="progress-numbers">
-                    <span class="processed-number">${campaign.processed_count || 0}</span>
-                    <span class="separator">/</span>
-                    <span class="total-number">${campaign.total_count || 0}</span>
-                    <span class="progress-percentage">(${getProgressPercentage(campaign.processed_count || 0, campaign.total_count || 0)}%)</span>
-                  </div>
-                  <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${getProgressPercentage(campaign.processed_count || 0, campaign.total_count || 0)}%"></div>
+              ${campaign.status === 'filtering' ? `
+                <div class="detail-item">
+                  <label>Статус фильтрации:</label>
+                  <div class="progress-detail">
+                    <div class="progress-numbers">
+                      <span class="filtering-text">Фильтрация по категории "${campaign.category_name}"</span>
+                    </div>
+                    <div class="progress-bar">
+                      <div class="progress-fill filtering" style="width: 100%"></div>
+                    </div>
+                    <div class="progress-percentage">Выполняется...</div>
                   </div>
                 </div>
-              </div>
-              <div class="detail-item">
-                <label>Отправлено успешно:</label>
-                <span class="detail-value success">${campaign.sent_numbers ? campaign.sent_numbers.filter(n => n.status === 'sent').length : 0}</span>
-              </div>
-              <div class="detail-item">
-                <label>Ошибки отправки:</label>
-                <span class="detail-value numbers-error">${campaign.failed_numbers ? campaign.failed_numbers.filter(n => n.status === 'failed').length : 0}</span>
-              </div>
-              <div class="detail-item">
-                <label>Скорость отправки:</label>
-                <span class="detail-value">${campaign.messages_per_hour || 0} сообщ./час</span>
-              </div>
+                <div class="detail-item">
+                  <label>Количество номеров:</label>
+                  <span class="detail-value">Определяется...</span>
+                </div>
+                <div class="detail-item">
+                  <label>Отправлено успешно:</label>
+                  <span class="detail-value">—</span>
+                </div>
+                <div class="detail-item">
+                  <label>Ошибки отправки:</label>
+                  <span class="detail-value">—</span>
+                </div>
+                <div class="detail-item">
+                  <label>Скорость отправки:</label>
+                  <span class="detail-value">${campaign.messages_per_hour || 0} сообщ./час</span>
+                </div>
+              ` : `
+                <div class="detail-item">
+                  <label>Корректных отправок:</label>
+                  <div class="progress-detail">
+                    <div class="progress-numbers">
+                      <span class="processed-number">${campaign.processed_count || 0}</span>
+                      <span class="separator">/</span>
+                      <span class="total-number">${campaign.total_count || 0}</span>
+                      <span class="progress-percentage">(${getProgressPercentage(campaign.processed_count || 0, campaign.total_count || 0)}%)</span>
+                    </div>
+                    <div class="progress-bar">
+                      <div class="progress-fill" style="width: ${getProgressPercentage(campaign.processed_count || 0, campaign.total_count || 0)}%"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="detail-item">
+                  <label>Отправлено успешно:</label>
+                  <span class="detail-value success">${campaign.sent_numbers ? campaign.sent_numbers.filter(n => n.status === 'sent').length : 0}</span>
+                </div>
+                <div class="detail-item">
+                  <label>Ошибки отправки:</label>
+                  <span class="detail-value numbers-error">${campaign.failed_numbers ? campaign.failed_numbers.filter(n => n.status === 'failed').length : 0}</span>
+                </div>
+                <div class="detail-item">
+                  <label>Скорость отправки:</label>
+                  <span class="detail-value">${campaign.messages_per_hour || 0} сообщ./час</span>
+                </div>
+              `}
             </div>
           </div>
           
@@ -460,9 +510,14 @@ export function initHistoryPage(showToast) {
           </div>
           ` : ''}
           
-          ${campaign.status === 'started' || campaign.status === 'pending' ? `
+          ${campaign.status === 'started' || campaign.status === 'pending' || campaign.status === 'filtering' ? `
           <div class="detail-section">
             <div class="cancel-campaign-container">
+              ${campaign.status === 'pending' ? `
+                <button class="start-campaign-btn" onclick="startCampaign('${campaign.id}', '${campaign.name.replace(/'/g, "\\'")}')">
+                  🚀 Запустить рассылку
+                </button>
+              ` : ''}
               <button class="cancel-campaign-btn" onclick="cancelCampaign('${campaign.id}', '${campaign.name.replace(/'/g, "\\'")}')">
                 🚫 Отменить рассылку
               </button>
@@ -491,7 +546,8 @@ export function initHistoryPage(showToast) {
       'finished': '✅',
       'failed': '❌',
       'pending': '⏳',
-      'cancelled': '🚫'
+      'cancelled': '🚫',
+      'filtering': '🔍'
     };
     return iconMap[status] || '❓';
   }
@@ -502,7 +558,8 @@ export function initHistoryPage(showToast) {
       'finished': 'Завершена',
       'failed': 'Ошибка',
       'pending': 'Ожидает',
-      'cancelled': 'Отменена'
+      'cancelled': 'Отменена',
+      'filtering': 'Фильтрация'
     };
     return statusMap[status] || status;
   }
@@ -730,22 +787,51 @@ export function initHistoryPage(showToast) {
   // Делаем функцию loadHistory доступной глобально для кнопки повтора
   window.loadHistory = loadHistory;
   
-  // Функция для отмены рассылки (глобальная для доступа из onclick)
-  window.cancelCampaign = async function(campaignId, campaignName) {
-    if (!confirm(`Вы уверены, что хотите отменить рассылку "${campaignName}"?\n\nЭто действие нельзя отменить.`)) {
+  // Глобальная функция для запуска кампании
+  window.startCampaign = async function(campaignId, campaignName) {
+    if (!confirm(`Запустить рассылку "${campaignName}"?`)) {
       return;
     }
 
     try {
-      await apiPost(`/api/v1/campaigns/${campaignId}/cancel`, {}, showToast);
-      showToast('Рассылка отменена', 'success');
-      // Закрываем модальное окно
-      modal.style.display = 'none';
-      // Перезагружаем историю
-      loadHistory();
+      const response = await apiPost(`/api/v1/campaigns/${campaignId}/start`, {}, showToast);
+      
+      if (response.status === 'started') {
+        showToast('Рассылка успешно запущена!', 'success');
+        // Обновляем историю
+        loadHistory();
+        // Закрываем модальное окно
+        modal.style.display = 'none';
+      } else {
+        showToast(`Ошибка запуска: ${response.error || response.message || 'Неизвестная ошибка'}`, 'danger');
+      }
+    } catch (error) {
+      console.error('Error starting campaign:', error);
+      showToast('Ошибка запуска рассылки', 'danger');
+    }
+  };
+
+  // Глобальная функция для отмены кампании
+  window.cancelCampaign = async function(campaignId, campaignName) {
+    if (!confirm(`Отменить рассылку "${campaignName}"? Это действие нельзя отменить.`)) {
+      return;
+    }
+
+    try {
+      const response = await apiPost(`/api/v1/campaigns/${campaignId}/cancel`, {}, showToast);
+      
+      if (response.status === 'cancelled') {
+        showToast('Рассылка успешно отменена!', 'success');
+        // Обновляем историю
+        loadHistory();
+        // Закрываем модальное окно
+        modal.style.display = 'none';
+      } else {
+        showToast(`Ошибка отмены: ${response.error || response.message || 'Неизвестная ошибка'}`, 'danger');
+      }
     } catch (error) {
       console.error('Error cancelling campaign:', error);
-      // Ошибка уже обработана в apiPost
+      showToast('Ошибка отмены рассылки', 'danger');
     }
   };
 } 

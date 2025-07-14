@@ -66,6 +66,7 @@ type GetCampaignByIDResponse struct {
 	ProcessedCount  int
 	ErrorCount      int
 	MessagesPerHour int
+	CategoryName    string
 	CreatedAt       string
 	SentNumbers     []PhoneNumberStatus
 	FailedNumbers   []PhoneNumberStatus
@@ -81,6 +82,7 @@ type CampaignSummary struct {
 	ProcessedCount  int
 	ErrorCount      int
 	MessagesPerHour int
+	CategoryName    string
 	CreatedAt       string
 }
 

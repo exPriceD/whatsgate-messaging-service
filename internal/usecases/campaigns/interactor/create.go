@@ -49,15 +49,16 @@ func (ci *CampaignInteractor) Create(ctx context.Context, req dto.CreateCampaign
 		return nil, err
 	}
 
-	// Фильтрация по категории, если указана
+	// Если есть фильтрация по категории, создаем кампанию со статусом "filtering"
 	if req.SelectedCategoryName != "" {
-		if err := ci.filterByCategory(ctx, phoneProcessingResult, req.SelectedCategoryName); err != nil {
+		campaignEntity.SetStatus(campaign.CampaignStatusFiltering)
+		// Устанавливаем временное значение total_count = 0
+		campaignEntity.Metrics().Total = 0
+	} else {
+		// Если фильтрации нет, добавляем номера сразу
+		if err := ci.addNumbersToCampaign(campaignEntity, phoneProcessingResult); err != nil {
 			return nil, err
 		}
-	}
-
-	if err := ci.addNumbersToCampaign(campaignEntity, phoneProcessingResult); err != nil {
-		return nil, err
 	}
 
 	if err := ci.processMediaFile(campaignEntity, req.MediaFile); err != nil {
@@ -68,7 +69,165 @@ func (ci *CampaignInteractor) Create(ctx context.Context, req dto.CreateCampaign
 		return nil, err
 	}
 
+	if req.SelectedCategoryName != "" {
+		copyPhones := func(src []*campaign.PhoneNumber) []*campaign.PhoneNumber {
+			dst := make([]*campaign.PhoneNumber, len(src))
+			copy(dst, src)
+			return dst
+		}
+
+		asyncResult := &PhoneProcessingResult{
+			FilePhones:       copyPhones(phoneProcessingResult.FilePhones),
+			AdditionalPhones: copyPhones(phoneProcessingResult.AdditionalPhones),
+			ExcludePhones:    copyPhones(phoneProcessingResult.ExcludePhones),
+			InvalidCount:     phoneProcessingResult.InvalidCount,
+			TotalTargets:     phoneProcessingResult.TotalTargets,
+		}
+
+		go ci.processCategoryFilteringAsync(campaignEntity.ID(), asyncResult, req.SelectedCategoryName, req.AutoStartAfterFilter)
+	}
+
 	return ci.buildCreateResponse(campaignEntity, phoneProcessingResult), nil
+}
+
+// processCategoryFilteringAsync асинхронно обрабатывает фильтрацию по категории
+func (ci *CampaignInteractor) processCategoryFilteringAsync(campaignID string, result *PhoneProcessingResult, categoryName string, autoStartAfterFilter bool) {
+	ci.logger.Info("campaign interactor: starting async category filtering",
+		"campaign_id", campaignID,
+		"category_name", categoryName,
+		"total_numbers", len(result.FilePhones)+len(result.AdditionalPhones),
+	)
+
+	ctx := context.Background()
+
+	if err := ci.filterByCategory(ctx, result, categoryName); err != nil {
+		ci.logger.Error("campaign interactor: async category filtering failed",
+			"error", err,
+			"campaign_id", campaignID,
+			"category_name", categoryName,
+		)
+
+		if err := ci.campaignRepo.UpdateStatus(ctx, campaignID, campaign.CampaignStatusFailed); err != nil {
+			ci.logger.Error("campaign interactor: failed to update campaign status to failed",
+				"error", err,
+				"campaign_id", campaignID,
+			)
+		}
+		return
+	}
+
+	campaignEntity, err := ci.campaignRepo.GetByID(ctx, campaignID)
+	if err != nil {
+		ci.logger.Error("campaign interactor: failed to get campaign for async update",
+			"error", err,
+			"campaign_id", campaignID,
+		)
+		return
+	}
+
+	if err := ci.addNumbersToCampaign(campaignEntity, result); err != nil {
+		if err == campaign.ErrNoPhoneNumbers {
+			ci.logger.Info("campaign interactor: no phone numbers found after category filtering",
+				"campaign_id", campaignID,
+				"category_name", categoryName,
+			)
+			campaignEntity.Metrics().Total = 0
+			result.TotalTargets = 0
+			campaignEntity.SetStatus(campaign.CampaignStatusFailed)
+			ci.logger.Info("campaign interactor: setting campaign status to failed",
+				"campaign_id", campaignID,
+				"status", campaignEntity.Status(),
+			)
+		} else {
+			ci.logger.Error("campaign interactor: failed to add filtered numbers to campaign",
+				"error", err,
+				"campaign_id", campaignID,
+			)
+			return
+		}
+	} else {
+		campaignEntity.SetStatus(campaign.CampaignStatusPending)
+		ci.logger.Info("campaign interactor: setting campaign status to pending",
+			"campaign_id", campaignID,
+			"status", campaignEntity.Status(),
+			"total_targets", result.TotalTargets,
+		)
+	}
+
+	if err := ci.campaignRepo.Update(ctx, campaignEntity); err != nil {
+		ci.logger.Error("campaign interactor: failed to update campaign after filtering",
+			"error", err,
+			"campaign_id", campaignID,
+		)
+		return
+	}
+
+	if err := ci.campaignRepo.UpdateStatus(ctx, campaignID, campaignEntity.Status()); err != nil {
+		ci.logger.Error("campaign interactor: failed to update campaign status after filtering",
+			"error", err,
+			"campaign_id", campaignID,
+			"status", campaignEntity.Status(),
+		)
+		return
+	}
+
+	if result.TotalTargets > 0 {
+		statuses := make([]*campaign.CampaignPhoneStatus, 0, result.TotalTargets)
+
+		for _, phone := range result.FilePhones {
+			status := campaign.NewCampaignStatus(campaignID, phone.Value())
+			statuses = append(statuses, status)
+		}
+
+		for _, phone := range result.AdditionalPhones {
+			status := campaign.NewCampaignStatus(campaignID, phone.Value())
+			statuses = append(statuses, status)
+		}
+
+		if err := ci.saveCampaignStatuses(ctx, statuses); err != nil {
+			ci.logger.Error("campaign interactor: failed to save campaign statuses after filtering",
+				"error", err,
+				"campaign_id", campaignID,
+			)
+			return
+		}
+
+		for _, status := range statuses {
+			campaignEntity.Delivery().Add(status)
+		}
+	} else {
+		ci.logger.Info("campaign interactor: no phone numbers to save statuses for",
+			"campaign_id", campaignID,
+		)
+	}
+
+	ci.logger.Info("campaign interactor: async category filtering completed successfully",
+		"campaign_id", campaignID,
+		"category_name", categoryName,
+		"filtered_total", result.TotalTargets,
+	)
+
+	if autoStartAfterFilter && result.TotalTargets > 0 && campaignEntity.Status() == campaign.CampaignStatusPending {
+		ci.logger.Info("campaign interactor: auto-starting campaign after filtering",
+			"campaign_id", campaignID,
+			"auto_start_after_filter", autoStartAfterFilter,
+		)
+
+		startReq := dto.StartCampaignRequest{
+			CampaignID: campaignID,
+		}
+
+		if _, err := ci.Start(ctx, startReq); err != nil {
+			ci.logger.Error("campaign interactor: failed to auto-start campaign after filtering",
+				"error", err,
+				"campaign_id", campaignID,
+			)
+		} else {
+			ci.logger.Info("campaign interactor: campaign auto-started successfully after filtering",
+				"campaign_id", campaignID,
+			)
+		}
+	}
 }
 
 // filterByCategory фильтрует номера по выбранной категории
@@ -78,25 +237,28 @@ func (ci *CampaignInteractor) filterByCategory(ctx context.Context, result *Phon
 		"total_numbers", len(result.FilePhones)+len(result.AdditionalPhones),
 	)
 
-	// Собираем все номера для фильтрации
 	allPhones := make([]string, 0, len(result.FilePhones)+len(result.AdditionalPhones))
 
-	// Добавляем номера из файла
 	for _, phone := range result.FilePhones {
 		allPhones = append(allPhones, phone.Value())
 	}
 
-	// Добавляем дополнительные номера
 	for _, phone := range result.AdditionalPhones {
 		allPhones = append(allPhones, phone.Value())
 	}
+
+	ci.logger.Info("campaign interactor: sending phones for filtering",
+		"total_phones", len(allPhones),
+		"file_phones", len(result.FilePhones),
+		"additional_phones", len(result.AdditionalPhones),
+		"phone_numbers", allPhones,
+	)
 
 	if len(allPhones) == 0 {
 		ci.logger.Warn("campaign interactor: no phone numbers to filter")
 		return nil
 	}
 
-	// Фильтруем номера по категории
 	filterRequest := retailcrmDTO.FilterCustomersByCategoryRequest{
 		PhoneNumbers:         allPhones,
 		SelectedCategoryName: categoryName,
@@ -111,45 +273,68 @@ func (ci *CampaignInteractor) filterByCategory(ctx context.Context, result *Phon
 		return fmt.Errorf("failed to filter customers by category: %w", err)
 	}
 
-	// Подсчитываем статистику фильтрации
 	shouldSendCount := filterResponse.ShouldSendCount
-	totalMatches := filterResponse.TotalMatches
 	filterResults := filterResponse.Results
 
 	ci.logger.Info("campaign interactor: category filtering completed",
 		"category_name", categoryName,
 		"total_numbers", len(allPhones),
 		"should_send_count", shouldSendCount,
-		"total_matches", totalMatches,
 	)
 
-	// Создаем новые списки отфильтрованных номеров
 	filteredFilePhones := make([]*campaign.PhoneNumber, 0)
 	filteredAdditionalPhones := make([]*campaign.PhoneNumber, 0)
 
-	// Создаем map для быстрого поиска отфильтрованных номеров
 	filteredPhonesMap := make(map[string]bool)
 	for _, filterResult := range filterResults {
+		ci.logger.Debug("campaign interactor: processing filter result",
+			"phone_number", filterResult.PhoneNumber,
+			"should_send", filterResult.ShouldSend,
+		)
 		if filterResult.ShouldSend {
 			filteredPhonesMap[filterResult.PhoneNumber] = true
+			ci.logger.Debug("campaign interactor: found matching phone number",
+				"phone_number", filterResult.PhoneNumber,
+				"should_send", filterResult.ShouldSend,
+			)
 		}
 	}
 
-	// Фильтруем номера из файла
+	ci.logger.Info("campaign interactor: filtering results summary",
+		"total_results", len(filterResults),
+		"should_send_count", shouldSendCount,
+		"filtered_phones_map_size", len(filteredPhonesMap),
+		"filtered_phones", getMapKeys(filteredPhonesMap),
+	)
+
 	for _, phone := range result.FilePhones {
-		if filteredPhonesMap[phone.Value()] {
+		phoneValue := phone.Value()
+		if filteredPhonesMap[phoneValue] {
 			filteredFilePhones = append(filteredFilePhones, phone)
+			ci.logger.Debug("campaign interactor: added file phone to filtered list",
+				"phone_number", phoneValue,
+			)
+		} else {
+			ci.logger.Debug("campaign interactor: file phone not in filtered list",
+				"phone_number", phoneValue,
+			)
 		}
 	}
 
-	// Фильтруем дополнительные номера
 	for _, phone := range result.AdditionalPhones {
-		if filteredPhonesMap[phone.Value()] {
+		phoneValue := phone.Value()
+		if filteredPhonesMap[phoneValue] {
 			filteredAdditionalPhones = append(filteredAdditionalPhones, phone)
+			ci.logger.Debug("campaign interactor: added additional phone to filtered list",
+				"phone_number", phoneValue,
+			)
+		} else {
+			ci.logger.Debug("campaign interactor: additional phone not in filtered list",
+				"phone_number", phoneValue,
+			)
 		}
 	}
 
-	// Обновляем результат
 	result.FilePhones = filteredFilePhones
 	result.AdditionalPhones = filteredAdditionalPhones
 	result.TotalTargets = len(filteredFilePhones) + len(filteredAdditionalPhones)
@@ -165,7 +350,6 @@ func (ci *CampaignInteractor) filterByCategory(ctx context.Context, result *Phon
 	return nil
 }
 
-// checkActiveCampaigns проверяет наличие активных кампаний
 func (ci *CampaignInteractor) checkActiveCampaigns(ctx context.Context) error {
 	activeCampaigns, err := ci.campaignRepo.GetActiveCampaigns(ctx)
 	if err != nil {
@@ -302,6 +486,11 @@ func (ci *CampaignInteractor) saveCampaignWithStatuses(ctx context.Context, camp
 		return fmt.Errorf("failed to save campaign: %w", err)
 	}
 
+	// Для кампаний с фильтрацией номера будут сохранены после завершения фильтрации
+	if campaignEntity.Status() == campaign.CampaignStatusFiltering {
+		return nil
+	}
+
 	targetNumbers := campaignEntity.Audience().AllTargets()
 	statuses := make([]*campaign.CampaignPhoneStatus, 0, len(targetNumbers))
 
@@ -323,6 +512,11 @@ func (ci *CampaignInteractor) saveCampaignWithStatuses(ctx context.Context, camp
 
 // saveCampaignStatuses сохраняет статусы пакетно
 func (ci *CampaignInteractor) saveCampaignStatuses(ctx context.Context, statuses []*campaign.CampaignPhoneStatus) error {
+	// Если нет статусов для сохранения, это нормально
+	if len(statuses) == 0 {
+		return nil
+	}
+
 	var lastErr error
 	successCount := 0
 
@@ -372,21 +566,29 @@ func (ci *CampaignInteractor) buildCreateResponse(campaignEntity *campaign.Campa
 		Warnings:      make([]string, 0),
 	}
 
-	// Добавляем предупреждения
-	if len(result.ExcludePhones) > 0 {
+	// Если кампания в статусе filtering, показываем информацию о фильтрации
+	if campaignEntity.Status() == campaign.CampaignStatusFiltering {
+		response.TotalNumbers = 0 // Показываем 0, так как фильтрация еще не завершена
 		response.Warnings = append(response.Warnings,
-			fmt.Sprintf("Исключено %d номеров", len(result.ExcludePhones)))
-	}
+			fmt.Sprintf("Фильтрация по категории '%s' выполняется в фоне", campaignEntity.CategoryName()))
+	} else {
+		// Для кампаний без фильтрации показываем обычную статистику
+		if len(result.ExcludePhones) > 0 {
+			response.Warnings = append(response.Warnings,
+				fmt.Sprintf("Исключено %d номеров", len(result.ExcludePhones)))
+		}
 
-	if result.InvalidCount > 0 {
-		response.Warnings = append(response.Warnings,
-			fmt.Sprintf("Пропущено %d невалидных номеров", result.InvalidCount))
+		if result.InvalidCount > 0 {
+			response.Warnings = append(response.Warnings,
+				fmt.Sprintf("Пропущено %d невалидных номеров", result.InvalidCount))
+		}
 	}
 
 	ci.logger.Info("Successfully created campaign", map[string]interface{}{
 		"campaignID":   campaignEntity.ID(),
 		"name":         campaignEntity.Name(),
-		"totalNumbers": result.TotalTargets,
+		"status":       campaignEntity.Status(),
+		"totalNumbers": response.TotalNumbers,
 		"invalidCount": result.InvalidCount,
 		"excludeCount": len(result.ExcludePhones),
 	})
@@ -445,4 +647,13 @@ func (ci *CampaignInteractor) parseMediaFile(file *multipart.FileHeader) ([]byte
 	}
 
 	return data, nil
+}
+
+// getMapKeys возвращает ключи из map для логирования
+func getMapKeys(m map[string]bool) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }

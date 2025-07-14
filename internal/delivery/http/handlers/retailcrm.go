@@ -104,7 +104,6 @@ func (h *RetailCRMHandler) FilterCustomersByCategory(w http.ResponseWriter, r *h
 		"total_customers", ucResponse.TotalCustomers,
 		"results_count", ucResponse.ResultsCount,
 		"should_send_count", ucResponse.ShouldSendCount,
-		"total_matches", ucResponse.TotalMatches,
 	)
 
 	h.presenter.PresentFilterCustomersByCategorySuccess(w, ucResponse)

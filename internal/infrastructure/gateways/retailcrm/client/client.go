@@ -15,7 +15,7 @@ import (
 
 const (
 	// defaultTimeout таймаут по умолчанию для HTTP запросов
-	defaultTimeout = 30 * time.Second
+	defaultTimeout = 60 * time.Second
 
 	// defaultUserAgent User-Agent по умолчанию
 	defaultUserAgent = "WhatsApp-Service/1.0"

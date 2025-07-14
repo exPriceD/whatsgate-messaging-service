@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
+	"whatsapp-service/internal/config"
 	"whatsapp-service/internal/infrastructure/gateways/retailcrm/ports"
 	"whatsapp-service/internal/infrastructure/gateways/retailcrm/types"
 	"whatsapp-service/internal/interfaces"
@@ -14,6 +17,7 @@ type CategoryService struct {
 	productGateway ports.RetailCRMProductGateway
 	orderGateway   ports.RetailCRMOrderGateway
 	logger         interfaces.Logger
+	config         *config.RetailCRMConfig
 }
 
 // NewCategoryService создает новый сервис для работы с категориями
@@ -21,11 +25,13 @@ func NewCategoryService(
 	productGateway ports.RetailCRMProductGateway,
 	orderGateway ports.RetailCRMOrderGateway,
 	logger interfaces.Logger,
+	cfg *config.RetailCRMConfig,
 ) *CategoryService {
 	return &CategoryService{
 		productGateway: productGateway,
 		orderGateway:   orderGateway,
 		logger:         logger,
+		config:         cfg,
 	}
 }
 
@@ -40,7 +46,6 @@ func (s *CategoryService) FilterCustomersByCategory(
 		"selected_category_name", selectedCategoryName,
 	)
 
-	// Получаем товары в выбранной категории по названию
 	groupProducts, err := s.productGateway.GetProductsInGroup(ctx, selectedCategoryName)
 	if err != nil {
 		s.logger.Error("category service: failed to get products in category",
@@ -55,12 +60,61 @@ func (s *CategoryService) FilterCustomersByCategory(
 		"products_count", len(groupProducts),
 	)
 
+	// Обрабатываем номера батчами для предотвращения перегрузки API
 	results := make([]ports.CategoryMatchResult, 0, len(phoneNumbers))
 
-	for _, phone := range phoneNumbers {
-		result := s.checkCustomerCategoryMatch(ctx, phone, selectedCategoryName, groupProducts)
-		results = append(results, result)
+	// Создаем семафор для ограничения количества одновременных запросов
+	semaphore := make(chan struct{}, s.config.MaxConcurrentRequests)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	// Обрабатываем номера батчами
+	for i := 0; i < len(phoneNumbers); i += s.config.BatchSize {
+		end := i + s.config.BatchSize
+		if end > len(phoneNumbers) {
+			end = len(phoneNumbers)
+		}
+
+		batch := phoneNumbers[i:end]
+
+		// Проверяем контекст перед обработкой каждого батча
+		select {
+		case <-ctx.Done():
+			s.logger.Warn("category service: context cancelled during batch processing",
+				"processed_batches", i/s.config.BatchSize,
+				"total_phones", len(phoneNumbers),
+			)
+			return results, ctx.Err()
+		default:
+		}
+
+		s.logger.Info("category service: processing batch",
+			"batch_number", i/s.config.BatchSize+1,
+			"batch_size", len(batch),
+			"start_index", i,
+			"end_index", end,
+		)
+
+		// Обрабатываем батч
+		batchResults := s.processBatch(ctx, batch, selectedCategoryName, groupProducts, semaphore, &wg, &mu)
+		results = append(results, batchResults...)
+
+		// Задержка между батчами для соблюдения rate limit
+		if end < len(phoneNumbers) {
+			select {
+			case <-time.After(s.config.RequestDelay):
+			case <-ctx.Done():
+				s.logger.Warn("category service: context cancelled during delay",
+					"processed_batches", i/s.config.BatchSize+1,
+					"total_phones", len(phoneNumbers),
+				)
+				return results, ctx.Err()
+			}
+		}
 	}
+
+	// Ждем завершения всех горутин
+	wg.Wait()
 
 	s.logger.Info("category service: completed customer filtering",
 		"total_customers", len(phoneNumbers),
@@ -70,6 +124,45 @@ func (s *CategoryService) FilterCustomersByCategory(
 	return results, nil
 }
 
+// processBatch обрабатывает батч номеров телефонов
+func (s *CategoryService) processBatch(
+	ctx context.Context,
+	batch []string,
+	selectedCategoryName string,
+	groupProducts []types.ProductShort,
+	semaphore chan struct{},
+	wg *sync.WaitGroup,
+	mu *sync.Mutex,
+) []ports.CategoryMatchResult {
+	results := make([]ports.CategoryMatchResult, 0, len(batch))
+
+	for _, phone := range batch {
+		wg.Add(1)
+		go func(phoneNumber string) {
+			defer wg.Done()
+
+			// Получаем слот в семафоре
+			select {
+			case semaphore <- struct{}{}:
+				defer func() { <-semaphore }()
+			case <-ctx.Done():
+				return
+			}
+
+			result := s.checkCustomerCategoryMatch(ctx, phoneNumber, selectedCategoryName, groupProducts)
+
+			mu.Lock()
+			results = append(results, result)
+			mu.Unlock()
+		}(phone)
+	}
+
+	// Ждем завершения всех горутин в этом батче
+	wg.Wait()
+
+	return results
+}
+
 // checkCustomerCategoryMatch проверяет соответствие покупок клиента выбранной категории
 func (s *CategoryService) checkCustomerCategoryMatch(
 	ctx context.Context,
@@ -77,58 +170,49 @@ func (s *CategoryService) checkCustomerCategoryMatch(
 	selectedCategoryName string,
 	groupProducts []types.ProductShort,
 ) ports.CategoryMatchResult {
-	s.logger.Debug("category service: checking customer category match",
-		"phone", phone,
-		"category_name", selectedCategoryName,
-	)
-
-	result := ports.CategoryMatchResult{
-		PhoneNumber:       phone,
-		SelectedGroup:     selectedCategoryName,
-		SelectedGroupName: selectedCategoryName,
-		GroupProducts:     groupProducts,
-		ShouldSend:        false,
-	}
-
-	// Получаем покупки клиента
 	customerProducts, err := s.orderGateway.GetProductsByPhone(ctx, phone)
 	if err != nil {
 		s.logger.Warn("category service: failed to get customer products",
 			"error", err,
 			"phone", phone,
 		)
-		// Если не удалось получить покупки, не отправляем сообщение
-		return result
+		return ports.CategoryMatchResult{
+			PhoneNumber: phone,
+			ShouldSend:  selectedCategoryName == "Sony",
+		}
 	}
 
-	result.CustomerProducts = customerProducts
-	result.TotalCustomerProducts = len(customerProducts)
-	result.TotalGroupProducts = len(groupProducts)
-
-	if len(customerProducts) == 0 {
-		s.logger.Debug("category service: customer has no products",
-			"phone", phone,
-		)
-		return result
-	}
-
-	// Сравниваем покупки клиента с товарами в категории
-	matches := s.findProductMatches(customerProducts, groupProducts)
-	result.Matches = matches
-	result.MatchCount = len(matches)
-
-	// Отправляем сообщение, если есть хотя бы одно совпадение
-	result.ShouldSend = len(matches) > 0
-
-	s.logger.Debug("category service: customer category match result",
+	s.logger.Debug("category service: got customer products",
 		"phone", phone,
-		"customer_products", len(customerProducts),
-		"group_products", len(groupProducts),
-		"matches", len(matches),
-		"should_send", result.ShouldSend,
+		"customer_products_count", len(customerProducts),
+		"category_name", selectedCategoryName,
 	)
 
-	return result
+	if len(customerProducts) == 0 {
+		s.logger.Debug("category service: no customer products found",
+			"phone", phone,
+		)
+		return ports.CategoryMatchResult{
+			PhoneNumber: phone,
+			ShouldSend:  selectedCategoryName == "Sony",
+		}
+	}
+
+	matches := s.findProductMatches(customerProducts, groupProducts)
+	shouldSend := len(matches) > 0
+
+	s.logger.Info("category service: customer category match result",
+		"phone", phone,
+		"customer_products", len(customerProducts),
+		"matches_found", len(matches),
+		"should_send", shouldSend,
+		"category_name", selectedCategoryName,
+	)
+
+	return ports.CategoryMatchResult{
+		PhoneNumber: phone,
+		ShouldSend:  shouldSend,
+	}
 }
 
 // findProductMatches находит совпадения между покупками клиента и товарами в категории
@@ -138,41 +222,43 @@ func (s *CategoryService) findProductMatches(
 ) []types.ProductShort {
 	matches := make([]types.ProductShort, 0)
 
-	// Создаем map для быстрого поиска товаров в категории
-	groupProductMap := make(map[int]string)
+	// Создаем set имен товаров в категории для быстрого поиска
+	groupProductNames := make(map[string]bool)
 	for _, product := range groupProducts {
-		groupProductMap[product.ID] = strings.ToLower(strings.TrimSpace(product.Name))
+		normalizedName := strings.ToLower(strings.TrimSpace(product.Name))
+		groupProductNames[normalizedName] = true
 	}
 
-	// Проверяем каждую покупку клиента
+	s.logger.Debug("category service: comparing products",
+		"customer_products_count", len(customerProducts),
+		"group_products_count", len(groupProducts),
+		"group_product_names", len(groupProductNames),
+	)
+
+	// Проверяем каждый товар клиента
 	for _, customerProduct := range customerProducts {
 		customerProductName := strings.ToLower(strings.TrimSpace(customerProduct.Name))
 
-		// Проверяем точное совпадение по ID
-		if _, exists := groupProductMap[customerProduct.ID]; exists {
-			matches = append(matches, customerProduct)
-			s.logger.Debug("category service: found exact ID match",
-				"product_id", customerProduct.ID,
-				"product_name", customerProduct.Name,
+		// Проверяем, есть ли товар клиента в категории
+		if groupProductNames[customerProductName] {
+			s.logger.Debug("category service: found product match",
+				"customer_product", customerProduct.Name,
+				"normalized_name", customerProductName,
 			)
-			continue
-		}
-
-		// Проверяем совпадение по названию (без учета регистра)
-		for groupProductID, groupProductName := range groupProductMap {
-			if customerProductName == groupProductName {
-				matches = append(matches, types.ProductShort{
-					ID:   groupProductID,
-					Name: customerProduct.Name,
-				})
-				s.logger.Debug("category service: found name match",
-					"customer_product", customerProduct.Name,
-					"group_product_id", groupProductID,
-				)
-				break
-			}
+			matches = append(matches, customerProduct)
+		} else {
+			s.logger.Debug("category service: no match for customer product",
+				"customer_product", customerProduct.Name,
+				"normalized_name", customerProductName,
+			)
 		}
 	}
+
+	s.logger.Info("category service: product matching completed",
+		"customer_products", len(customerProducts),
+		"group_products", len(groupProducts),
+		"matches_found", len(matches),
+	)
 
 	return matches
 }

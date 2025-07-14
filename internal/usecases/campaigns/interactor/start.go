@@ -105,6 +105,24 @@ func (ci *CampaignInteractor) validateStart(c *campaign.Campaign) error {
 		})
 		return fmt.Errorf("%w: current status is %s", ErrCannotBeStarted, c.Status())
 	}
+
+	statuses, err := ci.campaignRepo.ListPhoneStatusesByCampaignID(context.Background(), c.ID())
+	if err != nil {
+		ci.logger.Error("Failed to check phone numbers for campaign", map[string]interface{}{
+			"error":      err.Error(),
+			"campaignID": c.ID(),
+		})
+		return fmt.Errorf("%w: %s", ErrGetStatuses, err.Error())
+	}
+
+	if len(statuses) == 0 {
+		ci.logger.Warn("No phone numbers found for campaign", map[string]interface{}{
+			"campaignID": c.ID(),
+			"status":     string(c.Status()),
+		})
+		return fmt.Errorf("campaign cannot be started: no phone numbers found for campaign %s", c.ID())
+	}
+
 	return nil
 }
 
@@ -139,13 +157,6 @@ func (ci *CampaignInteractor) getStartCampaignStatuses(ctx context.Context, camp
 			"campaignID": campaignID,
 		})
 		return nil, fmt.Errorf("%w: %s", ErrGetStatuses, err.Error())
-	}
-
-	if len(statuses) == 0 {
-		ci.logger.Warn("No statuses found for campaign", map[string]interface{}{
-			"campaignID": campaignID,
-		})
-		return nil, fmt.Errorf("no phone numbers found for campaign %s", campaignID)
 	}
 
 	return statuses, nil
@@ -278,12 +289,6 @@ func (ci *CampaignInteractor) processStartResults(ctx context.Context, campaignI
 func (ci *CampaignInteractor) processStartMessageResult(campaignID string, result *infraDTO.MessageSendResult) {
 	ctx := context.Background()
 
-	ci.logger.Debug("Processing message result", map[string]interface{}{
-		"campaignID":  campaignID,
-		"phoneNumber": result.PhoneNumber,
-		"success":     result.Success,
-	})
-
 	var newStatus campaign.CampaignStatusType
 	var errMsg string
 
@@ -335,13 +340,6 @@ func (ci *CampaignInteractor) processStartMessageResult(campaignID string, resul
 			})
 		}
 	}
-
-	ci.logger.Debug("Message result processed successfully", map[string]interface{}{
-		"campaignID":  campaignID,
-		"phoneNumber": result.PhoneNumber,
-		"success":     result.Success,
-		"status":      newStatus,
-	})
 }
 
 // finalizeStartCampaignStatus обновляет финальный статус кампании в БД
@@ -380,13 +378,6 @@ func (ci *CampaignInteractor) finalizeStartCampaignStatus(campaignID string, was
 		// Обновляем метрики в entity
 		c.Metrics().Processed = processedCount
 		c.Metrics().Errors = errorCount
-
-		ci.logger.Debug("Updated campaign metrics", map[string]interface{}{
-			"campaignID":     campaignID,
-			"processedCount": processedCount,
-			"errorCount":     errorCount,
-			"totalStatuses":  len(statuses),
-		})
 	}
 
 	if wasCancelled {

@@ -127,11 +127,6 @@ func (s *ProductService) collectProductsInGroup(ctx context.Context, groupID int
 			"page":             page,
 		}
 
-		s.logger.Debug("product service: making API request",
-			"endpoint", "store/products",
-			"params", params,
-			"page", page)
-
 		resp, err := s.client.Get(ctx, "store/products", params)
 		if err != nil {
 			s.logger.Error("product service: failed to get products in group",
@@ -141,10 +136,6 @@ func (s *ProductService) collectProductsInGroup(ctx context.Context, groupID int
 			)
 			return fmt.Errorf("failed to get products in group %d: %w", groupID, err)
 		}
-
-		s.logger.Debug("product service: received API response",
-			"response_length", len(resp),
-			"response_preview", string(resp[:min(200, len(resp))]))
 
 		var raw map[string]any
 		if err := json.Unmarshal(resp, &raw); err != nil {
@@ -198,12 +189,4 @@ func (s *ProductService) collectProductsInGroup(ctx context.Context, groupID int
 	}
 
 	return nil
-}
-
-// min возвращает минимальное из двух чисел
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

@@ -10,6 +10,7 @@ import (
 	_ "whatsapp-service/docs"
 	"whatsapp-service/internal/delivery/http/handlers"
 	customMiddleware "whatsapp-service/internal/delivery/http/middleware"
+	"whatsapp-service/internal/interfaces"
 )
 
 // Router обрабатывает HTTP маршрутизацию и настройку middleware
@@ -20,6 +21,7 @@ type Router struct {
 	retailcrmSettings *handlers.RetailCRMSettingsHandler
 	health            *handlers.HealthHandler
 	retailcrm         *handlers.RetailCRMHandler
+	logger            interfaces.Logger
 }
 
 // NewRouter создает новый роутер со всеми обработчиками
@@ -30,6 +32,7 @@ func NewRouter(
 	retailcrmSettingsHandler *handlers.RetailCRMSettingsHandler,
 	healthHandler *handlers.HealthHandler,
 	retailcrmHandler *handlers.RetailCRMHandler,
+	logger interfaces.Logger,
 ) *Router {
 	return &Router{
 		campaigns:         campaignHandler,
@@ -38,6 +41,7 @@ func NewRouter(
 		retailcrmSettings: retailcrmSettingsHandler,
 		health:            healthHandler,
 		retailcrm:         retailcrmHandler,
+		logger:            logger,
 	}
 }
 
@@ -49,7 +53,7 @@ func (rt *Router) SetupRoutes() http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(customMiddleware.CORS)
-	r.Use(customMiddleware.Logging)
+	r.Use(customMiddleware.Logging(rt.logger))
 
 	// Health check endpoints - no versioning
 	r.Get("/health", rt.health.Check)

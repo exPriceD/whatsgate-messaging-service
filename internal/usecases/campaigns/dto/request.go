@@ -14,6 +14,7 @@ type CreateCampaignRequest struct {
 	Initiator            string                // Инициатор кампании
 	Async                bool                  // Асинхронное выполнение
 	SelectedCategoryName string                // Название выбранной категории для фильтрации (пустая строка = без фильтрации)
+	AutoStartAfterFilter bool                  // Автоматически запустить после фильтрации
 }
 
 // StartCampaignRequest представляет запрос на запуск кампании

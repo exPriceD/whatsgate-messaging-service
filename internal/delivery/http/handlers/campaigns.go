@@ -218,6 +218,7 @@ func (h *CampaignsHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *CampaignsHandler) parseCreateRequest(r *http.Request) (httpDTO.CreateCampaignRequest, error) {
 	messagesPerHour := parseIntDefault(r.FormValue("messages_per_hour"), 60)
 	selectedCategoryName := r.FormValue("selected_category_name")
+	autoStartAfterFilter := r.FormValue("auto_start_after_filter") == "on"
 
 	return httpDTO.CreateCampaignRequest{
 		Name:                 r.FormValue("name"),
@@ -227,6 +228,7 @@ func (h *CampaignsHandler) parseCreateRequest(r *http.Request) (httpDTO.CreateCa
 		MessagesPerHour:      messagesPerHour,
 		Initiator:            r.FormValue("initiator"),
 		SelectedCategoryName: selectedCategoryName,
+		AutoStartAfterFilter: autoStartAfterFilter,
 	}, nil
 }
 

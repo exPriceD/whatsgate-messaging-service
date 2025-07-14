@@ -29,7 +29,7 @@ func NewHTTPServer(
 	healthHandler *handlers.HealthHandler,
 	logger interfaces.Logger,
 ) *HTTPServer {
-	router := NewRouter(campaignHandler, messagingHandler, whatsgateSettingsHandler, retailCRMSettingsHandler, healthHandler, retailCRMHandler)
+	router := NewRouter(campaignHandler, messagingHandler, whatsgateSettingsHandler, retailCRMSettingsHandler, healthHandler, retailCRMHandler, logger)
 
 	return &HTTPServer{
 		router: router,
@@ -37,9 +37,9 @@ func NewHTTPServer(
 		server: &http.Server{
 			Addr:         fmt.Sprintf(":%d", port),
 			Handler:      router.SetupRoutes(),
-			ReadTimeout:  15 * time.Second,
-			WriteTimeout: 15 * time.Second,
-			IdleTimeout:  60 * time.Second,
+			ReadTimeout:  60 * time.Second,
+			WriteTimeout: 60 * time.Second,
+			IdleTimeout:  120 * time.Second,
 		},
 	}
 }

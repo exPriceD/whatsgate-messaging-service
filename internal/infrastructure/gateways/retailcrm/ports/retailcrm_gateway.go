@@ -31,17 +31,8 @@ type RetailCRMCategoryGateway interface {
 
 // CategoryMatchResult представляет результат сравнения категории клиента с выбранной категорией
 type CategoryMatchResult struct {
-	PhoneNumber           string               `json:"phone_number"`
-	CustomerName          string               `json:"customer_name,omitempty"`
-	SelectedGroup         string               `json:"selected_group"`
-	SelectedGroupName     string               `json:"selected_group_name"`
-	CustomerProducts      []types.ProductShort `json:"customer_products"`
-	GroupProducts         []types.ProductShort `json:"group_products"`
-	Matches               []types.ProductShort `json:"matches"`
-	ShouldSend            bool                 `json:"should_send"`
-	MatchCount            int                  `json:"match_count"`
-	TotalCustomerProducts int                  `json:"total_customer_products"`
-	TotalGroupProducts    int                  `json:"total_group_products"`
+	PhoneNumber string `json:"phone_number"`
+	ShouldSend  bool   `json:"should_send"`
 }
 
 // RetailCRMGateway объединяет все интерфейсы RetailCRM

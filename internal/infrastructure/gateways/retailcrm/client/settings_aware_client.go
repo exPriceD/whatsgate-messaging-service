@@ -16,13 +16,13 @@ import (
 
 const (
 	// defaultCacheTTL время жизни кэша для настроек
-	defaultCacheTTL = 5 * time.Minute
+	defaultCacheTTL = 1 * time.Minute
 
 	// defaultRequestTimeout таймаут для HTTP запросов
-	defaultRequestTimeout = 30 * time.Second
+	defaultRequestTimeout = 60 * time.Second
 
 	// maxRetries максимальное количество попыток
-	maxRetries = 3
+	maxRetries = 2
 
 	// retryDelay задержка между попытками
 	retryDelay = 1 * time.Second
