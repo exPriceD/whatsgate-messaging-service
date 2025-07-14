@@ -171,15 +171,12 @@ func (ci *CampaignInteractor) processCategoryFilteringAsync(campaignID string, r
 		return
 	}
 
+	// Сохраняем статусы номеров (только если есть номера)
 	if result.TotalTargets > 0 {
-		statuses := make([]*campaign.CampaignPhoneStatus, 0, result.TotalTargets)
+		targetNumbers := campaignEntity.Audience().AllTargets()
+		statuses := make([]*campaign.CampaignPhoneStatus, 0, len(targetNumbers))
 
-		for _, phone := range result.FilePhones {
-			status := campaign.NewCampaignStatus(campaignID, phone.Value())
-			statuses = append(statuses, status)
-		}
-
-		for _, phone := range result.AdditionalPhones {
+		for _, phone := range targetNumbers {
 			status := campaign.NewCampaignStatus(campaignID, phone.Value())
 			statuses = append(statuses, status)
 		}
@@ -337,12 +334,11 @@ func (ci *CampaignInteractor) filterByCategory(ctx context.Context, result *Phon
 
 	result.FilePhones = filteredFilePhones
 	result.AdditionalPhones = filteredAdditionalPhones
-	result.TotalTargets = len(filteredFilePhones) + len(filteredAdditionalPhones)
+	// TotalTargets будет рассчитан в addNumbersToCampaign после применения исключения номеров
 
 	ci.logger.Info("campaign interactor: phone numbers filtered by category",
 		"category_name", categoryName,
 		"original_total", len(allPhones),
-		"filtered_total", result.TotalTargets,
 		"filtered_file_phones", len(filteredFilePhones),
 		"filtered_additional_phones", len(filteredAdditionalPhones),
 	)
