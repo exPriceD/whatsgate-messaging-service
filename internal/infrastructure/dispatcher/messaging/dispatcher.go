@@ -66,7 +66,12 @@ func (d *Dispatcher) Stop(ctx context.Context) error {
 	case <-done:
 		return nil
 	case <-ctx.Done():
-		return ctx.Err()
+		select {
+		case <-done:
+			return nil
+		case <-time.After(5 * time.Second):
+			return ctx.Err()
+		}
 	}
 }
 
@@ -84,7 +89,6 @@ func (d *Dispatcher) Submit(ctx context.Context, newJob *dto.DispatcherJob) (<-c
 
 	select {
 	case d.jobsChan <- req:
-		// Ждем ответа от run(), была ли принята работа
 		select {
 		case err := <-errChan:
 			if err != nil {
@@ -114,7 +118,6 @@ func (d *Dispatcher) run(ctx context.Context) {
 			d.handleShutdown()
 			return
 		case req := <-d.jobsChan:
-			d.logger.Debug("Dispatcher received job request", zap.String("campaignID", req.job.CampaignID))
 			d.addJob(req)
 			req.errChan <- nil // Сигнализируем, что работа принята
 		case <-ticker.C:
@@ -174,8 +177,6 @@ func (d *Dispatcher) processNextMessage(ctx context.Context) {
 	message := queue.Remove(msgElement).(*dto.Message)
 	d.mu.Unlock()
 
-	d.logger.Debug("Processing message", zap.String("campaignID", campaignID), zap.String("phoneNumber", message.PhoneNumber), zap.Int("remainingInQueue", queue.Len()))
-
 	// --- Длительные операции ---
 	if err := d.limiter.WaitForCampaign(ctx, campaignID); err != nil {
 		d.logger.Error("Campaign rate limiter wait error", zap.Error(err), zap.String("campaignID", campaignID))
@@ -192,7 +193,6 @@ func (d *Dispatcher) processNextMessage(ctx context.Context) {
 
 	if resultsChan, ok := d.resultsChans[campaignID]; ok {
 		resultsChan <- result
-		d.logger.Debug("Result sent to channel", zap.String("campaignID", campaignID), zap.String("phoneNumber", result.PhoneNumber), zap.Bool("success", result.Success))
 	} else {
 		d.logger.Warn("No results channel found for campaign", zap.String("campaignID", campaignID))
 	}
