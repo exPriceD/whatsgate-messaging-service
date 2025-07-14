@@ -27,8 +27,14 @@ database:
   max_attempt_connection: 3
 
 logging:
-  level: "debug"
+  level: "info"
   format: "console"
   output_path: "stdout"
   service: "whatsapp-service"
   env: "dev"
+
+retailcrm:
+  batch_size: 50
+  max_concurrent_requests: 5
+  request_delay: "200ms"
+  request_timeout: "60s"
