@@ -1,18 +1,19 @@
 package zaplogger
 
 import (
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"os"
 	"strings"
 	"time"
 	"whatsapp-service/internal/interfaces"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	"whatsapp-service/internal/config"
 )
 
 type zapAdapter struct {
-	sugar *zap.SugaredLogger
+	logger *zap.Logger
 }
 
 var (
@@ -27,57 +28,66 @@ func New(cfg config.LoggingConfig) (interfaces.Logger, error) {
 		return nil, err
 	}
 
-	sugar := coreLogger.Sugar()
-	return &zapAdapter{sugar: sugar}, nil
+	return &zapAdapter{logger: coreLogger}, nil
 }
 
 // Info logs a message at InfoLevel.
 func (l *zapAdapter) Info(msg string, fields ...any) {
-	l.sugar.Infow(msg, l.convertFields(fields)...)
+	l.logger.WithOptions(zap.AddCallerSkip(1)).Info(msg, l.convertFields(fields)...)
 }
 
 // Warn logs a message at WarnLevel.
 func (l *zapAdapter) Warn(msg string, fields ...any) {
-	l.sugar.Warnw(msg, l.convertFields(fields)...)
+	l.logger.WithOptions(zap.AddCallerSkip(1)).Warn(msg, l.convertFields(fields)...)
 }
 
 // Error logs a message at ErrorLevel.
 func (l *zapAdapter) Error(msg string, fields ...any) {
-	l.sugar.Errorw(msg, l.convertFields(fields)...)
+	l.logger.WithOptions(zap.AddCallerSkip(1)).Error(msg, l.convertFields(fields)...)
 }
 
 // Debug logs a message at DebugLevel.
 func (l *zapAdapter) Debug(msg string, fields ...any) {
-	l.sugar.Debugw(msg, l.convertFields(fields)...)
+	l.logger.WithOptions(zap.AddCallerSkip(1)).Debug(msg, l.convertFields(fields)...)
 }
 
 // With returns a child logger with structured context.
 func (l *zapAdapter) With(fields ...any) interfaces.Logger {
-	return &zapAdapter{sugar: l.sugar.With(l.convertFields(fields)...)}
+	return &zapAdapter{logger: l.logger.With(l.convertFields(fields)...)}
 }
 
 // convertFields преобразует различные форматы полей в формат zap
-func (l *zapAdapter) convertFields(fields []any) []any {
+func (l *zapAdapter) convertFields(fields []any) []zap.Field {
 	if len(fields) == 0 {
-		return fields
+		return nil
 	}
+
+	var zapFields []zap.Field
 
 	if len(fields) == 1 {
 		if fieldMap, ok := fields[0].(map[string]interface{}); ok {
-			result := make([]any, 0, len(fieldMap)*2)
+			zapFields = make([]zap.Field, 0, len(fieldMap))
 			for key, value := range fieldMap {
-				result = append(result, key, value)
+				zapFields = append(zapFields, zap.Any(key, value))
 			}
-			return result
+			return zapFields
 		}
 	}
 
-	return fields
+	for i := 0; i < len(fields); i += 2 {
+		if i+1 < len(fields) {
+			if key, ok := fields[i].(string); ok {
+				zapFields = append(zapFields, zap.Any(key, fields[i+1]))
+			}
+		}
+	}
+
+	return zapFields
 }
 
 // Sync flushes any buffered log entries.
 func (l *zapAdapter) Sync() {
-	_ = l.sugar.Sync()
+	_ = l.logger.Sync()
 }
 
 // SetLevel changes log level at runtime.
@@ -117,7 +127,7 @@ func buildDevelopmentConfig() zapcore.EncoderConfig {
 	config := zap.NewDevelopmentEncoderConfig()
 	config.EncodeLevel = zapcore.CapitalColorLevelEncoder           // Цветные уровни логов
 	config.EncodeTime = zapcore.TimeEncoderOfLayout("15:04:05.000") // Короткое время
-	config.EncodeCaller = zapcore.ShortCallerEncoder                // Короткий путь к файлу
+	config.EncodeCaller = zapcore.FullCallerEncoder                 // Полный путь к файлу
 	config.ConsoleSeparator = " | "
 	return config
 }
@@ -131,6 +141,7 @@ func buildProductionConfig() zapcore.EncoderConfig {
 	config.LevelKey = "level"
 	config.CallerKey = "caller"
 	config.StacktraceKey = "stacktrace"
+	config.EncodeCaller = zapcore.FullCallerEncoder // Полный путь к файлу
 	return config
 }
 
@@ -157,7 +168,6 @@ func buildZap(cfg config.LoggingConfig) (*zap.Logger, error) {
 
 	atomicLevel = zap.NewAtomicLevel()
 
-	// Автоматическая настройка уровня логирования по окружению
 	if cfg.Level == "" {
 		if isDev {
 			cfg.Level = "debug"
@@ -185,7 +195,6 @@ func buildZap(cfg config.LoggingConfig) (*zap.Logger, error) {
 
 	core := zapcore.NewCore(encoder, syncer, atomicLevel)
 
-	// Для продакшена добавляем сэмплинг для высоконагруженных приложений
 	if !isDev {
 		core = zapcore.NewSamplerWithOptions(core, time.Second, 100, 100)
 	}
@@ -194,7 +203,6 @@ func buildZap(cfg config.LoggingConfig) (*zap.Logger, error) {
 		zap.AddCaller(),
 	}
 
-	// Стэктрейсы только для Error+ в продакшене, для всех уровней в dev
 	if isDev {
 		options = append(options, zap.AddStacktrace(zapcore.WarnLevel))
 		options = append(options, zap.Development())
@@ -206,7 +214,6 @@ func buildZap(cfg config.LoggingConfig) (*zap.Logger, error) {
 
 	coreLogger := zap.New(core, options...)
 
-	// Добавляем контекстные поля
 	if cfg.Service != "" {
 		coreLogger = coreLogger.With(zap.String("service", cfg.Service))
 	}
